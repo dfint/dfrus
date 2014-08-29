@@ -1,8 +1,8 @@
 
 import struct
 from collections import namedtuple
-
 from binio import *
+import bisect
 
 # IMAGE_DOS_HEADER
 MZ_SIGNATURE = 0x00
@@ -91,3 +91,81 @@ def get_section_table(fn, pe = None):
     return [Section._make(struct.unpack('<8s6L2HL', fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
             for i in range(n)]
 
+def put_section_info(fn, off, section):
+    pass
+
+IMAGE_SCN_CNT_CODE                  = 0x00000020
+IMAGE_SCN_CNT_INITIALIZED_DATA      = 0x00000040
+IMAGE_SCN_CNT_UNINITIALIZED_DATA    = 0x00000080
+IMAGE_SCN_MEM_DISCARDABLE           = 0x02000000
+IMAGE_SCN_MEM_SHARED                = 0x10000000
+IMAGE_SCN_MEM_EXECUTE               = 0x20000000
+IMAGE_SCN_MEM_READ                  = 0x40000000
+IMAGE_SCN_MEM_WRITE                 = 0x80000000
+
+def rva_to_off(rva, section_table):
+    pass
+
+def rva_to_off_ex(rva, section):
+    return rva + section.physical_offset - section.rva
+
+def off_to_rva(off, section_table):
+    pass
+
+def off_to_rva_ex(off, section):
+    return rva - section.phisical_offset + section.rva
+
+IMAGE_REL_BASED_ABSOLUTE = 0
+IMAGE_REL_BASED_HIGHLOW  = 3
+
+def get_reloc_table(fn, offset, reloc_size):
+    reloc_table = dict()
+    cur_off = 0
+    fn.seek(offset)
+    while cur_off<reloc_size:
+        cur_page = get_integer32(fn)
+        bloc_size = get_integer32(fn)
+        assert(block_size % 4 == 0)
+        relocs = get_words(fn, (bloc_size-8)//8)
+        reloc_table[cur_page] = relocs
+        cur_off += block_size
+    return reloc_table
+
+def table_to_relocs(reloc_table):
+    relocs = set()
+    for cur_page in roloc_table:
+        for record in reloc_table[cur_page]:
+            if record & 0x3000 == IMAGE_REL_BASED_HIGHLOW << 12:
+                relocs.add(cur_page | (record & 0x0FFF))
+    return relocs
+
+def get_relocations(fn, sections = None):
+    dd = get_data_directory(fn)
+    if sections is None:
+        sections = get_section_table(fn)
+    reloc_off = rva_to_off(dd[DD_BASERELOC][1], sections)
+    reloc_size = dd[DD_BASERELOC][2]
+    return table_to_relocs( get_reloc_table(fn, reloc_off, reloc_size ) )
+
+def relocs_to_table(relocs):
+    reloc_table = dict()
+    cur_page = 0
+    padding_words = 0
+    for item in relocs:
+        page = item & 0xFFFFF000
+        off  = item & 0x00000FFF
+        if page not in reloc_table:
+            reloc_table[page] = []
+        bisect.insort(reloc_table[page], off)
+    reloc_table_size = length(reloc_table)*8 + (length(relocs)+padding_words)*2
+    return reloc_table_size, reloc_table
+
+def write_relocation_table(fn, offset, reloc_table):
+    fn.seek(offset)
+    for page in sorted(reloc_table):
+        if len(reloc_table[page]) % 2 == 1:
+            reloc_table[page].append(IMAGE_REL_BASED_ABSOLUTE << 12 + 0)
+        records = reloc_table[page]
+        block_size = len(records)*2 + 8
+        write_dwords(fn, [page, block_size])
+        write_words(fn, records)
