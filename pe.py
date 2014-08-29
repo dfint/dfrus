@@ -104,13 +104,33 @@ IMAGE_SCN_MEM_READ                  = 0x40000000
 IMAGE_SCN_MEM_WRITE                 = 0x80000000
 
 def rva_to_off(rva, section_table):
-    pass
+    lo = 0
+    hi = len(section_table)-1
+    while lo <= hi:
+        mid = (lo+hi)//2
+        local_offset = rva - section_table[mid].rva
+        if loc < 0:
+            hi = mid-1
+        elif loc < section_table[mid].virtual_size:
+            return local_offset + section_table[mid].phisical_offset
+        else:
+            lo = mid+1
 
 def rva_to_off_ex(rva, section):
     return rva + section.physical_offset - section.rva
 
 def off_to_rva(off, section_table):
-    pass
+    lo = 0
+    hi = len(section_table)-1
+    while lo <= hi:
+        mid = (lo+hi)//2
+        local_offset = off - section_table[mid].phisical_offset
+        if loc < 0:
+            hi = mid-1
+        elif loc < section_table[mid].phisical_size:
+            return local_offset + section_table[mid].rva
+        else:
+            lo = mid+1
 
 def off_to_rva_ex(off, section):
     return rva - section.phisical_offset + section.rva
