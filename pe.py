@@ -112,7 +112,7 @@ def rva_to_off(rva, section_table):
         if loc < 0:
             hi = mid-1
         elif loc < section_table[mid].virtual_size:
-            return local_offset + section_table[mid].phisical_offset
+            return local_offset + section_table[mid].physical_offset
         else:
             lo = mid+1
 
@@ -124,16 +124,16 @@ def off_to_rva(off, section_table):
     hi = len(section_table)-1
     while lo <= hi:
         mid = (lo+hi)//2
-        local_offset = off - section_table[mid].phisical_offset
+        local_offset = off - section_table[mid].physical_offset
         if loc < 0:
             hi = mid-1
-        elif loc < section_table[mid].phisical_size:
+        elif loc < section_table[mid].physical_size:
             return local_offset + section_table[mid].rva
         else:
             lo = mid+1
 
 def off_to_rva_ex(off, section):
-    return rva - section.phisical_offset + section.rva
+    return rva - section.physical_offset + section.rva
 
 IMAGE_REL_BASED_ABSOLUTE = 0
 IMAGE_REL_BASED_HIGHLOW  = 3
