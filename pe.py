@@ -80,8 +80,8 @@ def get_data_directory(fn):
 
 SIZEOF_IMAGE_SECTION_HEADER = 0x28
 
-Section = namedtuple('Section', ['name', 'virtual_size', 'rva', 'physical_size', 'physical_offset',
-                                '-', '-', '-', '-', 'flags'], rename = True)
+Section = namedtuple('Section', ['name', 'virtual_size', 'rva', 'physical_size', 
+    'physical_offset', '-', '-', '-', '-', 'flags'], rename = True)
 
 def get_section_table(fn, pe = None):
     if pe is None:
@@ -91,8 +91,9 @@ def get_section_table(fn, pe = None):
     return [Section._make(struct.unpack('<8s6L2HL', fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
             for i in range(n)]
 
-def put_section_info(fn, off, section):
-    pass
+def put_section_info(fn, off, sect_info):
+    fn.seek(off)
+    fn.write(struct.pack('<8s6L2HL',sect_info))
 
 IMAGE_SCN_CNT_CODE                  = 0x00000020
 IMAGE_SCN_CNT_INITIALIZED_DATA      = 0x00000040
