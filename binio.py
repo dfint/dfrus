@@ -62,7 +62,7 @@ class TestFileObject(object):
         
     def read(self, n):
         self.position += n
-        return [int(random.random()*256) for i in range(n)]
+        return bytes(int(random.random()*256) for i in range(n))
     
     def write(self, s):
         print('Writing %d bytes at position 0x%X:' % (len(s),self.position))

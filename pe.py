@@ -57,7 +57,7 @@ SIZEOF_DATA_DIRECTORY       = 0x08,
 SIZEOF_PE_HEADER            = 0xF8
 
 def check_pe(fn):
-    if fpeek(fn, MZ.SIGNATURE, 2) != b'MZ':
+    if fpeek(fn, MZ_SIGNATURE, 2) != b'MZ':
         return None
     pe_header_offset = fpeek4u(fn, MZ_LFANEW)
     if fpeek(fn, pe_header_offset + PE_SIGNATURE, 4) != b'PE\0\0':
@@ -190,3 +190,24 @@ def write_relocation_table(fn, offset, reloc_table):
         block_size = len(records)*2 + 8
         write_dwords(fn, [page, block_size])
         write_words(fn, records)
+
+class TestPeObject(TestFileObject):
+    file_structure = {
+        MZ_SIGNATURE:b'MZ',
+        MZ_LFANEW:0x100.to_bytes(4,byteorder='little'),
+        0x100:b'PE\0\0'
+    }
+    def read(self, n):
+        if self.position in self.file_structure:
+            if n<=len(self.file_structure[self.position]):
+                return self.file_structure[self.position][:n]
+            else:
+                l = len(self.file_structure[self.position])
+                return self.file_structure[self.position] + super(Child, self).read(n)
+        else:
+            return super(Child, self).read(n)
+            
+if __name__ == "__main__":
+    fn = TestPeObject()
+    print(check_pe(fn))
+    
