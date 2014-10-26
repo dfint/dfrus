@@ -55,6 +55,16 @@ def fpeek2u(file_object, off, count = 1):
         file_object.seek(off)
         return [get_integer16(file_object) for i in range(count)]
 
+import collections
+
+def fpoke4(file_object, off, x):
+    if isinstance(x, collections.Iterable):
+        file_object.seek(off)
+        write_dwords(file_object, x)
+    else:
+        file_object.seek(off)
+        put_integer32(file_object, x)
+
 import random
 class TestFileObject(object):
     def __init__(self):
