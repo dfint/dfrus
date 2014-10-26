@@ -11,6 +11,9 @@ def put_integer32(file_object, val):
 def put_integer16(file_object, val):
     file_object.write(val.to_bytes(2, byteorder='little'))
 
+def put_integer8(file_object, val):
+    file_object.write(val.to_bytes(1, byteorder='little'))
+
 def fpeek(file_object, off, count = 1):
     if count == 1:
         file_object.seek(off)
@@ -75,9 +78,11 @@ class TestFileObject(object):
 
 if __name__ == "__main__":
     fn = TestFileObject()
+    # fn = open("test.bin","r+b")
     put_integer32(fn, 0xDEADBEEF)
     put_integer16(fn, 0xBAAD)
     put_integer8(fn, 0xAB)
     write_string(fn, "1234")
-    print(get_dwords(fn,3))
+    # fn.seek(0)
+    print(get_dwords(fn,2))
     print(get_words(fn,3))
