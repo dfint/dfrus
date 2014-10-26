@@ -199,11 +199,11 @@ class TestPeObject(TestFileObject):
     }
     def read(self, n):
         if self.position in self.file_structure:
-            if n<=len(self.file_structure[self.position]):
-                return self.file_structure[self.position][:n]
+            item_at_pos = self.file_structure[self.position]
+            if n<=len(item_at_pos):
+                return item_at_pos[:n]
             else:
-                l = len(self.file_structure[self.position])
-                return self.file_structure[self.position] + super(Child, self).read(n)
+                return item_at_pos + super(Child, self).read(n-len(item_at_pos))
         else:
             return super(Child, self).read(n)
             
