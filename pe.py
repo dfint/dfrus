@@ -208,6 +208,5 @@ class TestPeObject(TestFileObject):
             return super(Child, self).read(n)
             
 if __name__ == "__main__":
-    fn = TestPeObject()
-    print(check_pe(fn))
-    
+    assert(check_pe(TestFileObject()) is None)
+    assert(check_pe(TestPeObject()) is not None)
