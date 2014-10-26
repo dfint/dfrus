@@ -9,10 +9,7 @@ def put_integer32(file_object, val):
     file_object.write(val.to_bytes(4, byteorder='little'))
     
 def put_integer16(file_object, val):
-    file_object.write(val.to_bytes(2, byteorder='little'))    
-    
-def put_integer8(file_object, val):
-    file_object.write(val.to_bytes(1, byteorder='little'))
+    file_object.write(val.to_bytes(2, byteorder='little'))
 
 def fpeek(file_object, off, count = 1):
     if count == 1:
@@ -55,24 +52,32 @@ def fpeek2u(file_object, off, count = 1):
         file_object.seek(off)
         return [get_integer16(file_object) for i in range(count)]
 
-if __name__ == "__main__":
-    import sys
-    import random
-    class TestFileObject(object):
-        def read(self, n):
-            return [int(random.random()*256) for i in range(n)]
+import random
+class TestFileObject(object):
+    def __init__(self):
+        self.position = 0
         
-        def seek(self, n):
-            pass
-    put_integer32(sys.stdout, 0x30313233)
-    print()
-    put_integer16(sys.stdout, 0x3435)
-    print()
-    put_integer8(sys.stdout, 0x36)
-    print()
-    write_string(sys.stdout, "123")
-    print()
+    def read(self, n):
+        self.position += n
+        return [int(random.random()*256) for i in range(n)]
+    
+    def write(self, s):
+        print('Writing %d bytes at position 0x%X:' % (len(s),self.position))
+        print(' '.join('0x%02X' % x for x in s))
+        self.position += len(s)
+    
+    def seek(self, n):
+        self.position = n
+        return n
+        
+    def tell(self):
+        return self.position
+
+if __name__ == "__main__":
     fn = TestFileObject()
+    put_integer32(fn, 0xDEADBEEF)
+    put_integer16(fn, 0xBAAD)
+    put_integer8(fn, 0xAB)
+    write_string(fn, "1234")
     print(get_dwords(fn,3))
-    print()
     print(get_words(fn,3))
