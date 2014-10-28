@@ -210,3 +210,5 @@ class TestPeObject(TestFileObject):
 if __name__ == "__main__":
     assert(check_pe(TestFileObject()) is None)
     assert(check_pe(TestPeObject()) is not None)
+    assert(len(TestPeObject().read(10))==10)
+    
