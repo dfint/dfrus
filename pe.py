@@ -203,9 +203,9 @@ class TestPeObject(TestFileObject):
             if n<=len(item_at_pos):
                 return item_at_pos[:n]
             else:
-                return item_at_pos + super(TestPeObject, self).read(n-len(item_at_pos))
+                return item_at_pos + super().read(n-len(item_at_pos))
         else:
-            return super(TestPeObject, self).read(n)
+            return super().read(n)
             
 if __name__ == "__main__":
     assert(check_pe(TestFileObject()) is None)
