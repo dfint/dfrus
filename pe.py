@@ -27,33 +27,33 @@ PE_MINOR_LINKER_VER         = 0x1B
 PE_SIZE_OF_CODE             = 0x1C
 PE_SIZE_OF_INIT_DATA        = 0x20
 PE_SIZE_OF_UNINIT_DATA      = 0x24
-PE_ENTRY_POINT_RVA          = 0x28, # !
-PE_BASE_OF_CODE             = 0x2C,
-PE_BASE_OF_DATA             = 0x30,
-PE_IMAGE_BASE               = 0x34, # !
-PE_SECTION_ALIGNMENT        = 0x38,
-PE_FILE_ALIGNMENT           = 0x3C,
-PE_MAJOR_OS_VER             = 0x40,
-PE_MINOR_OS_VER             = 0x42,
-PE_MAJOR_IMAGE_VER          = 0x44,
-PE_MINOR_IMAGE_VER          = 0x46,
-PE_MAJOR_SUBSYS_VER         = 0x48,
-PE_MINOR_SUBSYS_VER         = 0x4A,
-PE_WIN32_VER                = 0x4C,
-PE_SIZE_OF_IMAGE            = 0x50,
-PE_SIZE_OF_HEADER           = 0x54,
-PE_CHECKSUM                 = 0x58,
-PE_SUBSYSTEM                = 0x5C, # !
-PE_DLL_CHARACTERISTICS      = 0x5E,
-PE_SIZE_OF_STACK_RESERVE    = 0x60,
-PE_SIZE_OF_STACK_COMMIT     = 0x64,
-PE_SIZE_OF_HEAP_RESERVE     = 0x68,
-PE_SIZE_OF_HEAP_COMMIT      = 0x6C,
-PE_LOADER_FLAGS             = 0x70,
-PE_NUMBER_OF_RVA_AND_SIZES  = 0x74, # reserved
-PE_DATA_DIRECTORY           = 0x78,
-IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16,
-SIZEOF_DATA_DIRECTORY       = 0x08,
+PE_ENTRY_POINT_RVA          = 0x28 # !
+PE_BASE_OF_CODE             = 0x2C
+PE_BASE_OF_DATA             = 0x30
+PE_IMAGE_BASE               = 0x34 # !
+PE_SECTION_ALIGNMENT        = 0x38
+PE_FILE_ALIGNMENT           = 0x3C
+PE_MAJOR_OS_VER             = 0x40
+PE_MINOR_OS_VER             = 0x42
+PE_MAJOR_IMAGE_VER          = 0x44
+PE_MINOR_IMAGE_VER          = 0x46
+PE_MAJOR_SUBSYS_VER         = 0x48
+PE_MINOR_SUBSYS_VER         = 0x4A
+PE_WIN32_VER                = 0x4C
+PE_SIZE_OF_IMAGE            = 0x50
+PE_SIZE_OF_HEADER           = 0x54
+PE_CHECKSUM                 = 0x58
+PE_SUBSYSTEM                = 0x5C # !
+PE_DLL_CHARACTERISTICS      = 0x5E
+PE_SIZE_OF_STACK_RESERVE    = 0x60
+PE_SIZE_OF_STACK_COMMIT     = 0x64
+PE_SIZE_OF_HEAP_RESERVE     = 0x68
+PE_SIZE_OF_HEAP_COMMIT      = 0x6C
+PE_LOADER_FLAGS             = 0x70
+PE_NUMBER_OF_RVA_AND_SIZES  = 0x74 # reserved
+PE_DATA_DIRECTORY           = 0x78
+IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16
+SIZEOF_DATA_DIRECTORY       = 0x08
 SIZEOF_PE_HEADER            = 0xF8
 
 def check_pe(fn):
@@ -110,9 +110,9 @@ def rva_to_off(rva, section_table):
     while lo <= hi:
         mid = (lo+hi)//2
         local_offset = rva - section_table[mid].rva
-        if loc < 0:
+        if local_offset < 0:
             hi = mid-1
-        elif loc < section_table[mid].virtual_size:
+        elif local_offset < section_table[mid].virtual_size:
             return local_offset + section_table[mid].physical_offset
         else:
             lo = mid+1
@@ -126,36 +126,36 @@ def off_to_rva(off, section_table):
     while lo <= hi:
         mid = (lo+hi)//2
         local_offset = off - section_table[mid].physical_offset
-        if loc < 0:
+        if local_offset < 0:
             hi = mid-1
-        elif loc < section_table[mid].physical_size:
+        elif local_offset < section_table[mid].physical_size:
             return local_offset + section_table[mid].rva
         else:
             lo = mid+1
 
 def off_to_rva_ex(off, section):
-    return rva - section.physical_offset + section.rva
+    return off - section.physical_offset + section.rva
 
 IMAGE_REL_BASED_ABSOLUTE = 0
 IMAGE_REL_BASED_HIGHLOW  = 3
 
 def get_reloc_table(fn, offset, reloc_size):
-    reloc_table = dict()
     cur_off = 0
     fn.seek(offset)
+    print(hex(offset))
     while cur_off<reloc_size:
         cur_page = get_integer32(fn)
-        bloc_size = get_integer32(fn)
-        assert(block_size % 4 == 0)
-        relocs = get_words(fn, (bloc_size-8)//8)
-        reloc_table[cur_page] = relocs
+        block_size = get_integer32(fn)
+        assert(block_size > 8)
+        assert((block_size-8) % 2 == 0)
+        relocs = get_words(fn, (block_size-8)//2)
+        yield cur_page, relocs
         cur_off += block_size
-    return reloc_table
 
 def table_to_relocs(reloc_table):
     relocs = set()
-    for cur_page in roloc_table:
-        for record in reloc_table[cur_page]:
+    for cur_page, records in reloc_table:
+        for record in records:
             if record & 0x3000 == IMAGE_REL_BASED_HIGHLOW << 12:
                 relocs.add(cur_page | (record & 0x0FFF))
     return relocs
@@ -164,8 +164,8 @@ def get_relocations(fn, sections = None):
     dd = get_data_directory(fn)
     if sections is None:
         sections = get_section_table(fn)
-    reloc_off = rva_to_off(dd[DD_BASERELOC][1], sections)
-    reloc_size = dd[DD_BASERELOC][2]
+    reloc_off = rva_to_off(dd[DD_BASERELOC][0], sections)
+    reloc_size = dd[DD_BASERELOC][1]
     return table_to_relocs( get_reloc_table(fn, reloc_off, reloc_size ) )
 
 def relocs_to_table(relocs):
