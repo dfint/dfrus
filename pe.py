@@ -171,13 +171,13 @@ def get_relocations(fn, sections = None):
 def relocs_to_table(relocs):
     reloc_table = dict()
     cur_page = 0
-    padding_words = 0
     for item in relocs:
         page = item & 0xFFFFF000
         off  = item & 0x00000FFF
         if page not in reloc_table:
             reloc_table[page] = []
         bisect.insort(reloc_table[page], off)
+    padding_words = sum(len(reloc_table[page])%2 for page in reloc_table)
     reloc_table_size = length(reloc_table)*8 + (length(relocs)+padding_words)*2
     return reloc_table_size, reloc_table
 
