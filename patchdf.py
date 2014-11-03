@@ -28,6 +28,9 @@ def load_trans_file(fn):
             trans[parts[1]]=parts[2]
     return trans
 
+def get_cross_references(fn, relocs, sections, image_base):
+    pass
+
 if __name__ == '__main__':
     patch_unicode_table(binio.TestFileObject(), 0)
     print(load_trans_file(['|12\\t3|as\\rd|', '|dfg|345y|', ' ', '|||']))
