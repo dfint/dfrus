@@ -110,4 +110,35 @@ if needle is None:
 
 patch_unicode_table(fn, needle)
 
+#--------------------------------------------------------
+if debug:
+    print("Preparing additional data section...")
+
+last_section = sections[-1]
+
+if last_section.name.startswith(b'.rus'):
+    fn.close()
+    print("There is '.rus' section in the file already.")
+    abort()
+
+file_alignment = fpeek4u(fn, pe_offset+PE_FILE_ALIGNMENT)
+section_alignment = fpeek4u(fn, pe_offset+PE_SECTION_ALIGNMENT)
+
+
+from disasm import align
+
+# New section prototype
+
+new_section = Section(
+    name = '.rus',
+    virtual_size = 0, # for now
+    rva = align(sections[-1].rva+last_section.virtual_size,
+                section_alignment),
+    physical_size = 0, # for now
+    physical_offset = align(last_section.physical_offset +
+                            last_section.physical_size, file_alignment),
+    flags = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ |
+            IMAGE_SCN_MEM_EXECUTE
+)
+
 fn.close()

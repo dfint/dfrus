@@ -81,19 +81,23 @@ def get_data_directory(fn):
 SIZEOF_IMAGE_SECTION_HEADER = 0x28
 
 Section = namedtuple('Section', ['name', 'virtual_size', 'rva', 'physical_size', 
-    'physical_offset', '-', '-', '-', '-', 'flags'], rename = True)
+    'physical_offset', 'flags'])
+
+SectionStruct = struct.Struct('<8s4L12xL')
+
+assert(SectionStruct.size == SIZEOF_IMAGE_SECTION_HEADER)
 
 def get_section_table(fn, pe = None):
     if pe is None:
         pe = fpeek4u(fn, MZ_LFANEW)
     n = fpeek2u(fn, pe + PE_NUMBER_OF_SECTIONS)
     fn.seek(pe + SIZEOF_PE_HEADER)
-    return [Section._make(struct.unpack('<8s6L2HL', fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
+    return [Section._make(SectionStruct.unpack(fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
             for i in range(n)]
 
 def put_section_info(fn, off, sect_info):
     fn.seek(off)
-    fn.write(struct.pack('<8s6L2HL',sect_info))
+    fn.write(SectionStruct.pack(sect_info))
 
 IMAGE_SCN_CNT_CODE                  = 0x00000020
 IMAGE_SCN_CNT_INITIALIZED_DATA      = 0x00000040
