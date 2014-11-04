@@ -142,7 +142,6 @@ IMAGE_REL_BASED_HIGHLOW  = 3
 def get_reloc_table(fn, offset, reloc_size):
     cur_off = 0
     fn.seek(offset)
-    print(hex(offset))
     while cur_off<reloc_size:
         cur_page = get_integer32(fn)
         block_size = get_integer32(fn)
