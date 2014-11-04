@@ -80,8 +80,15 @@ def get_data_directory(fn):
 
 SIZEOF_IMAGE_SECTION_HEADER = 0x28
 
-Section = namedtuple('Section', ['name', 'virtual_size', 'rva', 'physical_size', 
+Section0 = namedtuple('Section', ['name', 'virtual_size', 'rva', 'physical_size', 
     'physical_offset', 'flags'])
+
+class Section(Section0):
+    __slots__ = ()
+    def __repr__(self):
+        'Return a nicely formatted representation string'
+        return (self.__class__.__name__ + '(name=%r, virtual_size=0x%X, rva=0x%X, physical_size=0x%X, physical_offset=0x%X, flags=0x%X)' %
+                    self)
 
 SectionStruct = struct.Struct('<8s4L12xL')
 
