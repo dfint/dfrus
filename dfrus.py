@@ -149,5 +149,39 @@ strings = extract_strings(fn, xref_table)
 
 if debug:
     print("%d strings extracted.\n" % len(strings))
+    # TODO: add slicing of the string list for the debugging purposes
+
+funcs = dict()
+
+for off, string in strings:
+    if string in trans_table:
+        translation = trans_table[string]
+        
+        if string == translation:
+            continue
+        
+        refs = xref_table[off]
+        
+        # Find the earliest reference to the string
+        k = 4
+        while off+k in xref_table and k < len(string)+1:
+            for j, ref in enumerate(refs):
+                mid_refs = xref_table[off+k]
+                delta = ref - mid_refs[0]
+                if len(mid_refs)==1 and delta>0 and delta<=6: # 6 is the length of mov reg, [imm32]
+                    refs[j] = mid_refs[0]
+            k += 4
+        
+        aligned_len = align(len(string)+1)
+        is_long = aligned_len < len(translation)+1
+        if not is_long:
+            write_string(fn, translation,
+                         off=off, encoding='cp1251',
+                         new_len=aligned_len)
+        else:
+            pass
+        
+        pass
+
 
 fn.close()

@@ -36,8 +36,20 @@ def write_words(file_object, words):
     for x in words:
         put_integer16(file_object, x)
 
-def write_string(file_object, s):
-    file_object.write(s.encode())
+def write_string(file_object, s, off = None, new_len = None, encoding=None):
+    if off is not None:
+        file_object.seek(off)
+    
+    if new_len is None:
+        new_len = len(s)+1
+    
+    if new_len > len(s):
+        s += '\0'*(len(s)-new_len)
+    
+    if encoding is None:
+        file_object.write(s.encode())
+    else:
+        file_object.write(s.encode(encoding))
 
 def fpeek4u(file_object, off, count = 1):
     if count == 1:
