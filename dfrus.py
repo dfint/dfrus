@@ -85,14 +85,29 @@ from pe import *
 image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
 sections = get_section_table(fn, pe_offset)
 
-print(hex(image_base))
-for section in sections:
-    print(section)
-
 # Getting addreses of all relocatable entries
 relocs = get_relocations(fn, sections)
 
 # Getting cross-references:
 xref_table = get_cross_references(fn, relocs, sections, image_base)
+
+#--------------------------------------------------------
+print("Enabling the cyrillic alphabet...")
+
+unicode_table_start = [ 0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022 ]
+
+needle = None
+for obj_off in xref_table:
+    buf = fpeek4u(fn, obj_off, len(unicode_table_start))
+    if buf == unicode_table_start:
+        needle = obj_off
+        break
+
+if needle is None:
+    fn.close()
+    print("Unicode table not found.")
+    abort()
+
+patch_unicode_table(fn, needle)
 
 fn.close()
