@@ -124,7 +124,6 @@ if last_section.name.startswith(b'.rus'):
 file_alignment = fpeek4u(fn, pe_offset+PE_FILE_ALIGNMENT)
 section_alignment = fpeek4u(fn, pe_offset+PE_SECTION_ALIGNMENT)
 
-
 from disasm import align
 
 # New section prototype
@@ -132,7 +131,7 @@ from disasm import align
 new_section = Section(
     name = '.rus',
     virtual_size = 0, # for now
-    rva = align(sections[-1].rva+last_section.virtual_size,
+    rva = align(last_section.rva+last_section.virtual_size,
                 section_alignment),
     physical_size = 0, # for now
     physical_offset = align(last_section.physical_offset +
@@ -140,5 +139,15 @@ new_section = Section(
     flags = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ |
             IMAGE_SCN_MEM_EXECUTE
 )
+
+#--------------------------------------------------------
+print("Translating...")
+
+from extract_strings import extract_strings
+
+strings = extract_strings(fn, xref_table)
+
+if debug:
+    print("%d strings extracted.\n" % len(strings))
 
 fn.close()
