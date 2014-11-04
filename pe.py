@@ -104,7 +104,7 @@ def get_section_table(fn, pe = None):
 
 def put_section_info(fn, off, sect_info):
     fn.seek(off)
-    fn.write(SectionStruct.pack(sect_info))
+    fn.write(SectionStruct.pack(*sect_info))
 
 IMAGE_SCN_CNT_CODE                  = 0x00000020
 IMAGE_SCN_CNT_INITIALIZED_DATA      = 0x00000040
@@ -221,4 +221,5 @@ if __name__ == "__main__":
     assert(check_pe(TestFileObject()) is None)
     assert(check_pe(TestPeObject()) is not None)
     assert(len(TestPeObject().read(10))==10)
+    put_section_info(TestPeObject(), 0, [b'123',1,2,3,4,5])
     
