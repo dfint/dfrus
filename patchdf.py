@@ -1,5 +1,5 @@
 
-from binio import fpoke4, fpeek4u
+from binio import fpoke4, fpeek4u, fpeek
 from pe import rva_to_off
 
 def patch_unicode_table(fn, off):
@@ -40,12 +40,14 @@ def get_cross_references(fn, relocs, sections, image_base):
     xrefs = defaultdict(list)
     data_lower_bound = sections[rdata].rva
     data_upper_bound = sections[data].rva + sections[data].virtual_size
+    # Read entire code section to the memory (about 9.2 MB for DF 0.40.13):
+    code_section = fpeek(fn, sections[code].physical_offset, sections[code].physical_size)
     for reloc in relocs:
         reloc -= sections[code].rva
         if reloc < 0 and reloc >= sections[code].virtual_size:
             continue
+        obj_rva = int.from_bytes(code_section[reloc:reloc+4],'little') - image_base
         reloc += sections[code].physical_offset
-        obj_rva = fpeek4u(fn, reloc) - image_base
         if obj_rva >= data_lower_bound and obj_rva <= data_upper_bound:
             obj_off = rva_to_off(obj_rva, sections)
             if obj_off is not None:
