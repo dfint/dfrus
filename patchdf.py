@@ -38,18 +38,19 @@ rdata = 1
 data = 2
 def get_cross_references(fn, relocs, sections, image_base):
     xrefs = defaultdict(list)
+    data_lower_bound = sections[rdata].rva
+    data_upper_bound = sections[data].rva + sections[data].virtual_size
     for reloc in relocs:
         reloc -= sections[code].rva
         if reloc < 0 and reloc >= sections[code].virtual_size:
             continue
         reloc += sections[code].physical_offset
         obj_rva = fpeek4u(fn, reloc) - image_base
-        obj_off = rva_to_off(obj_rva, sections)
-        if obj_off is None:
-            continue
-        if (obj_off >= sections[rdata].physical_offset and
-            obj_off < sections[data].physical_offset+sections[data].physical_size):
+        if obj_rva >= data_lower_bound and obj_rva <= data_upper_bound:
+            obj_off = rva_to_off(obj_rva, sections)
+            if obj_off is not None:
                 xrefs[obj_off].append(reloc)
+    
     return xrefs
 
 if __name__ == '__main__':
