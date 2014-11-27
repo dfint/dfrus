@@ -41,7 +41,7 @@ if __name__ == "__main__":
         try:
             fn = open(sys.argv[1], "r+b")
         except OSError:
-            print("Failed to open '%s'" % df2)
+            print("Failed to open '%s'" % sys.argv[1])
             abort()
         from binio import fpeek4u
         from pe import *
