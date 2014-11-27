@@ -145,7 +145,7 @@ print("Translating...")
 
 from extract_strings import extract_strings
 
-strings = extract_strings(fn, xref_table)
+strings = list(extract_strings(fn, xref_table))
 
 if debug:
     print("%d strings extracted.\n" % len(strings))

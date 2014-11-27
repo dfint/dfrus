@@ -9,9 +9,9 @@ def is_allowed(x):
     return x in allowed or (x>' ' and x<chr(127) and x not in forbidden)
 
 def extract_strings(fn, xrefs):
-    strings = []
+    prev_string = None
     for obj_off in sorted(xrefs):
-        if strings and obj_off <= strings[-1][0]+len(strings[-1][1]):
+        if prev_string is not None and obj_off <= prev_string[0]+len(prev_string[1]):
             continue # it's not the beginning of the string
         
         fn.seek(obj_off)
@@ -29,6 +29,30 @@ def extract_strings(fn, xrefs):
                 letters+=1
         
         if s_len and letters > 0:
-            strings.append((obj_off, buf[:s_len].decode()))
-    
-    return strings
+            current_string = (obj_off, buf[:s_len].decode())
+            yield current_string
+            prev_string = current_string
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv)<2:
+        print('Usage:\nextract_strings.py "Dwarf Fortress.exe" > stringdump.txt', file=sys.stderr)
+    else:
+        try:
+            fn = open(sys.argv[1], "r+b")
+        except OSError:
+            print("Failed to open '%s'" % df2)
+            abort()
+        from binio import fpeek4u
+        from pe import *
+        from patchdf import get_cross_references
+        pe_offset = check_pe(fn)
+        image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
+        sections = get_section_table(fn, pe_offset)
+        relocs = get_relocations(fn, sections)
+        xrefs = get_cross_references(fn, relocs, sections, image_base)
+        strings = extract_strings(fn, xrefs)
+        for _, s in strings:
+            s = s.replace('\r','\\r')
+            s = s.replace('\t','\\t')
+            print('|%s|' % s)
