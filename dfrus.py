@@ -6,20 +6,25 @@ debug = 'debug' in cmd
 if debug:
     cmd.remove('debug')
 
-if len(cmd)>1:
+if len(cmd) > 1:
     path = cmd[1]
 else:
     path = ""
 
 import os.path
 
+
 def abort():
+    """
+
+    :rtype : None
+    """
     input("Press Enter...")
     sys.exit()
 
 df1 = None
 
-if len(path)==0 or not os.path.exists(path):
+if len(path) == 0 or not os.path.exists(path):
     if debug:
         print("Path was not given or doesn't exist. Using defaults")
     df1 = "Dwarf Fortress.exe"
@@ -31,7 +36,7 @@ else:
 
 df2 = os.path.join(path, "Dwarf Fortress Rus.exe")
 
-#--------------------------------------------------------
+# --------------------------------------------------------
 from pe import *
 
 try:
@@ -42,7 +47,7 @@ except OSError:
     print("Unable to open '%s'" % df1)
     abort()
 
-#--------------------------------------------------------
+# --------------------------------------------------------
 from patchdf import *
 print("Loading translation file...")
 
@@ -50,19 +55,19 @@ trans_filename = "trans.txt"
 with open(trans_filename, encoding="cp1251") as trans:
     trans_table = load_trans_file(trans)
     
-#--------------------------------------------------------
+# --------------------------------------------------------
 from shutil import copy
-print("Copying '%s'\nTo '%s'..." % (df1,df2))
+print("Copying '%s'\nTo '%s'..." % (df1, df2))
 
 try:
-    copy(df1,df2)
+    copy(df1, df2)
 except IOError:
     print("Failed.")
     abort()
 else:
     print("Success.")
 
-#--------------------------------------------------------
+# --------------------------------------------------------
 print("Finding cross-references...")
 
 try:
@@ -79,22 +84,22 @@ if pe_offset is None:
     os.remove(df2)
     abort()
 
-from binio import fpeek4u
+# from binio import fpeek4u
 from pe import *
 
 image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
 sections = get_section_table(fn, pe_offset)
 
-# Getting addreses of all relocatable entries
+# Getting addresses of all relocatable entries
 relocs = get_relocations(fn, sections)
 
 # Getting cross-references:
 xref_table = get_cross_references(fn, relocs, sections, image_base)
 
-#--------------------------------------------------------
+# --------------------------------------------------------
 print("Enabling the cyrillic alphabet...")
 
-unicode_table_start = [ 0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022 ]
+unicode_table_start = [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
 
 needle = None
 for obj_off in xref_table:
@@ -110,7 +115,7 @@ if needle is None:
 
 patch_unicode_table(fn, needle)
 
-#--------------------------------------------------------
+# --------------------------------------------------------
 if debug:
     print("Preparing additional data section...")
 
@@ -129,18 +134,17 @@ from disasm import align
 # New section prototype
 
 new_section = Section(
-    name = '.rus',
-    virtual_size = 0, # for now
-    rva = align(last_section.rva+last_section.virtual_size,
-                section_alignment),
-    physical_size = 0, # for now
-    physical_offset = align(last_section.physical_offset +
-                            last_section.physical_size, file_alignment),
-    flags = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ |
-            IMAGE_SCN_MEM_EXECUTE
+    name='.rus',
+    virtual_size=0,  # for now
+    rva=align(last_section.rva+last_section.virtual_size,
+              section_alignment),
+    physical_size=0,  # for now
+    physical_offset=align(last_section.physical_offset +
+                          last_section.physical_size, file_alignment),
+    flags=IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE
 )
 
-#--------------------------------------------------------
+# --------------------------------------------------------
 print("Translating...")
 
 from extract_strings import extract_strings
