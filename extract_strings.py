@@ -41,7 +41,7 @@ if __name__ == "__main__":
         try:
             fn = open(sys.argv[1], "r+b")
         except OSError:
-            print("Failed to open '%s'" % sys.argv[1])
+            print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
             input("Press Enter...")
             sys.exit()
         from binio import fpeek4u
