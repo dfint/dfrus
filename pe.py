@@ -81,26 +81,31 @@ def get_data_directory(fn):
 SIZEOF_IMAGE_SECTION_HEADER = 0x28
 
 Section0 = namedtuple('Section', ['name', 'virtual_size', 'rva', 'physical_size', 
-    'physical_offset', 'flags'])
+                      'physical_offset', 'flags'])
+
 
 class Section(Section0):
     __slots__ = ()
+
     def __repr__(self):
-        'Return a nicely formatted representation string'
-        return (self.__class__.__name__ + '(name=%r, virtual_size=0x%X, rva=0x%X, physical_size=0x%X, physical_offset=0x%X, flags=0x%X)' %
-                    self)
+        """Return a nicely formatted representation string"""
+        return (self.__class__.__name__ + '(name=%r, virtual_size=0x%X, rva=0x%X, physical_size=0x%X,' +
+                                          'physical_offset=0x%X, flags=0x%X)' %
+                self)
 
 SectionStruct = struct.Struct('<8s4L12xL')
 
 assert(SectionStruct.size == SIZEOF_IMAGE_SECTION_HEADER)
 
-def get_section_table(fn, pe = None):
+
+def get_section_table(fn, pe=None):
     if pe is None:
         pe = fpeek4u(fn, MZ_LFANEW)
     n = fpeek2u(fn, pe + PE_NUMBER_OF_SECTIONS)
     fn.seek(pe + SIZEOF_PE_HEADER)
     return [Section._make(SectionStruct.unpack(fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
             for i in range(n)]
+
 
 def put_section_info(fn, off, sect_info):
     fn.seek(off)
@@ -115,6 +120,7 @@ IMAGE_SCN_MEM_EXECUTE               = 0x20000000
 IMAGE_SCN_MEM_READ                  = 0x40000000
 IMAGE_SCN_MEM_WRITE                 = 0x80000000
 
+
 def rva_to_off(rva, section_table):
     lo = 0
     hi = len(section_table)-1
@@ -128,8 +134,10 @@ def rva_to_off(rva, section_table):
         else:
             lo = mid+1
 
+
 def rva_to_off_ex(rva, section):
     return rva + section.physical_offset - section.rva
+
 
 def off_to_rva(off, section_table):
     lo = 0
@@ -144,11 +152,13 @@ def off_to_rva(off, section_table):
         else:
             lo = mid+1
 
+
 def off_to_rva_ex(off, section):
     return off - section.physical_offset + section.rva
 
 IMAGE_REL_BASED_ABSOLUTE = 0
 IMAGE_REL_BASED_HIGHLOW  = 3
+
 
 def get_reloc_table(fn, offset, reloc_size):
     cur_off = 0
@@ -162,6 +172,7 @@ def get_reloc_table(fn, offset, reloc_size):
         yield cur_page, relocs
         cur_off += block_size
 
+
 def table_to_relocs(reloc_table):
     relocs = set()
     for cur_page, records in reloc_table:
@@ -170,13 +181,15 @@ def table_to_relocs(reloc_table):
                 relocs.add(cur_page | (record & 0x0FFF))
     return relocs
 
+
 def get_relocations(fn, sections = None):
     dd = get_data_directory(fn)
     if sections is None:
         sections = get_section_table(fn)
     reloc_off = rva_to_off(dd[DD_BASERELOC][0], sections)
     reloc_size = dd[DD_BASERELOC][1]
-    return table_to_relocs( get_reloc_table(fn, reloc_off, reloc_size ) )
+    return table_to_relocs(get_reloc_table(fn, reloc_off, reloc_size))
+
 
 def relocs_to_table(relocs):
     reloc_table = dict()
@@ -188,8 +201,9 @@ def relocs_to_table(relocs):
             reloc_table[page] = []
         bisect.insort(reloc_table[page], off)
     padding_words = sum(len(reloc_table[page])%2 for page in reloc_table)
-    reloc_table_size = length(reloc_table)*8 + (length(relocs)+padding_words)*2
+    reloc_table_size = len(reloc_table)*8 + (len(relocs)+padding_words)*2
     return reloc_table_size, reloc_table
+
 
 def write_relocation_table(fn, offset, reloc_table):
     fn.seek(offset)
@@ -201,16 +215,18 @@ def write_relocation_table(fn, offset, reloc_table):
         write_dwords(fn, [page, block_size])
         write_words(fn, records)
 
+
 class TestPeObject(TestFileObject):
     file_structure = {
-        MZ_SIGNATURE:b'MZ',
-        MZ_LFANEW:0x100.to_bytes(4,byteorder='little'),
-        0x100:b'PE\0\0'
+        MZ_SIGNATURE: b'MZ',
+        MZ_LFANEW: 0x100.to_bytes(4, byteorder='little'),
+        0x100: b'PE\0\0'
     }
+
     def read(self, n):
         if self.position in self.file_structure:
             item_at_pos = self.file_structure[self.position]
-            if n<=len(item_at_pos):
+            if n <= len(item_at_pos):
                 return item_at_pos[:n]
             else:
                 return item_at_pos + super().read(n-len(item_at_pos))
@@ -220,6 +236,5 @@ class TestPeObject(TestFileObject):
 if __name__ == "__main__":
     assert(check_pe(TestFileObject()) is None)
     assert(check_pe(TestPeObject()) is not None)
-    assert(len(TestPeObject().read(10))==10)
-    put_section_info(TestPeObject(), 0, [b'123',1,2,3,4,5])
-    
+    assert(len(TestPeObject().read(10)) == 10)
+    put_section_info(TestPeObject(), 0, [b'123', 1, 2, 3, 4, 5])
