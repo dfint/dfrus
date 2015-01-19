@@ -1,5 +1,6 @@
 from collections import namedtuple
 import struct
+import binio
 
 import pe
 
@@ -50,7 +51,52 @@ class IMAGE_SECTION_HEADER(IMAGE_SECTION_HEADER_):
         return self._struct.pack(self)
 
 
-#
+# IMAGE_SYMBOL
+
+IMAGE_SYMBOL_ = namedtuple('IMAGE_SYMBOL', ['Name', 'Value', 'SectionNumber', 'Type',
+                                            'StorageClass', 'NumberOfAuxSymbols'])
+
+class IMAGE_SYMBOL(IMAGE_SYMBOL_):
+    __slots__ = ()
+    
+    _struct_longname = struct.Struct('<3L2H2B')
+    _struct_shortname = struct.Struct('<8sL2H2B')
+    assert(_struct_longname.size == _struct_shortname.size)
+    
+    Size = _struct_longname.size
+    
+    @classmethod
+    def unpack(cls, data):
+        long = cls._struct_longname.unpack(data)
+        if long[0]:  # Short name
+            return cls._make(cls._struct_shortname.unpack(data))
+        else:  # Long name
+            return cls._make(long[1:])
+    
+    @classmethod
+    def load_symbol_table(cls, fn, n):
+        end_of_symbol_table = fn.tell()+cls.Size*n
+        symbol_table = []
+        for _ in range(n):
+            buf = fn.read(cls.Size)
+            if buf[0]:
+                symbol_table.append(cls._make(cls._struct_shortname.unpack(buf)))
+            else:
+                fields = list(cls._struct_longname.unpack(buf))
+                name_offset = fields[1]
+                saved_position = fn.tell()
+                fn.seek(end_of_symbol_table+name_offset)
+                name = binio.read_string(fn)
+                fn.seek(saved_position)
+                fields = fields[1:]
+                fields[0] = name
+                symbol_table.append(cls._make(fields))
+        return symbol_table
+        
+    
+    def pack(self):
+        pass # Not implemented
+
 
 def load_coff(fn):
     fn.seek(0)
@@ -58,10 +104,17 @@ def load_coff(fn):
     n = ifh.NumberOfSections
     ISH = IMAGE_SECTION_HEADER
     sections = [ISH.unpack(fn.read(ISH.Size)) for _ in range(n)]
-    return ifh, sections
+    fn.seek(ifh.PointerToSymbolTable)
+    symbol_table = IMAGE_SYMBOL.load_symbol_table(fn, ifh.NumberOfSymbols)
+    return ifh, sections, symbol_table
 
 
 with open("addcoloredst.obj", "rb") as obj:
-    header, sections = load_coff(obj)
-    print(header)
-    print(sections)
+    header, sections, symbol_table = load_coff(obj)
+    print(header, end='\n\n')
+    print()
+    for item in sections:
+        print(item)
+    print()
+    for item in symbol_table:
+        print(item)

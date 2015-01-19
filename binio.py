@@ -62,6 +62,22 @@ def write_string(file_object, s, off=None, new_len=None, encoding=None):
         file_object.write(s.encode(encoding))
 
 
+def read_string(file_object, off=None, maxlen=1024):
+    if off is not None:
+        file_object.seek(off)
+
+    buf = []
+
+    for i in range(maxlen):
+        c = file_object.read(1)
+        if c != b'\0':
+            buf.append(c)
+        else:
+            break
+
+    return b''.join(buf)
+
+
 def fpeek4u(file_object, off, count=1):
     if count == 1:
         file_object.seek(off)
