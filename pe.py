@@ -76,6 +76,12 @@ def get_data_directory(fn):
     fn.seek(pe + PE_DATA_DIRECTORY)
     return [get_dwords(fn, 2) for i in range(IMAGE_NUMBEROF_DIRECTORY_ENTRIES)]
 
+def update_data_directory(fn, dd):
+    pe = fpeek4u(fn, MZ_LFANEW)
+    fn.seek(pe + PE_DATA_DIRECTORY)
+    for item in dd:
+        write_dwords(fn, item)
+
 # name, virtual size, relative virtual address, physical size, physical offset
 # SECTION_NAME, SECTION_VSIZE, SECTION_RVA, SECTION_PSIZE, SECTION_POFFSET = range(5)
 # SECTION_FLAGS = 9  # section flags
@@ -187,13 +193,14 @@ def table_to_relocs(reloc_table):
     return relocs
 
 
-def get_relocations(fn, sections=None):
-    dd = get_data_directory(fn)
-    if sections is None:
-        sections = get_section_table(fn)
-    reloc_off = rva_to_off(dd[DD_BASERELOC][0], sections)
-    reloc_size = dd[DD_BASERELOC][1]
-    return table_to_relocs(get_reloc_table(fn, reloc_off, reloc_size))
+def get_relocations(fn, sections=None, offset=None, size=None):
+    if offset is None or size is None:
+        dd = get_data_directory(fn)
+        if sections is None:
+            sections = get_section_table(fn)
+        offset = rva_to_off(dd[DD_BASERELOC][0], sections)
+        size = dd[DD_BASERELOC][1]
+    return table_to_relocs(get_reloc_table(fn, offset, size))
 
 
 def relocs_to_table(relocs):
@@ -213,6 +220,8 @@ def relocs_to_table(relocs):
 def write_relocation_table(fn, offset, reloc_table):
     fn.seek(offset)
     for page in sorted(reloc_table):
+        for i, item in enumerate(reloc_table[page]):
+            reloc_table[page][i] = item | IMAGE_REL_BASED_HIGHLOW << 12
         if len(reloc_table[page]) % 2 == 1:
             reloc_table[page].append(IMAGE_REL_BASED_ABSOLUTE << 12 + 0)
         records = reloc_table[page]
