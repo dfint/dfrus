@@ -3,8 +3,6 @@ import pe
 
 cmd = sys.argv
 
-cmd.extend(["d:\Games\df_40_13_win_s\Dwarf Fortress 1.exe", "-*", "123", "12345"])
-
 print(cmd)
 
 if len(cmd) < 3:
