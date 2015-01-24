@@ -39,10 +39,14 @@ else:
                 print('Wrong operation: "%s"' % cmd[2])
                 sys.abort(0)
             
-            size, reloc_table = pe.relocs_to_table(relocs)
+            new_size, reloc_table = pe.relocs_to_table(relocs)
             pe.write_relocation_table(fn, reloc_off, reloc_table)
-            dd[pe.DD_BASERELOC][1] = size
+            dd[pe.DD_BASERELOC][1] = new_size
             pe.update_data_directory(fn, dd)
+            
+            if new_size < reloc_size:
+                fn.seek(reloc_off+new_size)
+                fn.write(b'\0'*(reloc_size-new_size))
             
             assert(pe.get_relocations(fn) == relocs)
 
