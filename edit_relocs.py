@@ -25,7 +25,7 @@ else:
             sections = pe.get_section_table(fn)
             reloc_off = pe.rva_to_off(dd[pe.DD_BASERELOC][0], sections)
             reloc_size = dd[pe.DD_BASERELOC][1]
-            relocs = pe.get_relocations(fn, offset=reloc_off, size=reloc_size)
+            relocs = set(pe.get_relocations(fn, offset=reloc_off, size=reloc_size))
             
             if cmd[2] == '+':
                 relocs.update(eval(x) for x in cmd[3:])
@@ -48,6 +48,6 @@ else:
                 fn.seek(reloc_off+new_size)
                 fn.write(b'\0'*(reloc_size-new_size))
             
-            assert(pe.get_relocations(fn) == relocs)
+            assert(set(pe.get_relocations(fn)) == relocs)
 
 
