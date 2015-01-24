@@ -3,6 +3,9 @@ import pe
 
 cmd = sys.argv
 
+cmd.extend(["d:\Games\df_40_13_win_s\Dwarf Fortress 1.exe", "-*", "0x3fdaa0", "0x3fdb1f"])
+print(cmd)
+
 if len(cmd) < 3:
     print('Usage:')
     print('python file.exe + 0x123 0x345 0x567 # add relocations')
@@ -31,7 +34,7 @@ else:
             elif cmd[2] == '-*':
                 lower_bound = eval(cmd[3])
                 upper_bound = eval(cmd[4])
-                relocs = set(filter(lambda x: x>=lower_bound and x<=upper_bound, relocs))
+                relocs = set(filter(lambda x: not (x>=lower_bound and x<=upper_bound), relocs))
             else:
                 print('Wrong operation: "%s"' % cmd[2])
                 sys.abort(0)
