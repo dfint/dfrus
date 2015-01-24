@@ -185,12 +185,10 @@ def get_reloc_table(fn, offset, reloc_size):
 
 
 def table_to_relocs(reloc_table):
-    relocs = set()
     for cur_page, records in reloc_table:
         for record in records:
-            if record & 0x3000 == IMAGE_REL_BASED_HIGHLOW << 12:
-                relocs.add(cur_page | (record & 0x0FFF))
-    return relocs
+            if record >> 12 == IMAGE_REL_BASED_HIGHLOW:
+                yield cur_page | (record & 0x0FFF)
 
 
 def get_relocations(fn, sections=None, offset=None, size=None):
