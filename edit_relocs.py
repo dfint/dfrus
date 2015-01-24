@@ -3,8 +3,8 @@ import pe
 
 cmd = sys.argv
 
-cmd.extend(["d:\Games\df_40_13_win_s\Dwarf Fortress 1.exe", "-*", "0x3fdaa0", "0x3fdb1f"])
-print(cmd)
+# cmd.extend(["d:\Games\df_40_13_win_s\Dwarf Fortress 1.exe", "-*", "0x3fdaa0", "0x3fdb1f"])
+# print(cmd)
 
 if len(cmd) < 3:
     print('Usage:')
