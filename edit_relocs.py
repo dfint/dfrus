@@ -3,8 +3,6 @@ import pe
 
 cmd = sys.argv
 
-print(cmd)
-
 if len(cmd) < 3:
     print('Usage:')
     print('python file.exe + 0x123 0x345 0x567 # add relocations')
@@ -15,7 +13,7 @@ else:
     for item in cmd[3:]:
         litem = item.lower()
         if not(all(x>='0' and x<='9' for x in litem) or (item.startswith('0x') and all((x>='0' and x<='9') or
-                (x>='a' and x<='f') for x in litem))):
+                (x>='a' and x<='f') for x in litem[3:]))):
             print('"%s" is not decimal or hexadecimal number' % item)
             break
     else:
