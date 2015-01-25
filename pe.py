@@ -97,8 +97,8 @@ class Section(Section0):
 
     def __repr__(self):
         """Return a nicely formatted representation string"""
-        return (self.__class__.__name__ + '(name=%r, virtual_size=0x%X, rva=0x%X, physical_size=0x%X,' +
-                'physical_offset=0x%X, flags=0x%X)' %
+        return ((self.__class__.__name__ + '(name=%r, virtual_size=0x%X, rva=0x%X, physical_size=0x%X,' +
+                'physical_offset=0x%X, flags=0x%X)') %
                 self)
 
 
