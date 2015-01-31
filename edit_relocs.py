@@ -12,42 +12,57 @@ if len(cmd) < 3:
     print('python file.exe - 0x123 0x345 0x567 # remove specific relocations')
     print('python file.exe -* 0x123 0x567 # remove relocations from the range')
 else:
-    # Check args for safety
-    for item in cmd[3:]:
+    def check_arg(item):
+        # Check args for eval safety
         litem = item.lower()
-        if not(all(x>='0' and x<='9' for x in litem) or (item.startswith('0x') and all((x>='0' and x<='9') or
-                (x>='a' and x<='f') for x in litem[3:]))):
-            print('"%s" is not decimal or hexadecimal number' % item)
-            break
-    else:
-        with open(cmd[1], 'r+b') as fn:
-            dd = pe.get_data_directory(fn)
-            sections = pe.get_section_table(fn)
-            reloc_off = pe.rva_to_off(dd[pe.DD_BASERELOC][0], sections)
-            reloc_size = dd[pe.DD_BASERELOC][1]
-            relocs = set(pe.get_relocations(fn, offset=reloc_off, size=reloc_size))
-            
-            if cmd[2] == '+':
-                relocs.update(eval(x) for x in cmd[3:])
-            elif cmd[2] == '-':
-                relocs.discard(eval(x) for x in cmd[3:])
+        return (all(x.isdigit() for x in litem) or (item.startswith('0x') and all((x.isdigit() or
+               (x >= 'a' and x <= 'f')) for x in litem[3:])))
+    
+    def group_args(args):
+        operators = {'+', '-', '-='}
+        op = None
+        list_start = None
+        for i, item in enumerate(args):
+            if op is None or item in operators:
+                if list_start is not None:
+                    yield op, args[list_start:i]
+                op = item
+                list_start = i+1
+            elif not check_arg(item):
+                print('"%s" is not decimal or hexadecimal number' % item)
+                sys.exit()
+    
+    args = list(group_args(cmd[2:]))
+    
+    with open(cmd[1], 'r+b') as fn:
+        dd = pe.get_data_directory(fn)
+        sections = pe.get_section_table(fn)
+        reloc_off = pe.rva_to_off(dd[pe.DD_BASERELOC][0], sections)
+        reloc_size = dd[pe.DD_BASERELOC][1]
+        relocs = set(pe.get_relocations(fn, offset=reloc_off, size=reloc_size))
+        
+        for op, items in args:
+            if op == '+':
+                relocs.update(eval(x) for x in items)
+            elif op == '-':
+                relocs.discard(eval(x) for x in items)
             elif cmd[2] == '-*':
-                lower_bound = eval(cmd[3])
-                upper_bound = eval(cmd[4])
+                if len(items) < 2:
+                    print('"-*" operation needs at least 2 arguments. Operation skipped.')
+                    continue
+                lower_bound = eval(items[1])
+                upper_bound = eval(items[2])
                 relocs = set(filter(lambda x: not (x>=lower_bound and x<=upper_bound), relocs))
             else:
-                print('Wrong operation: "%s"' % cmd[2])
-                sys.abort(0)
-            
-            new_size, reloc_table = pe.relocs_to_table(relocs)
-            pe.write_relocation_table(fn, reloc_off, reloc_table)
-            dd[pe.DD_BASERELOC][1] = new_size
-            pe.update_data_directory(fn, dd)
-            
-            if new_size < reloc_size:
-                fn.seek(reloc_off+new_size)
-                fn.write(b'\0'*(reloc_size-new_size))
-            
-            assert(set(pe.get_relocations(fn)) == relocs)
-
-
+                print('Wrong operation: "%s". Skipped.' % cmd[2])
+        
+        new_size, reloc_table = pe.relocs_to_table(relocs)
+        pe.write_relocation_table(fn, reloc_off, reloc_table)
+        dd[pe.DD_BASERELOC][1] = new_size
+        pe.update_data_directory(fn, dd)
+        
+        if new_size < reloc_size:
+            fn.seek(reloc_off+new_size)
+            fn.write(b'\0'*(reloc_size-new_size))
+        
+        assert(set(pe.get_relocations(fn)) == relocs)
