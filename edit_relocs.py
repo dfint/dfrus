@@ -31,6 +31,8 @@ else:
             elif not check_arg(item):
                 print('"%s" is not decimal or hexadecimal number' % item)
                 sys.exit()
+            else:
+                args[i] = eval(item)
     
     args = list(group_args(cmd[2:]))
     
@@ -43,15 +45,15 @@ else:
         
         for op, items in args:
             if op == '+':
-                relocs.update(eval(x) for x in items)
+                relocs.update(items)
             elif op == '-':
-                relocs.discard(eval(x) for x in items)
+                relocs.discard(items)
             elif cmd[2] == '-*':
                 if len(items) < 2:
                     print('"-*" operation needs at least 2 arguments. Operation skipped.')
                     continue
-                lower_bound = eval(items[1])
-                upper_bound = eval(items[2])
+                lower_bound = items[1]
+                upper_bound = items[2]
                 relocs = set(filter(lambda x: not (x>=lower_bound and x<=upper_bound), relocs))
             else:
                 print('Wrong operation: "%s". Skipped.' % cmd[2])
