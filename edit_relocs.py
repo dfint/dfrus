@@ -18,6 +18,14 @@ else:
         return (all(x.isdigit() for x in litem) or
                 (item.startswith('0x') and all((x.isdigit() or ('a' <= x <= 'f')) for x in litem[3:])))
 
+    def to_int(s):
+        if s.startswith('0x'):
+            return int(s[2:], 16)
+        elif s.startswith('0o'):
+            return int(s[2:], 8)
+        else:
+            return int(s)
+
     def group_args(args):
         operators = {'+', '-', '-*'}
         op = None
@@ -32,7 +40,7 @@ else:
                 print('"%s" is not decimal or hexadecimal number' % item)
                 sys.exit()
             else:
-                args[i] = eval(item)
+                args[i] = to_int(item)
 
         yield op, args[list_start:]
 
