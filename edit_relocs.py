@@ -19,7 +19,7 @@ else:
                (x >= 'a' and x <= 'f')) for x in litem[3:])))
     
     def group_args(args):
-        operators = {'+', '-', '-='}
+        operators = {'+', '-', '-*'}
         op = None
         list_start = None
         for i, item in enumerate(args):
