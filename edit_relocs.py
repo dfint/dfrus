@@ -33,6 +33,8 @@ else:
                 sys.exit()
             else:
                 args[i] = eval(item)
+        
+        yield op, args[list_start:] 
     
     args = list(group_args(cmd[2:]))
     
