@@ -54,7 +54,7 @@ else:
                     continue
                 lower_bound = items[1]
                 upper_bound = items[2]
-                relocs = set(filter(lambda x: not (x>=lower_bound and x<=upper_bound), relocs))
+                relocs = set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
             else:
                 print('Wrong operation: "%s". Skipped.' % cmd[2])
         
