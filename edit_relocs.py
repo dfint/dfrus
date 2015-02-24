@@ -50,12 +50,12 @@ else:
                 relocs.update(items)
             elif op == '-':
                 relocs.discard(items)
-            elif cmd[2] == '-*':
+            elif op == '-*':
                 if len(items) < 2:
                     print('"-*" operation needs at least 2 arguments. Operation skipped.')
                     continue
-                lower_bound = items[1]
-                upper_bound = items[2]
+                lower_bound = items[0]
+                upper_bound = items[1]
                 relocs = set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
             else:
                 print('Wrong operation: "%s". Skipped.' % cmd[2])
