@@ -172,7 +172,7 @@ for off, string in strings:
             for j, ref in enumerate(refs):
                 mid_refs = xref_table[off+k]
                 delta = ref - mid_refs[0]
-                if len(mid_refs)==1 and delta>0 and delta<=6: # 6 is the length of mov reg, [imm32]
+                if len(mid_refs) == 1 and 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
                     refs[j] = mid_refs[0]
             k += 4
         
