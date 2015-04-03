@@ -5,7 +5,7 @@ allowed = set("\r\t")
 
 
 def is_allowed(x):
-    return x in allowed or (x >= ' ' and x < chr(127) and x not in forbidden)
+    return x in allowed or ' ' <= x < chr(127 and x not in forbidden)
 
 
 def extract_strings(fn, xrefs, blocksize=1024):
