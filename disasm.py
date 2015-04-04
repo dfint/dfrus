@@ -237,6 +237,13 @@ def disasm(s, start_address=0):
                     mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
                 line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic=mnemonic, operands=[Operand(value=immediate)])
                 i += 2
+        elif s[i] == lea:
+            if i > j:
+                yield BytesLine(start_address+j, data=s[j:i])
+            j = i
+            x, i = analyse_modrm(s, i)
+            operands = unify_operands(x)
+            line = DisasmLine(start_address+i, data=s[j:i], mnemonic='lea', operands=operands)
 
         if not line:
             i += 1
