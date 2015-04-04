@@ -14,6 +14,105 @@ def signed(x, w):
     return x
 
 
+def split_byte(x):
+    """Split byte into groups of bits: (2 bits, 3 bits, 3 bits)"""
+    return x >> 6, x >> 3 & 7, x & 7
+
+
+def analyse_modrm(s, i):
+    result = dict()
+
+    modrm = split_byte(s[i])
+    result['modrm'] = modrm
+
+    i += 1
+
+    if modrm[0] != 3:
+        # Not register addressing
+        if modrm[0] == 0 and modrm[2] == 5:
+            # Direct addressing: [imm32]
+            imm32 = int.from_bytes(s[i:i+4], byteorder='little')
+            result['disp'] = imm32
+            i += 4
+        else:
+            # Indirect addressing
+            if modrm[2] == 4:
+                # Indirect addressing with scale
+                sib = split_byte(s[i])
+                result['sib'] = sib
+                i += 1
+
+            if modrm[0] == 1:
+                disp = signed(s[i], 8)
+                result['disp'] = disp
+                i += 1
+            elif modrm[0] == 2:
+                disp = signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
+                result['disp'] = disp
+                i += 4
+
+    return result, i
+
+
+regs = (
+    ("al", "ax", "eax"), 
+    ("cl", "cx", "ecx"), 
+    ("dl", "dx", "edx"), 
+    ("bl", "bx", "ebx"), 
+    ("ah", "sp", "esp"), 
+    ("ch", "bp", "ebp"), 
+    ("dh", "si", "esi"), 
+    ("bh", "di", "edi"),
+)
+
+
+class Operand:
+    def __init__(self, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, size=2):
+        self.reg = reg
+        self.size = size
+        self.base_reg = base_reg
+        self.index_reg = index_reg
+        self.scale = scale
+        self.disp = disp
+
+    def __repr__(self):
+        if self.reg is not None:
+            return regs[self.reg][self.size]
+        elif self.base_reg is None and self.index_reg is None:
+            return '[%s]' % asmhex(self.disp)
+        else:
+            pass
+
+
+def unify_operands(s):
+    modrm = s['modrm']
+    op1 = Operand(reg=modrm[1])
+    if modrm[0] == 3:
+        # Register addressing
+        op2 = modrm[2]
+    else:
+        if modrm[0] == 0 and modrm[2] == 5:
+            # Direct addressing
+            op2 = Operand(disp=s['disp'])
+        else:
+            if modrm[2] != 4:
+                # Without SIB-byte
+                op2 = Operand(scale=0, index_reg=modrm[2])
+            else:
+                # Use the SIB, Luke
+                sib = s['sib']
+                if sib[1] == 4:
+                    # Don't use index register
+                    op2 = Operand(scale=sib[0], base_reg=[2])
+                else:
+                    op2 = Operand(scale=sib[0], index_reg=sib[1], base_reg=[2])
+
+            if modrm[0] > 0:
+                op2.disp = s['disp']
+
+    return op1, op2
+
+
 seg_prefixes = {Prefix.seg_cs: "cs", Prefix.seg_ds: "ds", Prefix.seg_es: "es", Prefix.seg_ss: "ss", Prefix.seg_fs: "fs",
                 Prefix.seg_gs: "gs"}
 
