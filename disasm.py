@@ -55,19 +55,20 @@ def analyse_modrm(s, i):
 
 
 regs = (
-    ("al", "ax", "eax"), 
-    ("cl", "cx", "ecx"), 
-    ("dl", "dx", "edx"), 
-    ("bl", "bx", "ebx"), 
-    ("ah", "sp", "esp"), 
-    ("ch", "bp", "ebp"), 
-    ("dh", "si", "esi"), 
+    ("al", "ax", "eax"),
+    ("cl", "cx", "ecx"),
+    ("dl", "dx", "edx"),
+    ("bl", "bx", "ebx"),
+    ("ah", "sp", "esp"),
+    ("ch", "bp", "ebp"),
+    ("dh", "si", "esi"),
     ("bh", "di", "edi"),
 )
 
 seg_regs = ("es", "cs", "ss", "ds", "fs", "gs")
 
 op_sizes = ("byte", "word", "dword")
+
 
 class Operand:
     def __init__(self, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=2, seg_reg=None):
