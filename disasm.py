@@ -71,17 +71,20 @@ op_sizes = ("byte", "word", "dword")
 
 
 class Operand:
-    def __init__(self, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=2, seg_reg=None):
+    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=2, seg_reg=None):
+        self.value = value
         self.reg = reg
-        self.data_size = data_size
         self.base_reg = base_reg
+        self.data_size = data_size
         self.index_reg = index_reg
         self.scale = scale
         self.disp = disp
         self.seg_reg = seg_reg
 
     def __repr__(self):
-        if self.reg is not None:
+        if self.value is not None:
+            return asmhex(self.value)
+        elif self.reg is not None:
             return regs[self.reg][self.data_size]
         else:
             if self.base_reg is None and self.index_reg is None:
@@ -110,12 +113,11 @@ class Operand:
                             result += ' + ' + asmhex(self.disp)
                         else:
                             result += ' - ' + asmhex(-self.disp)
-                            
+
             if self.seg_reg is None:
                 return "%s [%s]" % (op_sizes[self.data_size], result)
             else:
                 return "%s %s:[%s]" % (seg_regs[self.seg_reg], op_sizes[self.data_size], result)
-
 
 
 def unify_operands(s):
@@ -123,7 +125,7 @@ def unify_operands(s):
     op1 = Operand(reg=modrm[1])
     if modrm[0] == 3:
         # Register addressing
-        op2 = modrm[2]
+        op2 = Operand(reg=modrm[2])
     else:
         if modrm[0] == 0 and modrm[2] == 5:
             # Direct addressing
@@ -182,7 +184,7 @@ class DisasmLine:
 
 class BytesLine(DisasmLine):
     def __init__(self, address, data):
-        super().__init__(address, data, mnemonic='db', operands=[asmhex(n) for n in data])
+        super().__init__(address, data, mnemonic='db', operands=[Operand(value=n) for n in data])
 
 
 def disasm(s, start_address=0):
@@ -193,7 +195,7 @@ def disasm(s, start_address=0):
         seg_prefix = ""
         line = None
         if s[i] in seg_prefixes:
-            seg_prefix = seg_prefixes[s[i]]
+            seg_reg = seg_prefixes[s[i]]
             i += 1
 
         if s[i] == Prefix.operand_size:
@@ -209,7 +211,7 @@ def disasm(s, start_address=0):
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
             immediate = int.from_bytes(bytes(s[i+1:i+2]), byteorder='little')
-            line = DisasmLine(start_address+i, data=s[i:i+4], mnemonic='retn', operands=[asmhex(immediate)])
+            line = DisasmLine(start_address+i, data=s[i:i+4], mnemonic='retn', operands=[Operand(value=immediate)])
             i += 3
         elif s[i] in {call_near, jmp_near}:
             if len(s) < i+4:
@@ -217,9 +219,11 @@ def disasm(s, start_address=0):
             else:
                 if i > j:
                     yield BytesLine(start_address+j, data=s[j:i])
-                immediate = start_address+i+5+signed(int.from_bytes(s[i+1:i+5], byteorder='little'), 32)
-                line = DisasmLine(start_address+i, data=s[i:i+5], mnemonic=op_nomask[s[i]], operands=[asmhex(immediate)])
+                j = i
                 i += 5
+                immediate = start_address+i+signed(int.from_bytes(s[j+1:i], byteorder='little'), 32)
+                line = DisasmLine(start_address+i, data=s[j:i], mnemonic=op_nomask[s[i]],
+                                  operands=[Operand(value=immediate)])
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
             if len(s) < i+1:
                 line = BytesLine(start_address+j, data=s[j:])
@@ -231,7 +235,7 @@ def disasm(s, start_address=0):
                     mnemonic = "jmp short"
                 else:
                     mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
-                line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic=mnemonic, operands=[asmhex(immediate)])
+                line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic=mnemonic, operands=[Operand(value=immediate)])
                 i += 2
 
         if not line:
