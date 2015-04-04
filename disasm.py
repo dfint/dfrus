@@ -65,23 +65,56 @@ regs = (
     ("bh", "di", "edi"),
 )
 
+seg_regs = ("es", "cs", "ss", "ds", "fs", "gs")
+
+op_sizes = ("byte", "word", "dword")
 
 class Operand:
-    def __init__(self, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, size=2):
+    def __init__(self, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=2, seg_reg=None):
         self.reg = reg
-        self.size = size
+        self.data_size = data_size
         self.base_reg = base_reg
         self.index_reg = index_reg
         self.scale = scale
         self.disp = disp
+        self.seg_reg = seg_reg
 
     def __repr__(self):
         if self.reg is not None:
-            return regs[self.reg][self.size]
-        elif self.base_reg is None and self.index_reg is None:
-            return '[%s]' % asmhex(self.disp)
+            return regs[self.reg][self.data_size]
         else:
-            pass
+            if self.base_reg is None and self.index_reg is None:
+                result = '[%s]' % asmhex(self.disp)
+            else:
+                result = ""
+                if self.base_reg is not None:
+                    result = regs[self.reg][2]  # Currently only 32-bit addressing supported
+                    if self.index_reg is not None:
+                        result += " + "
+
+                if self.index_reg is not None:
+                    if self.scale > 0:
+                        result += "%d*" % (1 << self.scale)
+
+                    result += regs[self.reg][2]
+
+                if self.disp != 0 or not result:
+                    if not result:
+                        if self.disp >= 0:
+                            result = asmhex(self.disp)
+                        else:
+                            result = '-' + asmhex(-self.disp)
+                    else:
+                        if self.disp > 0:
+                            result += ' + ' + asmhex(self.disp)
+                        else:
+                            result += ' - ' + asmhex(-self.disp)
+                            
+            if self.seg_reg is None:
+                return "%s [%s]" % (op_sizes[self.data_size], result)
+            else:
+                return "%s %s:[%s]" % (seg_regs[self.seg_reg], op_sizes[self.data_size], result)
+
 
 
 def unify_operands(s):
