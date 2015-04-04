@@ -106,3 +106,17 @@ pop_rm = 0x8f
 
 pushad = 0x60
 popad = 0x61
+
+add_rm_reg = 0x00  # + 2*dir + width
+add_acc_imm = 0x04  # + width
+sub_rm_reg = 0x28  # + 2*dir + width
+sub_reg_rm = sub_rm_reg+2  # + width
+sub_acc_imm = 0x2c  # + width
+xor_rm_reg = 0x30  # + 2*dir + width
+xor_acc_imm = 0x34  # + width
+or_rm_reg = 0x08  # + 2*dir + width
+or_acc_imm = 0x0c  # + width
+and_rm_reg = 0x20  # + 2*dir + width
+and_acc_imm = 0x24  # + width
+op_rm_imm = 0x80
+op_rm_imm8 = 0x83
