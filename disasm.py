@@ -239,7 +239,8 @@ def disasm(s, start_address=0):
                     mnemonic = "jmp short"
                 else:
                     mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
-                line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic=mnemonic, operands=[Operand(value=immediate)])
+                line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic=mnemonic,
+                                  operands=[Operand(value=immediate)])
                 i += 2
         elif s[i] == lea:
             if i > j:
