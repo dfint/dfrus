@@ -85,6 +85,8 @@ cmp_rm_reg = 0x38 # | dir<<1 | width
 
 nop = 0x90
 
+lea = 0x8d
+
 ret_near = 0xc3
 ret_far = 0xcb
 ret_near_n = 0xc2

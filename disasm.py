@@ -8,7 +8,7 @@ def align(n, edge=4):
 
 def signed(x, w):
     pow2w = 2**w
-    assert(x<pow2w)
+    assert(x < pow2w)
     if x & (pow2w//2):
         x -= pow2w
     return x
@@ -20,6 +20,8 @@ seg_prefixes = {Prefix.seg_cs: "cs", Prefix.seg_ds: "ds", Prefix.seg_es: "es", P
 op_1byte_nomask_noargs = {nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
                           popad: "popad", leave: "leave", int3: "int3"}
 op_nomask = {call_near: "call near", jmp_near: "jmp near", jmp_short: "jmp short"}
+
+conditions = ("o", "no", "b", "nb", "z", "nz", "na", "a", "s", "ns", "p", "np", "l", "nl", "ng", "g")
 
 
 def asmhex(n):
@@ -77,7 +79,7 @@ def disasm(s, start_address=0):
             line = DisasmLine(start_address+i, data=s[i:i+4], mnemonic='retn', operands=[asmhex(immediate)])
             i += 3
         elif s[i] in {call_near, jmp_near}:
-            if len(s) <= i+4:
+            if len(s) < i+4:
                 line = BytesLine(start_address+j, data=s[j:])
             else:
                 if i > j:
@@ -85,14 +87,18 @@ def disasm(s, start_address=0):
                 immediate = start_address+i+5+signed(int.from_bytes(s[i+1:i+5], byteorder='little'), 32)
                 line = DisasmLine(start_address+i, data=s[i:i+5], mnemonic=op_nomask[s[i]], operands=[asmhex(immediate)])
                 i += 5
-        elif s[i] == jmp_short:
-            if len(s) <= i+1:
+        elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
+            if len(s) < i+1:
                 line = BytesLine(start_address+j, data=s[j:])
             else:
                 if i > j:
                     yield BytesLine(start_address+j, data=s[j:i])
-                immediate = start_address+i+2+signed(s[i+1])
-                line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic="jmp short", operands=[asmhex(immediate)])
+                immediate = start_address+i+2+signed(s[i+1], 8)
+                if s[i] == jmp_short:
+                    mnemonic = "jmp short"
+                else:
+                    mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
+                line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic=mnemonic, operands=[asmhex(immediate)])
                 i += 2
 
         if not line:
