@@ -21,8 +21,10 @@ class Cond:
     nc = nb
     e = equal
     z = e
+    zero = z
     ne = not_equal
     nz = ne
+    not_zero = nz
     be = below_equal
     na = be
     s = sign
@@ -49,32 +51,56 @@ class Reg:
 
 class Prefix:
     """Prefix codes"""
-    rep = 0xF3
+    rep = 0xf3
     repe = rep
     repz = rep
-    repne = 0xF2
+    repne = 0xf2
     repnz = repne
-    lock = 0xF0
+    lock = 0xf0
 
     operand_size = 0x66
     address_size = 0x67
 
     seg_es = 0x26
-    seg_cs = 0x2E
+    seg_cs = 0x2e
     seg_ss = 0x36
-    seg_ds = 0x3E
+    seg_ds = 0x3e
     seg_fs = 0x64
     seg_gs = 0x65
 
 
-jmp_near = 0xE9
+jmp_near = 0xe9
 jmp_short = jmp_near+2
-jmp_indir = bytes([0xFF, 0x20])
+jmp_indir = bytes([0xff, 0x20])
 jcc_short = 0x70  # + cond
-jcc_near = bytes([0x0F, 0x80])  # + {0,cond}
+jcc_near = bytes([0x0f, 0x80])  # + {0,cond}
 
-setcc = bytes([0x0F, 0x90])
+call_near = 0xe8,
+call_indir = bytes([0xff, 0x10])
+
+setcc = bytes([0x0f, 0x90])
 
 cmp_rm_imm = 0x80
 cmp_rm_reg = 0x38 # | dir<<1 | width
 
+nop = 0x90
+
+ret_near = 0xc3
+ret_far = 0xcb
+ret_near_n = 0xc2
+ret_far_d = 0xca
+leave = 0xc9
+int3 = 0xcc
+
+push_reg = 0x50 # + reg
+push_imm32 = 0x68
+push_imm8 = push_imm32 + 2
+push_indir = bytes([0xff, 0x30]) # + размер смещение * 40h + базовый регистр [& sib]
+pushfd = 0x9c
+popfd = 0x9d
+
+pop_reg = 0x58 # + reg
+pop_rm = 0x8f
+
+pushad = 0x60
+popad = 0x61
