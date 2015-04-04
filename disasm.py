@@ -248,6 +248,27 @@ def disasm(s, start_address=0):
             x, i = analyse_modrm(s, i)
             operands = unify_operands(x)
             line = DisasmLine(start_address+i, data=s[j:i], mnemonic='lea', operands=operands)
+        elif (s[i] & 0xFC) == op_rm_imm and (s[i] & 3) != 2:
+            flags = s[i] & 3
+            mnemonics = ("add", "or", "adc", "sbb", "and", "sub", "xor", "cmp")
+            # Do not make i += 1 !
+            x, i = analyse_modrm(s, i)
+            mnemonic = mnemonics[x['modrm'][1]]
+            _, op = unify_operands(x)
+            if op.reg is None:
+                if flags == 0:
+                    op.data_size = 0
+                elif size_prefix:
+                    op.data_size = 1
+                else:
+                    op.data_size = 2
+            if flags == 1:
+                immediate = int.from_bytes(s[i:i+4], byteorder='little')
+                i += 4
+            else:  # flags == 0 or flags == 3
+                immediate = s[i]
+                i += 1
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
 
         if not line:
             i += 1
