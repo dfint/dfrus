@@ -160,10 +160,14 @@ conditions = ("o", "no", "b", "nb", "z", "nz", "na", "a", "s", "ns", "p", "np", 
 
 
 def asmhex(n):
-    h = ('%02xh' % n).upper()
-    if 'A' <= h[0] <= 'F':
-        h = '0' + 'h'
-    return h
+    assert(n >= 0)
+    if n < 0xA:
+        return str(n)
+    else:
+        h = ('%02xh' % n).upper()
+        if 'A' <= h[0] <= 'F':
+            h = '0' + 'h'
+        return h
 
 
 class DisasmLine:
