@@ -71,7 +71,8 @@ op_sizes = ("byte", "word", "dword")
 
 
 class Operand:
-    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=2, seg_reg=None):
+    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=None,
+                 seg_reg=None):
         self.value = value
         self.reg = reg
         self.base_reg = base_reg
@@ -80,6 +81,8 @@ class Operand:
         self.scale = scale
         self.disp = disp
         self.seg_reg = seg_reg
+        if self.data_size is None and self.reg is not None:
+            self.data_size = 2
 
     def __repr__(self):
         if self.value is not None:
@@ -112,9 +115,14 @@ class Operand:
                         result += '-' + asmhex(-self.disp)
 
             if self.seg_reg is None:
-                return "%s [%s]" % (op_sizes[self.data_size], result)
+                result = "[%s]" % result
             else:
-                return "%s %s:[%s]" % (seg_regs[self.seg_reg], op_sizes[self.data_size], result)
+                result = "%s:[%s]" % (seg_regs[self.seg_reg], result)
+
+            if self.data_size is not None:
+                result = op_sizes[2] + ' ' + result
+
+            return result
 
 
 def unify_operands(s):
@@ -196,7 +204,7 @@ def disasm(s, start_address=0):
     while i < len(s):
         j = i
         size_prefix = False
-        seg_prefix = ""
+        seg_reg = None
         line = None
         if s[i] in seg_prefixes:
             seg_reg = seg_prefixes[s[i]]
@@ -289,7 +297,7 @@ def disasm(s, start_address=0):
             # Operation between a register and register/memory with direction flag
             mnemonic = op_FC_dir_width_REG_RM[s[i] & 0xFC]
             dir_flag = s[i] & 2
-            flag_size = s[i] & 1
+            flag_size = not (s[i] & 1)
             x, i = analyse_modrm(s, i+1)
             op1, op2 = unify_operands(x)
             op1.data_size = flag_size*2-size_prefix
