@@ -255,8 +255,7 @@ def disasm(s, start_address=0):
         elif (s[i] & 0xFC) == op_rm_imm and (s[i] & 3) != 2:
             flags = s[i] & 3
             mnemonics = ("add", "or", "adc", "sbb", "and", "sub", "xor", "cmp")
-            # Do not make i += 1 !
-            x, i = analyse_modrm(s, i)
+            x, i = analyse_modrm(s, i+1)
             mnemonic = mnemonics[x['modrm'][1]]
             _, op = unify_operands(x)
             if op.reg is None:
@@ -277,7 +276,7 @@ def disasm(s, start_address=0):
             # Operation between register and register/memory without direction flag (xchg or test)
             mnemonic = op_FE_width_REG_RM[s[i] & 0xFE]
             flag_size = s[i] & 1
-            x, i = analyse_modrm(s, i)
+            x, i = analyse_modrm(s, i+1)
             op1, op2 = unify_operands(x)
             op1.data_size = flag_size*2-size_prefix
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
@@ -285,7 +284,7 @@ def disasm(s, start_address=0):
             # todo: combine with the previous case
             mnemonic = "mov"
             flag_size = s[i] & 1
-            x, i = analyse_modrm(s, i)
+            x, i = analyse_modrm(s, i+1)
             if x['modrm'][1] == 0:
                 _, op = unify_operands(x)
                 op.data_size = flag_size*2-size_prefix
@@ -298,7 +297,7 @@ def disasm(s, start_address=0):
             mnemonic = op_FC_dir_width_REG_RM[s[i] & 0xFC]
             dir_flag = s[i] & 2
             flag_size = s[i] & 1
-            x, i = analyse_modrm(s, i)
+            x, i = analyse_modrm(s, i+1)
             op1, op2 = unify_operands(s)
             op1.data_size = flag_size*2-size_prefix
             if dir_flag:
@@ -310,3 +309,4 @@ def disasm(s, start_address=0):
             line = BytesLine(start_address+j, data=s[j:i])
 
         yield line
+
