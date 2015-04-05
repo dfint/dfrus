@@ -79,13 +79,23 @@ class Operand:
         self.value = value
         self.reg = reg
         self.base_reg = base_reg
-        self.data_size = data_size
+        assert(data_size is None or 0 <= data_size <= 2)
+        self._data_size = data_size
         self.index_reg = index_reg
         self.scale = scale
         self.disp = disp
         self.seg_reg = seg_reg
         if self.data_size is None and self.reg is not None:
             self.data_size = 2
+
+    @property
+    def data_size(self):
+        return self._data_size
+
+    @data_size.setter
+    def data_size(self, value):
+        assert(value is None or 0 <= value <= 2)
+        self._data_size = value
 
     def __repr__(self):
         if self.value is not None:
@@ -327,7 +337,7 @@ def disasm(s, start_address=0):
                 mnemonic = mnemonics[op]
                 _, op1 = unify_operands(x)
                 if op < 2:
-                    size = 1+flag_size*2-size_prefix
+                    size = flag_size*2-size_prefix
                     op1.data_size = size
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1])
                 elif flag_size:
