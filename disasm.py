@@ -287,7 +287,9 @@ def disasm(s, start_address=0):
             x, i = analyse_modrm(s, i+1)
             _, op = unify_operands(x)
             op.data_size = flag_size*2-size_prefix
-            immediate = Operand(value=int.from_bytes(s[i:i+1 << op.data_size], byteorder='little'))
+            imm_size = 1 << op.data_size
+            immediate = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
+            i += imm_size
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
         elif (s[i] & 0xFC) in op_FC_dir_width_REG_RM:
             # Operation between a register and register/memory with direction flag
