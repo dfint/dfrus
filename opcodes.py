@@ -75,7 +75,7 @@ jmp_indir = bytes([0xff, 0x20])
 jcc_short = 0x70  # + cond
 jcc_near = bytes([0x0f, 0x80])  # + {0,cond}
 
-call_near = 0xe8,
+call_near = 0xe8
 call_indir = bytes([0xff, 0x10])
 
 setcc = bytes([0x0f, 0x90])
@@ -95,10 +95,10 @@ ret_far_d = 0xca
 leave = 0xc9
 int3 = 0xcc
 
-push_reg = 0x50 # + reg
+push_reg = 0x50  # + reg
 push_imm32 = 0x68
 push_imm8 = push_imm32 + 2
-push_indir = bytes([0xff, 0x30]) # + размер смещение * 40h + базовый регистр [& sib]
+push_indir = bytes([0xff, 0x30])  # + размер смещение * 40h + базовый регистр [& sib]
 pushfd = 0x9c
 popfd = 0x9d
 
