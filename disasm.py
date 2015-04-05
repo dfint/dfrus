@@ -98,7 +98,7 @@ class Operand:
             else:
                 result = ""
                 if self.base_reg is not None:
-                    result = regs[self.reg][2]  # Currently only 32-bit addressing supported
+                    result = regs[self.base_reg][2]  # Currently only 32-bit addressing supported
                     if self.index_reg is not None:
                         result += "+"
 
@@ -147,9 +147,9 @@ def unify_operands(s):
                 sib = s['sib']
                 if sib[1] == 4:
                     # Don't use index register
-                    op2 = Operand(scale=sib[0], base_reg=[2])
+                    op2 = Operand(scale=sib[0], base_reg=sib[2])
                 else:
-                    op2 = Operand(scale=sib[0], index_reg=sib[1], base_reg=[2])
+                    op2 = Operand(scale=sib[0], index_reg=sib[1], base_reg=sib[2])
 
             if modrm[0] > 0:
                 op2.disp = s['disp']
@@ -163,6 +163,7 @@ op_nomask = {call_near: "call near", jmp_near: "jmp near", jmp_short: "jmp short
 op_FE_width_REG_RM = {test_rm_reg: "test", xchg_rm_reg: "xchg"}
 op_FC_dir_width_REG_RM = {mov_rm_reg: "mov", add_rm_reg: "add", sub_rm_reg: "sub", or_rm_reg: "or", and_rm_reg: "and",
                           xor_rm_reg: "xor", cmp_rm_reg: "cmp", adc_rm_reg: "adc", sbb_rm_reg: "sbb"}
+op_F8_reg = {push_reg: 'push', pop_reg: 'pop', inc_reg: 'inc', dec_reg: 'dec'}
 
 conditions = ("o", "no", "b", "nb", "z", "nz", "na", "a", "s", "ns", "p", "np", "l", "nl", "ng", "g")
 
@@ -251,7 +252,8 @@ def disasm(s, start_address=0):
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
-            x, i = analyse_modrm(s, i)
+            x, i = analyse_modrm(s, i+1)
+            # print(x)
             operands = unify_operands(x)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='lea', operands=operands)
         elif (s[i] & 0xFC) == op_rm_imm and (s[i] & 3) != 2:
@@ -298,14 +300,20 @@ def disasm(s, start_address=0):
             # Operation between a register and register/memory with direction flag
             mnemonic = op_FC_dir_width_REG_RM[s[i] & 0xFC]
             dir_flag = s[i] & 2
-            flag_size = not (s[i] & 1)
+            flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
             op1, op2 = unify_operands(x)
             op1.data_size = flag_size*2-size_prefix
-            if dir_flag:
+            if not dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
-
+        elif s[i] & 0xF8 in op_F8_reg:
+            mnemonic = op_F8_reg[s[i] & 0xF8]
+            reg = s[i] & 7
+            size = 2 - size_prefix
+            op = Operand(reg=reg, data_size=size)
+            i += 1
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op])
         elif s[i] & 0xFE == 0xFE:
             flag_size = s[i] & 1
             i += 1
@@ -345,4 +353,4 @@ if __name__ == "__main__":
                 mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 100)
                 for disasm_line in disasm(mach, image_base+entry_point):
                     print("%08x\t%s\t\t%s" %
-                          (disasm_line.address, ''.join('%x' % x for x in disasm_line.data), disasm_line))
+                          (disasm_line.address, ''.join('%02x' % x for x in disasm_line.data), disasm_line))
