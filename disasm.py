@@ -100,7 +100,7 @@ class Operand:
                     if self.scale > 0:
                         result += "%d*" % (1 << self.scale)
 
-                    result += regs[self.reg][2]
+                    result += regs[self.index_reg][2]
 
                 if self.disp != 0 or not result:
                     if not result:
@@ -167,9 +167,9 @@ def asmhex(n):
     if n < 0xA:
         return str(n)
     else:
-        h = ('%02xh' % n).upper()
+        h = ('%02x' % n).upper() + 'h'
         if 'A' <= h[0] <= 'F':
-            h = '0' + 'h'
+            h = '0' + h
         return h
 
 
@@ -186,7 +186,7 @@ class DisasmLine:
         if not self.operands:
             return self.mnemonic
         else:
-            return self.mnemonic + ' ' + ', '.join(self.operands)
+            return self.mnemonic + ' ' + ', '.join(str(item) for item in self.operands)
 
 
 class BytesLine(DisasmLine):
@@ -212,13 +212,15 @@ def disasm(s, start_address=0):
         if s[i] in op_1byte_nomask_noargs:
             if i > j:  # Are there any prefixes?
                 yield BytesLine(start_address+j, data=s[j:i])
-            line = DisasmLine(start_address+i, data=s[i], mnemonic=op_1byte_nomask_noargs[s[i]])
+                j = i
+            line = DisasmLine(start_address+j, data=[s[i]], mnemonic=op_1byte_nomask_noargs[s[i]])
             i += 1
         elif s[i] == ret_near_n:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
+                j = i
             immediate = int.from_bytes(bytes(s[i+1:i+2]), byteorder='little')
-            line = DisasmLine(start_address+i, data=s[i:i+4], mnemonic='retn', operands=[Operand(value=immediate)])
+            line = DisasmLine(start_address+j, data=s[i:i+4], mnemonic='retn', operands=[Operand(value=immediate)])
             i += 3
         elif s[i] in {call_near, jmp_near}:
             if len(s) < i+4:
@@ -226,10 +228,10 @@ def disasm(s, start_address=0):
             else:
                 if i > j:
                     yield BytesLine(start_address+j, data=s[j:i])
-                j = i
+                    j = i
                 i += 5
                 immediate = start_address+i+signed(int.from_bytes(s[j+1:i], byteorder='little'), 32)
-                line = DisasmLine(start_address+i, data=s[j:i], mnemonic=op_nomask[s[i]],
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
                                   operands=[Operand(value=immediate)])
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
             if len(s) < i+1:
@@ -237,21 +239,22 @@ def disasm(s, start_address=0):
             else:
                 if i > j:
                     yield BytesLine(start_address+j, data=s[j:i])
+                    j = i
                 immediate = start_address+i+2+signed(s[i+1], 8)
                 if s[i] == jmp_short:
                     mnemonic = "jmp short"
                 else:
                     mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
-                line = DisasmLine(start_address+i, data=s[i:i+2], mnemonic=mnemonic,
+                line = DisasmLine(start_address+j, data=s[i:i+2], mnemonic=mnemonic,
                                   operands=[Operand(value=immediate)])
                 i += 2
         elif s[i] == lea:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
-            j = i
+                j = i
             x, i = analyse_modrm(s, i)
             operands = unify_operands(x)
-            line = DisasmLine(start_address+i, data=s[j:i], mnemonic='lea', operands=operands)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='lea', operands=operands)
         elif (s[i] & 0xFC) == op_rm_imm and (s[i] & 3) != 2:
             flags = s[i] & 3
             mnemonics = ("add", "or", "adc", "sbb", "and", "sub", "xor", "cmp")
@@ -297,7 +300,7 @@ def disasm(s, start_address=0):
             dir_flag = s[i] & 2
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
-            op1, op2 = unify_operands(s)
+            op1, op2 = unify_operands(x)
             op1.data_size = flag_size*2-size_prefix
             if dir_flag:
                 op1, op2 = op2, op1
@@ -309,3 +312,19 @@ def disasm(s, start_address=0):
 
         yield line
 
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        pass
+    else:
+        with open(sys.argv[1], "r+b") as fn:
+            from pe import *
+            pe_offset = check_pe(fn)
+            if pe_offset:
+                image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
+                sections = get_section_table(fn, pe_offset)
+                entry_point = fpeek4u(fn, pe_offset+PE_ENTRY_POINT_RVA)
+                mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 100)
+                for disasm_line in disasm(mach, image_base+entry_point):
+                    print("%08x\t%s\t%s" % (disasm_line.address,
+                                            ''.join('%x' % x for x in disasm_line.data), disasm_line))
