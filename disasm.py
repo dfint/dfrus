@@ -155,6 +155,9 @@ seg_prefixes = {Prefix.seg_cs: "cs", Prefix.seg_ds: "ds", Prefix.seg_es: "es", P
 op_1byte_nomask_noargs = {nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
                           popad: "popad", leave: "leave", int3: "int3"}
 op_nomask = {call_near: "call near", jmp_near: "jmp near", jmp_short: "jmp short"}
+op_FE_width_REG_RM = {test_rm_reg: "test", xchg_rm_reg: "xchg"}
+op_FC_dir_width_REG_RM = {mov_rm_reg: "mov", add_rm_reg: "add", sub_rm_reg: "sub", or_rm_reg: "or", and_rm_reg: "and",
+                          xor_rm_reg: "xor", cmp_rm_reg: "cmp", adc_rm_reg: "adc", sbb_rm_reg: "sbb"}
 
 conditions = ("o", "no", "b", "nb", "z", "nz", "na", "a", "s", "ns", "p", "np", "l", "nl", "ng", "g")
 
@@ -270,6 +273,37 @@ def disasm(s, start_address=0):
                 immediate = s[i]
                 i += 1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
+        elif (s[i] & 0xFE) in op_FE_width_REG_RM:
+            # Operation between register and register/memory without direction flag (xchg or test)
+            mnemonic = op_FE_width_REG_RM[s[i] & 0xFE]
+            flag_size = s[i] & 1
+            x, i = analyse_modrm(s, i)
+            op1, op2 = unify_operands(x)
+            op1.data_size = flag_size*2-size_prefix
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
+        elif (s[i] & 0xFE) == mov_rm_imm:
+            # todo: combine with the previous case
+            mnemonic = "mov"
+            flag_size = s[i] & 1
+            x, i = analyse_modrm(s, i)
+            if x['modrm'][1] == 0:
+                _, op = unify_operands(x)
+                op.data_size = flag_size*2-size_prefix
+                immediate = Operand(value=int.from_bytes(s[i:i+1 << op.data_size], byteorder='little'))
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
+            else:
+                pass  # todo: handle this case properly
+        elif (s[i] & 0xFC) in op_FC_dir_width_REG_RM:
+            # Operation between a register and register/memory with direction flag
+            mnemonic = op_FC_dir_width_REG_RM[s[i] & 0xFC]
+            dir_flag = s[i] & 2
+            flag_size = s[i] & 1
+            x, i = analyse_modrm(s, i)
+            op1, op2 = unify_operands(s)
+            op1.data_size = flag_size*2-size_prefix
+            if dir_flag:
+                op1, op2 = op2, op1
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
 
         if not line:
             i += 1
