@@ -103,16 +103,13 @@ class Operand:
                     result += regs[self.index_reg][2]
 
                 if self.disp != 0 or not result:
-                    if not result:
-                        if self.disp >= 0:
-                            result = asmhex(self.disp)
+                    if self.disp >= 0:
+                        if not result:
+                            result += asmhex(self.disp)
                         else:
-                            result = '-' + asmhex(-self.disp)
+                            result += '+' + asmhex(self.disp)
                     else:
-                        if self.disp > 0:
-                            result += ' + ' + asmhex(self.disp)
-                        else:
-                            result += ' - ' + asmhex(-self.disp)
+                        result += '-' + asmhex(-self.disp)
 
             if self.seg_reg is None:
                 return "%s [%s]" % (op_sizes[self.data_size], result)
@@ -320,5 +317,5 @@ if __name__ == "__main__":
                 entry_point = fpeek4u(fn, pe_offset+PE_ENTRY_POINT_RVA)
                 mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 100)
                 for disasm_line in disasm(mach, image_base+entry_point):
-                    print("%08x\t%s\t%s" % (disasm_line.address,
+                    print("%08x\t%s\t\t%s" % (disasm_line.address,
                                             ''.join('%x' % x for x in disasm_line.data), disasm_line))
