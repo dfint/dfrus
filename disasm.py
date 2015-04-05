@@ -334,6 +334,21 @@ def disasm(s, start_address=0):
                     if seg_reg:
                         op1.seg_reg = seg_reg
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1])
+        elif s[i] & 0xFC == mov_acc_mem:
+            dir_flag = s[i] & 2
+            size_flag = s[i] & 1
+            size = size_flag*2 - size_prefix
+            i += 1
+            imm_size = 1 << size
+            immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
+            i += imm_size
+            op1 = Operand(reg=Reg.eax, data_size=size)
+            op2 = Operand(disp=immediate)
+            if seg_reg:
+                op2.seg_reg = seg_reg
+            if dir_flag:
+                op1, op2 = op2, op1
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
 
         if not line:
             i += 1
@@ -353,7 +368,7 @@ if __name__ == "__main__":
                 image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
                 sections = get_section_table(fn, pe_offset)
                 entry_point = fpeek4u(fn, pe_offset+PE_ENTRY_POINT_RVA)
-                mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 100)
+                mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 0x100)
                 for disasm_line in disasm(mach, image_base+entry_point):
                     print("%08x\t%s\t\t%s" %
                           (disasm_line.address, ''.join('%02x' % x for x in disasm_line.data), disasm_line))
