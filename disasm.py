@@ -371,6 +371,11 @@ def disasm(s, start_address=0):
             if not dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
+        elif s[i] == pop_rm:
+            x, i = analyse_modrm(s, i+1)
+            _, op = unify_operands(x)
+            op.data_size = 2-size_prefix
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='pop', operands=[op])
 
         if not line:
             i += 1
