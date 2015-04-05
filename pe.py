@@ -57,6 +57,7 @@ SIZEOF_PE_HEADER = 0xF8
 
 
 def check_pe(fn):
+    """Check if the given file is Portable Executable and return offset of the PE-header"""
     if fpeek(fn, MZ_SIGNATURE, 2) != b'MZ':
         return None
     pe_header_offset = fpeek4u(fn, MZ_LFANEW)
