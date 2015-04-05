@@ -280,18 +280,15 @@ def disasm(s, start_address=0):
             op1, op2 = unify_operands(x)
             op1.data_size = flag_size*2-size_prefix
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
-        elif (s[i] & 0xFE) == mov_rm_imm:
+        elif (s[i] & 0xFE) == mov_rm_imm and (s[i+1] & 0x38) == 0:
             # todo: combine with the previous case
             mnemonic = "mov"
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
-            if x['modrm'][1] == 0:
-                _, op = unify_operands(x)
-                op.data_size = flag_size*2-size_prefix
-                immediate = Operand(value=int.from_bytes(s[i:i+1 << op.data_size], byteorder='little'))
-                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
-            else:
-                pass  # todo: handle this case properly
+            _, op = unify_operands(x)
+            op.data_size = flag_size*2-size_prefix
+            immediate = Operand(value=int.from_bytes(s[i:i+1 << op.data_size], byteorder='little'))
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
         elif (s[i] & 0xFC) in op_FC_dir_width_REG_RM:
             # Operation between a register and register/memory with direction flag
             mnemonic = op_FC_dir_width_REG_RM[s[i] & 0xFC]
