@@ -75,7 +75,7 @@ op_sizes = ("byte", "word", "dword")
 
 class Operand:
     def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=None,
-                 seg_reg=None):
+                 seg_prefix=None, seg_reg=None):
         self.value = value
         self.reg = reg
         self.base_reg = base_reg
@@ -84,6 +84,7 @@ class Operand:
         self.index_reg = index_reg
         self.scale = scale
         self.disp = disp
+        self.seg_prefix = seg_prefix
         self.seg_reg = seg_reg
         if self.data_size is None and self.reg is not None:
             self.data_size = 2
@@ -102,6 +103,8 @@ class Operand:
             return asmhex(self.value)
         elif self.reg is not None:
             return regs[self.reg][self.data_size]
+        elif self.seg_reg is not None:
+            return seg_regs[self.seg_reg]
         else:
             if self.base_reg is None and self.index_reg is None:
                 result = asmhex(self.disp)
@@ -127,10 +130,10 @@ class Operand:
                     else:
                         result += '-' + asmhex(-self.disp)
 
-            if self.seg_reg is None:
+            if self.seg_prefix is None:
                 result = "[%s]" % result
             else:
-                result = "%s:[%s]" % (seg_regs[self.seg_reg], result)
+                result = "%s:[%s]" % (seg_regs[self.seg_prefix], result)
 
             if self.data_size is not None:
                 result = op_sizes[2] + ' ' + result
@@ -138,8 +141,8 @@ class Operand:
             return result
 
 
-def unify_operands(s):
-    modrm = s['modrm']
+def unify_operands(x):
+    modrm = x['modrm']
     op1 = Operand(reg=modrm[1])
     if modrm[0] == 3:
         # Register addressing
@@ -147,14 +150,14 @@ def unify_operands(s):
     else:
         if modrm[0] == 0 and modrm[2] == 5:
             # Direct addressing
-            op2 = Operand(disp=s['disp'])
+            op2 = Operand(disp=x['disp'])
         else:
             if modrm[2] != 4:
                 # Without SIB-byte
                 op2 = Operand(scale=0, index_reg=modrm[2])
             else:
                 # Use the SIB, Luke
-                sib = s['sib']
+                sib = x['sib']
                 if sib[1] == 4:
                     # Don't use index register
                     op2 = Operand(scale=sib[0], base_reg=sib[2])
@@ -162,7 +165,7 @@ def unify_operands(s):
                     op2 = Operand(scale=sib[0], index_reg=sib[1], base_reg=sib[2])
 
             if modrm[0] > 0:
-                op2.disp = s['disp']
+                op2.disp = x['disp']
 
     return op1, op2
 
@@ -215,10 +218,10 @@ def disasm(s, start_address=0):
     while i < len(s):
         j = i
         size_prefix = False
-        seg_reg = None
+        seg_prefix = None
         line = None
         if s[i] in seg_prefixes:
-            seg_reg = seg_prefixes[s[i]]
+            seg_prefix = seg_prefixes[s[i]]
             i += 1
 
         if s[i] == Prefix.operand_size:
@@ -341,8 +344,8 @@ def disasm(s, start_address=0):
                     op1.data_size = size
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1])
                 elif flag_size:
-                    if seg_reg:
-                        op1.seg_reg = seg_reg
+                    if seg_prefix:
+                        op1.seg_prefix = seg_prefix
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1])
         elif s[i] & 0xFC == mov_acc_mem:
             dir_flag = s[i] & 2
@@ -354,9 +357,18 @@ def disasm(s, start_address=0):
             i += imm_size
             op1 = Operand(reg=Reg.eax, data_size=size)
             op2 = Operand(disp=immediate)
-            if seg_reg:
-                op2.seg_reg = seg_reg
+            if seg_prefix:
+                op2.seg_prefix = seg_prefix
             if dir_flag:
+                op1, op2 = op2, op1
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
+        elif s[i] & 0xFD == mov_rm_seg:
+            dir_flag = s[i] & 2
+            x, i = analyse_modrm(s, i+1)
+            op1, op2 = unify_operands(x)
+            op1.seg_reg = op1.reg
+            op1.reg = None
+            if not dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
 
