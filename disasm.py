@@ -223,31 +223,25 @@ def disasm(s, start_address=0):
             line = DisasmLine(start_address+j, data=s[i:i+4], mnemonic='retn', operands=[Operand(value=immediate)])
             i += 3
         elif s[i] in {call_near, jmp_near}:
-            if len(s) < i+4:
-                line = BytesLine(start_address+j, data=s[j:])
-            else:
-                if i > j:
-                    yield BytesLine(start_address+j, data=s[j:i])
-                    j = i
-                i += 5
-                immediate = start_address+i+signed(int.from_bytes(s[j+1:i], byteorder='little'), 32)
-                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
-                                  operands=[Operand(value=immediate)])
+            if i > j:
+                yield BytesLine(start_address+j, data=s[j:i])
+                j = i
+            i += 5
+            immediate = start_address+i+signed(int.from_bytes(s[j+1:i], byteorder='little'), 32)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
+                              operands=[Operand(value=immediate)])
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
-            if len(s) < i+1:
-                line = BytesLine(start_address+j, data=s[j:])
+            if i > j:
+                yield BytesLine(start_address+j, data=s[j:i])
+                j = i
+            immediate = start_address+i+2+signed(s[i+1], 8)
+            if s[i] == jmp_short:
+                mnemonic = "jmp short"
             else:
-                if i > j:
-                    yield BytesLine(start_address+j, data=s[j:i])
-                    j = i
-                immediate = start_address+i+2+signed(s[i+1], 8)
-                if s[i] == jmp_short:
-                    mnemonic = "jmp short"
-                else:
-                    mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
-                line = DisasmLine(start_address+j, data=s[i:i+2], mnemonic=mnemonic,
-                                  operands=[Operand(value=immediate)])
-                i += 2
+                mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
+            line = DisasmLine(start_address+j, data=s[i:i+2], mnemonic=mnemonic,
+                              operands=[Operand(value=immediate)])
+            i += 2
         elif s[i] == lea:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
