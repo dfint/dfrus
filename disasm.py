@@ -66,6 +66,9 @@ regs = (
 )
 
 seg_regs = ("es", "cs", "ss", "ds", "fs", "gs")
+seg_prefixes = {Prefix.seg_es: Reg.es, Prefix.seg_cs: Reg.cs, Prefix.seg_ss: Reg.ss, Prefix.seg_ds: Reg.ds,
+                Prefix.seg_fs: Reg.fs, Prefix.seg_gs: Reg.gs}
+
 
 op_sizes = ("byte", "word", "dword")
 
@@ -91,13 +94,13 @@ class Operand:
             return regs[self.reg][self.data_size]
         else:
             if self.base_reg is None and self.index_reg is None:
-                result = '[%s]' % asmhex(self.disp)
+                result = asmhex(self.disp)
             else:
                 result = ""
                 if self.base_reg is not None:
                     result = regs[self.reg][2]  # Currently only 32-bit addressing supported
                     if self.index_reg is not None:
-                        result += " + "
+                        result += "+"
 
                 if self.index_reg is not None:
                     if self.scale > 0:
@@ -153,9 +156,6 @@ def unify_operands(s):
 
     return op1, op2
 
-
-seg_prefixes = {Prefix.seg_cs: "cs", Prefix.seg_ds: "ds", Prefix.seg_es: "es", Prefix.seg_ss: "ss", Prefix.seg_fs: "fs",
-                Prefix.seg_gs: "gs"}
 
 op_1byte_nomask_noargs = {nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
                           popad: "popad", leave: "leave", int3: "int3"}
@@ -305,6 +305,24 @@ def disasm(s, start_address=0):
             if dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
+
+        elif s[i] & 0xFE == 0xFE:
+            flag_size = s[i] & 1
+            i += 1
+            op = (s[i] & 0x38) >> 3
+            if op != 7:
+                x, i = analyse_modrm(s, i)
+                mnemonics = ["inc", "dec", "call dword", "call far", "jmp dword", "jmp far", "push dword"]
+                mnemonic = mnemonics[op]
+                _, op1 = unify_operands(x)
+                if op < 2:
+                    size = 1+flag_size*2-size_prefix
+                    op1.data_size = size
+                    line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1])
+                elif flag_size:
+                    if seg_reg:
+                        op1.seg_reg = seg_reg
+                    line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1])
 
         if not line:
             i += 1
