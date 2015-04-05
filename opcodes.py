@@ -81,7 +81,8 @@ call_indir = bytes([0xff, 0x10])
 setcc = bytes([0x0f, 0x90])
 
 cmp_rm_imm = 0x80
-cmp_rm_reg = 0x38 # | dir<<1 | width
+cmp_rm_reg = 0x38  # | dir<<1 | width
+cmp_acc_imm = 0x3c  # + width
 
 nop = 0x90
 
@@ -101,7 +102,7 @@ push_indir = bytes([0xff, 0x30]) # + размер смещение * 40h + ба�
 pushfd = 0x9c
 popfd = 0x9d
 
-pop_reg = 0x58 # + reg
+pop_reg = 0x58  # + reg
 pop_rm = 0x8f
 
 pushad = 0x60
@@ -120,3 +121,18 @@ and_rm_reg = 0x20  # + 2*dir + width
 and_acc_imm = 0x24  # + width
 op_rm_imm = 0x80
 op_rm_imm8 = 0x83
+adc_rm_reg = 0x10
+sbb_rm_reg = 0x18
+
+xchg_rm_reg = 0x86  # + width
+xchg_acc_reg = 0x90  # + reg # no width bit, so only eax and ax are acceptable
+
+test_rm_reg = 0x84  # + width
+test_acc_imm = 0xa8  # + width
+
+mov_reg_imm = 0xb0  # + 8*width + reg
+mov_acc_mem = 0xa0  # + 2*dir + width
+mov_rm_reg = 0x88  # + 2*dir + width
+mov_reg_rm = mov_rm_reg+2  # + width
+mov_rm_imm = 0xc6  # + width
+mov_rm_seg = 0x8c  # + 2*dir
