@@ -82,7 +82,6 @@ setcc = bytes([0x0f, 0x90])
 
 cmp_rm_imm = 0x80
 cmp_rm_reg = 0x38  # | dir<<1 | width
-cmp_acc_imm = 0x3c  # + width
 
 nop = 0x90
 
@@ -113,6 +112,10 @@ sub_acc_imm = 0x2c  # + width
 xor_acc_imm = 0x34  # + width
 or_acc_imm = 0x0c  # + width
 and_acc_imm = 0x24  # + width
+test_acc_imm = 0xa8  # + width
+cmp_acc_imm = 0x3c  # + width
+adc_acc_imm = 0x14
+sbb_acc_imm = 0x1c
 
 add_rm_reg = 0x00  # + 2*dir + width
 sub_rm_reg = 0x28  # + 2*dir + width
@@ -130,7 +133,6 @@ xchg_rm_reg = 0x86  # + width
 xchg_acc_reg = 0x90  # + reg # no width bit, so only eax and ax are acceptable
 
 test_rm_reg = 0x84  # + width
-test_acc_imm = 0xa8  # + width
 
 mov_reg_imm = 0xb0  # + 8*width + reg
 mov_acc_mem = 0xa0  # + 2*dir + width
