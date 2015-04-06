@@ -177,6 +177,8 @@ op_FE_width_REG_RM = {test_rm_reg: "test", xchg_rm_reg: "xchg"}
 op_FC_dir_width_REG_RM = {mov_rm_reg: "mov", add_rm_reg: "add", sub_rm_reg: "sub", or_rm_reg: "or", and_rm_reg: "and",
                           xor_rm_reg: "xor", cmp_rm_reg: "cmp", adc_rm_reg: "adc", sbb_rm_reg: "sbb"}
 op_F8_reg = {push_reg: 'push', pop_reg: 'pop', inc_reg: 'inc', dec_reg: 'dec'}
+op_FE_width_acc_imm = {add_acc_imm: 'add', sub_acc_imm: 'sub', or_acc_imm: 'or', and_acc_imm: 'or', xor_acc_imm: 'xor',
+                       cmp_acc_imm: 'cmp', test_acc_imm: 'test', adc_acc_imm: 'adc', sbb_acc_imm: 'sbb'}
 
 conditions = ("o", "no", "b", "nb", "z", "nz", "na", "a", "s", "ns", "p", "np", "l", "nl", "ng", "g")
 
@@ -289,7 +291,8 @@ def disasm(s, start_address=0):
             else:  # flags == 0 or flags == 3
                 immediate = s[i]
                 i += 1
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
+            op2 = Operand(value=immediate)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, op2])
         elif (s[i] & 0xFE) in op_FE_width_REG_RM:
             # Operation between register and register/memory without direction flag (xchg or test)
             mnemonic = op_FE_width_REG_RM[s[i] & 0xFE]
@@ -320,6 +323,8 @@ def disasm(s, start_address=0):
             op1.data_size = size
             if op2.reg is not None:
                 op2.data_size = size
+            if seg_prefix is not None:  # redundant check
+                op2.seg_prefix = seg_prefix
             if not dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
@@ -336,7 +341,7 @@ def disasm(s, start_address=0):
             op = (s[i] & 0x38) >> 3
             if op != 7:
                 x, i = analyse_modrm(s, i)
-                mnemonics = ["inc", "dec", "call dword", "call far", "jmp dword", "jmp far", "push dword"]
+                mnemonics = ["inc", "dec", "call", "call far", "jmp dword", "jmp far", "push dword"]
                 mnemonic = mnemonics[op]
                 _, op1 = unify_operands(x)
                 if op < 2:
@@ -376,6 +381,38 @@ def disasm(s, start_address=0):
             _, op = unify_operands(x)
             op.data_size = 2-size_prefix
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='pop', operands=[op])
+        elif s[i] & 0xFD == push_imm32:
+            size_flag = s[i] & 2
+            i += 1
+            if size_flag:
+                immediate = s[i]
+                i += 1
+            else:
+                immediate = int.from_bytes(s[i:i+4], byteorder='little')
+                i += 4
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='push', operands=[Operand(value=immediate)])
+        elif s[i] & 0xFE in op_FE_width_acc_imm:
+            mnemonic = op_FE_width_acc_imm[s[i] & 0xFE]
+            flag_size = s[i] & 1
+            i += 1
+            size = flag_size*2 - size_prefix
+            imm_size = 1 << size
+            immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
+            i += imm_size
+            op1 = Operand(reg=Reg.eax, data_size=size)
+            op2 = Operand(value=immediate)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
+        elif s[i] & 0xF0 == mov_reg_imm:
+            flag_size = (s[i] & 8) >> 3
+            reg = s[i] & 7
+            i += 1
+            size = flag_size*2 - size_prefix
+            imm_size = 1 << size
+            immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
+            i += imm_size
+            op1 = Operand(reg=reg)
+            op2 = Operand(value=immediate)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
 
         if not line:
             i += 1
