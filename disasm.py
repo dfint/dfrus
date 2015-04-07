@@ -456,7 +456,9 @@ if __name__ == "__main__":
                 image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
                 sections = get_section_table(fn, pe_offset)
                 entry_point = fpeek4u(fn, pe_offset+PE_ENTRY_POINT_RVA)
-                mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 0x100)
+                mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 0x500)
                 for disasm_line in disasm(mach, image_base+entry_point):
-                    print("%08x\t%s\t\t%s" %
-                          (disasm_line.address, ''.join('%02x' % x for x in disasm_line.data), disasm_line))
+                    print("%08x\t%s" %
+                          (disasm_line.address, disasm_line))
+                    if disasm_line.mnemonic == 'db':
+                        break
