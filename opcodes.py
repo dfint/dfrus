@@ -143,3 +143,11 @@ mov_rm_seg = 0x8c  # + 2*dir
 
 inc_reg = 0x40  # + reg
 dec_reg = 0x48  # + reg
+
+# Opcodes after 0x0f prefix
+x0f_setcc = 0x90
+x0f_movzx = 0xB6
+x0f_movsx = 0xBE
+x0f_jcc_near = 0x80
+
+

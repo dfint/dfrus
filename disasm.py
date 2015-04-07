@@ -135,8 +135,8 @@ class Operand:
             else:
                 result = "%s:[%s]" % (seg_regs[self.seg_prefix], result)
 
-            if self.data_size is not None:
-                result = op_sizes[2] + ' ' + result
+            if self._data_size is not None:
+                result = op_sizes[self._data_size] + ' ' + result
 
             return result
 
@@ -413,6 +413,30 @@ def disasm(s, start_address=0):
             op1 = Operand(reg=reg)
             op2 = Operand(value=immediate)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
+        elif s[i] == 0x0F:
+            i += 1
+            if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
+                condition = s[i] & 0x0F
+                mnemonic = "set%s" % conditions[condition]
+                reg = Operand(reg=s[i+1] & 7, data_size=0)
+                i += 2
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[reg])
+            elif s[i] & 0xF0 == x0f_jcc_near:
+                condition = s[i] & 0x0F
+                mnemonic = "j%s near" % conditions[condition]
+                i += 1
+                immediate = start_address+i+4+signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
+                i += 4
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=Operand(value=immediate))
+            elif s[i] & 0xFE in {x0f_movzx, x0f_movsx}:
+                op = s[i] & 0xFE
+                mnemonic = 'movzx' if op == x0f_movzx else 'movsx'
+                flag_size = s[i] & 1
+                x, i = analyse_modrm(s, i+1)
+                dest, src = unify_operands(x)
+                dest.data_size = flag_size+1
+                src.data_size = flag_size
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[dest, src])
 
         if not line:
             i += 1
