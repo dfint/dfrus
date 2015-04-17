@@ -48,16 +48,19 @@ def get_cross_references(fn, relocs, sections, image_base):
     code_section = fpeek(fn, sections[code].physical_offset, sections[code].physical_size)
     for reloc in relocs:
         reloc -= sections[code].rva
-        if reloc < 0 and reloc >= sections[code].virtual_size:
+        if not (0 <= reloc < sections[code].virtual_size):
+            # Relocation doesn't belong to the code section
             continue
         obj_rva = int.from_bytes(code_section[reloc:reloc+4], 'little') - image_base
         reloc += sections[code].physical_offset
-        if obj_rva >= data_lower_bound and obj_rva <= data_upper_bound:
+        if data_lower_bound <= obj_rva <= data_upper_bound:
             obj_off = rva_to_off(obj_rva, sections)
             if obj_off is not None:
                 xrefs[obj_off].append(reloc)
     
     return xrefs
+
+
 
 if __name__ == '__main__':
     from binio import TestFileObject
