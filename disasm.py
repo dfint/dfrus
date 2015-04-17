@@ -416,10 +416,11 @@ def disasm(s, start_address=0):
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
         elif s[i] & 0xFE in {shift_op_rm_1, shift_op_rm_cl, shift_op_rm_imm8}:
             opcode = s[i] & 0xFE
-            flag_size = s[i] & 0x01
+            flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
             mnemonic = op_shifts_rolls[x['modrm'][1]]
             _, op1 = unify_operands(x)
+            op1.data_size = flag_size*2 - size_prefix
             if opcode == shift_op_rm_1:
                 op2 = Operand(value=1)
             elif opcode == shift_op_rm_cl:
