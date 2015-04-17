@@ -179,6 +179,7 @@ op_FC_dir_width_REG_RM = {mov_rm_reg: "mov", add_rm_reg: "add", sub_rm_reg: "sub
 op_F8_reg = {push_reg: 'push', pop_reg: 'pop', inc_reg: 'inc', dec_reg: 'dec'}
 op_FE_width_acc_imm = {add_acc_imm: 'add', sub_acc_imm: 'sub', or_acc_imm: 'or', and_acc_imm: 'or', xor_acc_imm: 'xor',
                        cmp_acc_imm: 'cmp', test_acc_imm: 'test', adc_acc_imm: 'adc', sbb_acc_imm: 'sbb'}
+op_shifts_rolls = ("rol", "ror", "rcl", "rcr", "shl", "shr", "sal", "sar")
 
 conditions = ("o", "no", "b", "nb", "z", "nz", "na", "a", "s", "ns", "p", "np", "l", "nl", "ng", "g")
 
@@ -413,6 +414,21 @@ def disasm(s, start_address=0):
             op1 = Operand(reg=reg)
             op2 = Operand(value=immediate)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
+        elif s[i] & 0xFE in {shift_op_rm_1, shift_op_rm_cl, shift_op_rm_imm8}:
+            opcode = s[i] & 0xFE
+            flag_size = s[i] & 0x01
+            x, i = analyse_modrm(s, i+1)
+            mnemonic = op_shifts_rolls[x['modrm'][1]]
+            _, op1 = unify_operands(x)
+            if opcode == shift_op_rm_1:
+                op2 = Operand(value=1)
+            elif opcode == shift_op_rm_cl:
+                op2 = Operand(reg=Reg.cl, data_size=0)
+            else:
+                immediate = s[i]
+                i += 1
+                op2 = Operand(value=immediate)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
         elif s[i] == 0x0F:
             i += 1
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
