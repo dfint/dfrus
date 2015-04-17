@@ -430,6 +430,26 @@ def disasm(s, start_address=0):
                 i += 1
                 op2 = Operand(value=immediate)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
+        elif s[i] & 0xFE == test_or_unary_rm:
+            flag_size = s[i] & 1
+            x, i = analyse_modrm(s, i+1)
+            modrm1 = x['modrm'][1]
+            if modrm1 != 1:
+                _, op1 = unify_operands(x)
+                size = flag_size*2 - size_prefix
+                op1.data_size = size
+                if modrm1 >= 2:
+                    # unary operations: not, neg, mul, imul etc.
+                    mnemonics = ("not", "neg", "mul", "imul", "div", "idiv")
+                    mnemonic = mnemonics[modrm1-2]
+                    line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(op1,))
+                elif modrm1 == 0:
+                    # test r/m, imm
+                    imm_size = 1 << size
+                    immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
+                    i += imm_size
+                    op2 = Operand(value=immediate)
+                    line = DisasmLine(start_address+j, data=s[j:i], mnemonic='test', operands=(op1, op2))
         elif s[i] == 0x0F:
             i += 1
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:

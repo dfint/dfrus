@@ -153,3 +153,5 @@ x0f_jcc_near = 0x80
 shift_op_rm_1 = 0xd0  # + width
 shift_op_rm_cl = 0xd2  # + width
 shift_op_rm_imm8 = 0xc0  # + width
+
+test_or_unary_rm = 0xf6  # + width & MODRM (reg==0 - test; reg==1 - n/a; reg==2 through 7 - unary ops)
