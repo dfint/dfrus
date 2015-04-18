@@ -1,6 +1,8 @@
 
 from binio import fpoke4, fpeek4u, fpeek
 from pe import rva_to_off
+from opcodes import *
+from disasm import *
 
 
 def patch_unicode_table(fn, off):
@@ -61,6 +63,57 @@ def get_cross_references(fn, relocs, sections, image_base):
     return xrefs
 
 
+count_before = 0x20
+count_after = 0x80
+
+
+def fix_len(fn, offset, oldlen, newlen):
+    next_off = offset+4
+    pre = fpeek(fn, offset-count_before, count_before)
+    aft = fpeek(fn, next_off, count_after)
+    jmp = None
+    oldnext = None
+    if aft[0] in {jmp_short, jmp_near}:
+        oldnext = next_off
+        if aft[0] == jmp_short:
+            disp = signed(aft[1], width=8)
+            next_off += 2 + disp
+        else:
+            disp = signed(int.from_bytes(aft[1:5], byteorder='little'), 32)
+            next_off += 5 + disp
+        jmp = aft[0]
+        aft = fpeek(fn, next_off, count_after)
+    elif aft[0] == call_near or aft[0] & 0xf0 == jcc_short or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
+        aft = None
+
+    if pre[-1] == push_imm32:
+        # push offset str
+        pass
+    elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
+        # mov reg32, offset str
+        reg = pre[-1] & 7
+        if reg == Reg.eax:
+            if int.from_bytes(pre[-5:-2], byteorder='little') == oldlen:
+                pass
+            elif pre[-3] == push_imm8 and pre[-2] == oldlen:
+                pass
+            elif aft and aft[0] == push_imm8 and aft[1] == oldlen:
+                pass
+            elif pre[-2] == mov_reg_rm+1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
+                pass
+            elif aft and aft[0] == mov_reg_imm | 8 | Reg.edi and int.from_bytes(aft[1:5], byteorder='little') == oldlen:
+                pass
+            elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0):
+                pass
+            elif aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0):
+                pass
+        elif reg == Reg.esi:
+            pass
+        return -1  # Assume that there no need to fix
+    elif pre[-1] == mov_acc_mem | 1 or pre[-2] == mov_reg_rm | 1:
+        pass
+
+    return -1
 
 if __name__ == '__main__':
     from binio import TestFileObject
