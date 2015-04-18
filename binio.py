@@ -1,4 +1,13 @@
 
+def from_bytes(s):
+    assert(len(s)<=4)
+    x = 0
+    for i in s:
+        x <<= 8
+        x += i
+    return x
+
+
 def get_integer32(file_object):
     return int.from_bytes(file_object.read(4), byteorder='little')
 
