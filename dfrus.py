@@ -144,6 +144,8 @@ new_section = Section(
     flags=IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE
 )
 
+new_section_offset = new_section.physical_offset
+
 # --------------------------------------------------------
 print("Translating...")
 
@@ -183,9 +185,37 @@ for off, string in strings:
                          off=off, encoding='cp1251',
                          new_len=aligned_len)
         else:
-            pass
-        
+            str_off = new_section_offset
+            new_section_offset = add_to_new_section(fn, new_section_offset,
+                                                    bytes(translation + '\0', encoding='cp1251'))
+
         pass
 
+
+if new_section_offset > new_section.physical_offset:
+    file_size = align(new_section_offset, file_alignment)
+    new_section.physical_size = file_size - new_section.physical_offset
+
+    print("Adding new data section...")
+
+    # Align file size
+    if file_size > new_section_offset:
+        fn.seek(file_size-1)
+        fn.write('\0')
+
+    # Set the new section virtual size
+    new_section.virtual_size = new_section_offset - new_section.physical_offset
+
+    # Write the new section info
+    put_section_info(fn,
+                     pe_offset + SIZEOF_PE_HEADER + len(sections)*SIZEOF_IMAGE_SECTION_HEADER,
+                     new_section)
+
+    # Fix number of sections
+    fpoke2(fn, pe_offset + PE_NUMBER_OF_SECTIONS, len(sections)+1)
+
+    # Fix ImageSize field of the PE header
+    fpoke4(fn, pe_offset + PE_SIZE_OF_IMAGE,
+           align(new_section.rva + new_section.virtual_size, section_alignment))
 
 fn.close()

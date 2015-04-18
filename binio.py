@@ -55,15 +55,20 @@ def write_words(file_object, words):
         put_integer16(file_object, x)
 
 
+def pad_tail(target, size, ch=' '):
+    if len(target) < size:
+        target += ch*(len(target)-size)
+    return target
+
+
 def write_string(file_object, s, off=None, new_len=None, encoding=None):
     if off is not None:
         file_object.seek(off)
     
     if new_len is None:
         new_len = len(s)+1
-    
-    if new_len > len(s):
-        s += '\0'*(len(s)-new_len)
+
+    s = pad_tail(s, new_len, '\0')
     
     if encoding is None:
         file_object.write(s.encode())
@@ -100,6 +105,15 @@ def fpoke4(file_object, off, x):
         put_integer32(file_object, x)
 
 
+def fpoke2(file_object, off, x):
+    if isinstance(x, collections.Iterable):
+        file_object.seek(off)
+        write_words(file_object, x)
+    else:
+        file_object.seek(off)
+        put_integer16(file_object, x)
+
+
 def fpoke(file_object, off, x):
     if isinstance(x, collections.Iterable):
         file_object.seek(off)
@@ -108,6 +122,7 @@ def fpoke(file_object, off, x):
     else:
         file_object.seek(off)
         file_object.write(x)
+
 
 import random
 
