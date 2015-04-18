@@ -6,8 +6,8 @@ def align(n, edge=4):
     return (n+edge-1) & (-edge)
 
 
-def signed(x, w):
-    pow2w = 2**w
+def signed(x, width):
+    pow2w = 2**width
     assert(x < pow2w)
     if x & (pow2w//2):
         x -= pow2w
@@ -17,6 +17,14 @@ def signed(x, w):
 def split_byte(x):
     """Split byte into groups of bits: (2 bits, 3 bits, 3 bits)"""
     return x >> 6, x >> 3 & 7, x & 7
+
+
+def join_byte(*parts):
+    s = 0
+    for x in parts:
+        s <<= 3
+        s |= x
+    return s
 
 
 def analyse_modrm(s, i):
