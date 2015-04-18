@@ -291,11 +291,19 @@ def fix_len(fn, offset, oldlen, newlen):
                             fpoke(fn, next_off+move_to_mem, nop)  # clear operand size prefix
                             return 1
                 i = j
-                assert(flag<2)
+                assert(flag < 2)
         else:
             return 0
 
     return -1  # Assume that there's no need to fix
+
+
+def add_to_new_section(fn, dest, s, alignment=4):
+    aligned = align(len(s), alignment)
+    s = pad_tail(s, aligned, b'\0')
+    fpoke(fn, dest, s)
+    return dest + aligned
+
 
 if __name__ == '__main__':
     from binio import TestFileObject
