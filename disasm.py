@@ -178,6 +178,26 @@ def unify_operands(x):
     return op1, op2
 
 
+def analyse_mach(s, i=0):
+    j = i
+    if s[i] == Prefix.operand_size:
+        i += 1
+    op = s[i]
+    data = s[j:i+1]
+    result = dict(data=data)
+    i += 1
+    if op & 0xfe == mov_acc_mem:
+        result.update(reg=Reg.eax, imm=from_bytes(s[i:i+4]))
+        i += 4
+    elif op & 0xfc == mov_rm_reg or s[i] == lea:
+        modrm, i = analyse_modrm(s, i)
+        result.update(modrm)
+    else:
+        return None
+
+    return result, i
+
+
 op_1byte_nomask_noargs = {nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
                           popad: "popad", leave: "leave", int3: "int3"}
 op_nomask = {call_near: "call near", jmp_near: "jmp near", jmp_short: "jmp short"}
