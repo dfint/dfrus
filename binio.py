@@ -90,6 +90,16 @@ def fpoke4(file_object, off, x):
         file_object.seek(off)
         put_integer32(file_object, x)
 
+
+def fpoke(file_object, off, x):
+    if isinstance(x, collections.Iterable):
+        file_object.seek(off)
+        for item in x:
+            file_object.write(item)
+    else:
+        file_object.seek(off)
+        file_object.write(x)
+
 import random
 
 
