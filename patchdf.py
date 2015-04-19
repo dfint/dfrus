@@ -298,6 +298,98 @@ def fix_len(fn, offset, oldlen, newlen):
     return -1  # Assume that there's no need to fix
 
 
+def get_length(s, oldlen):
+    i = 0
+    curlen = 0
+    regs = [None, None, None]
+    deleted = set()
+    dest = None
+    _lea = None
+    while curlen < oldlen:
+        size = 4
+        if s[i] == Prefix.operand_size:
+            size = 2
+            i += 1
+
+        op = s[i]
+        i += 1
+        if op & 0xfe == mov_acc_mem:
+            # mov eax/ax/al, [mem]
+            assert(regs[Reg.ax] is None)
+            if op & 1 == 0:
+                size = 1
+            regs[Reg.ax] = size
+            deleted.add(i)
+            i += 4
+        elif op & 0xfc == mov_rm_reg:
+            if op & 1 == 0:
+                size = 1
+            x, j = analyse_modrm(s, i)
+            modrm = x['modrm']
+            reg = modrm[1]
+            assert(reg <= Reg.dx)  # reg in {Reg.ax, Reg.cx, Reg.dx})
+            i += 1  # assume there's no sib byte
+            if op & 2:
+                # mov reg, [mem]
+                assert(modrm[0] == 0 and modrm[2] == 5)  # move from explicit address to register
+                assert(regs[reg] is None)  # register value was not saved
+                regs[reg] = size
+                deleted.add(i)
+            else:
+                # mov [mem], reg
+                assert(modrm[0] == 3 or (modrm[0] == 0 and modrm[2] == 5))  # move to register or explicit address
+                assert(regs[reg] == size)  # get a value with the same size as stored
+                regs[reg] = None
+                x = process_operands(x)
+                if dest is None:
+                    dest = x
+                elif dest[0] == x[0] and dest[1] > x[1]:
+                    dest[1] = x[1]
+                curlen += size
+            i = j
+        elif op == lea:
+            x, j = analyse_modrm(s, i)
+            modrm = x['modrm']
+            assert(modrm[0] != 3)
+            reg = modrm[1]
+            if reg <= Reg.dx:
+                regs[reg] = -1  # mark register as occupied
+            x = process_operands(x)
+            if dest is None:
+                dest = x
+            elif dest[0] == x[0] and dest[1] > x[1]:
+                dest[1] = x[1]
+            _lea = dict(dest=modrm[1], src=Operand(base_reg=x[0], disp=x[1]))
+            i = j
+        else:
+            raise AssertionError
+    return dict(length=i, dest=dest, deleted=deleted, lea=_lea)
+
+
+def mach_memcpy(src, dest, count):
+    mach = bytearray()
+    mach.append(pushad)  # pushad
+    mach += bytearray((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
+    mach += bytearray((mov_reg_imm | Reg.cl, (count+3)//4))  # mov cl, (count+3)//4
+
+    # If the destination address is not in edi yet, put it there
+    if dest != (Reg.edi, 0):
+        if dest[1] == 0:
+            # mov edi, reg
+            mach += bytearray((mov_rm_reg | 1, join_byte(3, dest[0], Reg.edi)))
+        else:
+            # lea edi, [reg+imm]
+            mach += mach_lea(Reg.edi, Operand(base_reg=dest[0], disp=dest[1]))
+
+    mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
+    new_reference = len(mach)
+    mach += to_bytes(src, 4)  # imm32
+    mach += bytearray((Prefix.rep, movsd))  # rep movsd
+    mach.append(popad)  # popad
+
+    return mach, new_reference
+
+
 def add_to_new_section(fn, dest, s, alignment=4):
     aligned = align(len(s), alignment)
     s = pad_tail(s, aligned, b'\0')

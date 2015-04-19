@@ -6,6 +6,8 @@ debug = 'debug' in cmd
 if debug:
     cmd.remove('debug')
 
+make_call_hooks = False
+
 if len(cmd) > 1:
     path = cmd[1]
 else:
@@ -92,6 +94,7 @@ sections = get_section_table(fn, pe_offset)
 
 # Getting addresses of all relocatable entries
 relocs = get_relocations(fn, sections)
+relocs_modified = False
 
 # Getting cross-references:
 xref_table = get_cross_references(fn, relocs, sections, image_base)
@@ -157,7 +160,8 @@ if debug:
     print("%d strings extracted.\n" % len(strings))
     # TODO: add slicing of the string list for the debugging purposes
 
-funcs = dict()
+funcs = defaultdict(defaultdict(list))
+fixes = dict()
 
 for off, string in strings:
     if string in trans_table:
@@ -184,14 +188,158 @@ for off, string in strings:
             write_string(fn, translation,
                          off=off, encoding='cp1251',
                          new_len=aligned_len)
+            str_off = None
         else:
             str_off = new_section_offset
             new_section_offset = add_to_new_section(fn, new_section_offset,
                                                     bytes(translation + '\0', encoding='cp1251'))
 
-        pass
+        # Fix string length for each reference
+        for ref in refs:
+            fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation))
+            if type(fix) is not int:
+                # fix_len() failed to fix length
+                if len(fix) < 4:
+                    if debug:
+                        print('Unable to add jump/call hook at 0x%x for |%s|%s| (jump or call to address 0x%x)' %
+                              (off_to_rva_ex(fix[0], sections[code]) + image_base,
+                               string, translation, off_to_rva_ex(fix[2], sections[code])+image_base))
+                else:
+                    src_off, newcode, dest_off, op = fix
+                    newcode = bytes(newcode)
+                    if op == call_near and make_call_hooks:
+                        funcs[dest_off][newcode].append(off_to_rva_ex(src_off, sections[code]))
+                    else:
+                        if src_off in fixes:
+                            oldfix = fixes[src_off]
+                            oldcode = oldfix[1]
+                            if newcode not in oldcode:
+                                newcode = oldcode + newcode
+                        fix[1] = newcode
+                        fixes[src_off] = fix
+                fix = -1
+
+            if fix != 0:
+                if fix == -2 and debug:
+                    print('|%s|%s| <- %x (%x)' %
+                          (string, translation, ref, off_to_rva_ex(ref, sections[code])+image_base))
+                    print('SUSPICIOUS: Failed to fix length. Probably the code is broken.')
+
+                if is_long:
+                    fpoke4(fn, ref, off_to_rva_ex(str_off, new_section)+image_base)
+            elif is_long:
+                pre = fpeek(fn, ref-3, 3)
+                start = ref-get_start(pre)
+                x = get_length(fpeek(fn, start, 100), len(string)+1)
+
+                src = off_to_rva_ex(str_off, new_section)+image_base
+                mach, new_ref_off = mach_memcpy(src, x[2], len(translation)+1)
+                if x['lea'] is not None:
+                    mach += mach_lea(*x['lea'])
+
+                start_rva = off_to_rva_ex(start, sections[code])
+
+                if len(mach) > x['length']:
+                    # if memcpy code is to long, try to write it into the new section and make call to it
+                    mach.append(ret_near)
+                    proc = mach
+                    dest_off = new_section_offset
+                    dest_rva = off_to_rva_ex(dest_off, new_section)
+                    disp = dest_rva-(start_rva+5)
+                    mach = bytearray((call_near,))+to_bytes(disp, 4)
+                    if len(mach) > x['length']:
+                        if debug:
+                            print('|%s|%s| <- %x (%x)' %
+                                  (string, translation, ref, off_to_rva_ex(ref, sections[code])+image_base))
+                            print('Replacement machine code is too long (%d against %d).' % (len(mach), x['length']))
+                        continue
+                    new_sect_off = add_to_new_section(fn, dest_off, proc)
+                    new_ref = dest_rva+new_ref_off
+                else:
+                    new_ref = start_rva+new_ref_off
+
+                # Fix relocations
+                # Remove relocations of the overwritten references
+                deleted_relocs = x['deleted']
+                for i, item in enumerate(deleted_relocs):
+                    relocs.remove(item+start_rva)
+
+                # Add relocation for the new reference
+                relocs.add(new_ref)
+
+                relocs_modified = True
+
+                # Write replacement code
+                mach = pad_tail(mach, x['length'], nop)
+                fpoke(fn, start, mach)
 
 
+def fix_it(_, fix):
+    global new_section_offset
+    src_off, mach, dest = fix
+    hook_off = new_section_offset
+    hook_rva = off_to_rva_ex(hook_off, new_section)
+    dest_rva = off_to_rva_ex(dest, sections[code])
+    disp = dest_rva-(hook_rva+len(mach)+5)  # displacement for jump from the hook
+    # Add jump from the hook
+    mach += bytearray((jmp_near,)) + to_bytes(disp, 4)
+    # Write the hook to the new section
+    new_section_offset = add_to_new_section(fn, hook_off, mach)
+
+    src_rva = off_to_rva_ex(src_off, sections[code])
+    disp = hook_rva-(src_rva+5)  # displacement for jump to the hook
+    fpoke4(fn, src_off+1, disp)
+
+# Delayed fix
+for fix in fixes:
+    fix_it(fix, fixes[fix])
+
+
+def add_call_hook(dest, val):
+    global new_section_offset
+    mach = sum(val.keys(), bytearray())
+    hook_off = new_section_offset
+    hook_rva = off_to_rva_ex(hook_off, new_section)
+    dest_rva = off_to_rva_ex(dest, sections[code])
+
+    # Save the beginning of the function (at least 5 bytes for jump)
+    funccode = fpeek(fn, dest, 0x10)
+    n = None
+    for line in disasm(funccode):
+        if line.address >= 5:
+            n = line.address
+            break
+
+    saved_code = funccode[:n]
+    mach += saved_code
+    disp = dest_rva+len(saved_code)-(hook_rva+len(mach)+5)
+
+    # Jump back to the function
+    mach.append(jmp_near)
+    mach += to_bytes(disp, 4)
+    new_section_offset = add_to_new_section(fn, hook_off, mach)
+
+    # Add jump from the function to the hook
+    src_off = dest
+    src_rva = off_to_rva_ex(src_off, sections[code])
+    disp = hook_rva-(src_rva+5)
+    fpoke(fn, src_off, jmp_near)
+    fpoke4(fn, src_off+1, disp)
+
+# Adding call hooks
+if make_call_hooks:
+    for func in funcs:
+        add_call_hook(func, funcs[func])
+
+
+
+# Write relocation table to the executable
+if relocs_modified:
+    new_size, reloc_table = relocs_to_table(relocs)
+    dd = get_data_directory(fn)
+    reloc_off = rva_to_off(dd[DD_BASERELOC][0], sections)
+
+# Add new section to the executable
 if new_section_offset > new_section.physical_offset:
     file_size = align(new_section_offset, file_alignment)
     new_section.physical_size = file_size - new_section.physical_offset
@@ -219,3 +367,4 @@ if new_section_offset > new_section.physical_offset:
            align(new_section.rva + new_section.virtual_size, section_alignment))
 
 fn.close()
+print('Done.')

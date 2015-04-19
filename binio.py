@@ -1,11 +1,22 @@
 
 def from_bytes(s):
-    assert(len(s)<=4)
+    assert(len(s) <= 4)
     x = 0
     for i in s:
         x <<= 8
         x += i
     return x
+
+
+def to_bytes(x, length):
+    if x < 0:
+        x += 2**(length*8)
+    assert(x < 2**(length*8))
+    s = bytearray(b'\0'*length)
+    for i in range(length-1, -1, -1):
+        s[i] = x % 0x100
+        x //= 0x100
+    return bytes(s)
 
 
 def get_integer32(file_object):
@@ -17,15 +28,15 @@ def get_integer16(file_object):
 
 
 def put_integer32(file_object, val):
-    file_object.write(val.to_bytes(4, byteorder='little'))
+    file_object.write(to_bytes(val, 4))
 
 
 def put_integer16(file_object, val):
-    file_object.write(val.to_bytes(2, byteorder='little'))
+    file_object.write(to_bytes(val, 2))
 
 
 def put_integer8(file_object, val):
-    file_object.write(val.to_bytes(1, byteorder='little'))
+    file_object.write(to_bytes(val, 1))
 
 
 def fpeek(file_object, off, count=1):
