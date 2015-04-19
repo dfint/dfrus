@@ -141,6 +141,10 @@ mov_reg_rm = mov_rm_reg+2  # + width
 mov_rm_imm = 0xc6  # + width
 mov_rm_seg = 0x8c  # + 2*dir
 
+movsb = 0xa4
+movsd = 0xa5
+# movsw = (Prefix.operand_size, movsd)
+
 inc_reg = 0x40  # + reg
 dec_reg = 0x48  # + reg
 

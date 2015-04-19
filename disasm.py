@@ -149,6 +149,30 @@ class Operand:
             return result
 
 
+def mach_lea(dest_reg, src):
+    mach = bytearray()
+    mach.append(lea)
+
+    if src.disp == 0 and src.base_reg != Reg.ebp:
+        md = 0
+    elif -0x80 <= src.disp < 0x80:
+        md = 1
+    else:
+        md = 2
+
+    if src.base_reg == Reg.esp:
+        mach.append(join_byte(md, dest_reg, 4))  # mod r/m byte
+        mach.append(join_byte(0, 4, src.base_reg))  # sib byte
+    else:
+        mach.append(join_byte(md, dest_reg, src.base_reg))  # just mod r/m byte
+
+    if md == 1:
+        mach.append(src.disp)
+    else:
+        mach += to_bytes(src.disp, 4)
+    return mach
+
+
 def unify_operands(x):
     modrm = x['modrm']
     op1 = Operand(reg=modrm[1])
@@ -162,7 +186,7 @@ def unify_operands(x):
         else:
             if modrm[2] != 4:
                 # Without SIB-byte
-                op2 = Operand(scale=0, index_reg=modrm[2])
+                op2 = Operand(base_reg=modrm[2])
             else:
                 # Use the SIB, Luke
                 sib = x['sib']
@@ -176,6 +200,16 @@ def unify_operands(x):
                 op2.disp = x['disp']
 
     return op1, op2
+
+
+def process_operands(x):
+    _, op = unify_operands(x)
+    if op.base_reg is not None:
+        base_reg = x.base_reg
+    else:
+        base_reg = x.index_reg
+    disp = x.disp
+    return base_reg, disp
 
 
 def analyse_mach(s, i=0):
