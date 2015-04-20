@@ -306,6 +306,7 @@ def add_call_hook(dest, val):
     funccode = fpeek(fn, dest, 0x10)
     n = None
     for line in disasm(funccode):
+        assert(line.mnemonic != 'db')
         if line.address >= 5:
             n = line.address
             break

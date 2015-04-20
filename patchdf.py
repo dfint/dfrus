@@ -95,6 +95,7 @@ def mach_strlen(code_chunk):
 
 def find_instruction(s, instruction):
     for line in disasm(s):
+        assert(line.mnemonic != 'db')
         if line.data[0] == instruction:
             return line.address
     return None
@@ -140,6 +141,7 @@ def fix_len(fn, offset, oldlen, newlen):
                         mov_esp_edi = False
 
                         for line in disasm(aft):
+                            assert(line.mnemonic != 'db')
                             if str(line) == 'mov [esp], edi':
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
