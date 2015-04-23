@@ -1,6 +1,6 @@
 
 from disasm import *
-from binio import fpeek, fpoke4
+from binio import *
 from pe import rva_to_off
 
 
