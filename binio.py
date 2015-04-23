@@ -128,10 +128,11 @@ def fpoke2(file_object, off, x):
 def fpoke(file_object, off, x):
     if isinstance(x, collections.Iterable):
         file_object.seek(off)
-        file_object.write(bytes(x))
+        for item in x:
+            file_object.write(to_bytes(item, 1))
     else:
         file_object.seek(off)
-        file_object.write(bytes((x,)))
+        file_object.write(to_bytes(x, 1))
 
 
 import random
