@@ -217,8 +217,7 @@ for off, string in strings:
                             oldcode = oldfix[1]
                             if newcode not in oldcode:
                                 newcode = oldcode + newcode
-                        fix[1] = newcode
-                        fixes[src_off] = fix
+                        fixes[src_off] = src_off, newcode, dest_off, op
                 fix = -1
 
             if fix != 0:
