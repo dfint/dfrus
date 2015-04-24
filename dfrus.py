@@ -160,7 +160,7 @@ if debug:
     print("%d strings extracted.\n" % len(strings))
     # TODO: add slicing of the string list for the debugging purposes
 
-funcs = defaultdict(dict)
+funcs = defaultdict(lambda: defaultdict(list))
 fixes = dict()
 
 for off, string in strings:
@@ -208,8 +208,6 @@ for off, string in strings:
                     src_off, newcode, dest_off, op = fix
                     newcode = bytes(newcode)
                     if op == call_near and make_call_hooks:
-                        if newcode not in funcs[dest_off]:
-                            funcs[dest_off][newcode] = list()
                         funcs[dest_off][newcode].append(off_to_rva_ex(src_off, sections[code]))
                     else:
                         if src_off in fixes:
