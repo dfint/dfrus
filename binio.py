@@ -2,9 +2,10 @@
 def from_bytes(s):
     assert(len(s) <= 4)
     x = 0
+    mul = 1
     for i in s:
-        x <<= 8
-        x += i
+        x += i * mul
+        mul <<= 8
     return x
 
 
