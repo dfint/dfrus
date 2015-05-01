@@ -185,11 +185,13 @@ for off, string in strings:
         aligned_len = align(len(string)+1)
         is_long = aligned_len < len(translation)+1
         if not is_long:
+            # Overwrite the string with the translation in-place
             write_string(fn, translation,
                          off=off, encoding='cp1251',
                          new_len=aligned_len)
             str_off = None
         else:
+            # Add the translation to the separate section
             str_off = new_section_offset
             new_section_offset = add_to_new_section(fn, new_section_offset,
                                                     bytes(translation + '\0', encoding='cp1251'))
