@@ -200,12 +200,12 @@ def fix_len(fn, offset, oldlen, newlen):
             elif aft and aft[0] == mov_reg_imm | 8 | Reg.edi and from_bytes(aft[1:5]) == oldlen:
                 # mov edi, len ; after
                 if not jmp:
-                    fpoke4(fn, next_off+1, len)
+                    fpoke4(fn, next_off+1, newlen)
                     return 1
                 elif jmp == jmp_near:
                     return (
                         oldnext+1,
-                        bytes((mov_reg_imm | 8 | Reg.edi,)) + newlen.to_bytes(byteorder='little'),
+                        bytes((mov_reg_imm | 8 | Reg.edi,)) + newlen.to_bytes(length=4, byteorder='little'),
                         next_off+5,
                         jmp
                     )
