@@ -261,7 +261,10 @@ def fix_len(fn, offset, oldlen, newlen):
             reg = None
             move_to_reg = None
             while i < len(aft) and flag < 2:
-                x, j = analyse_mach(aft, i)
+                x = analyse_mach(aft, i)
+                if x is None:
+                    break
+                x, j = x
                 if r == 1:
                     if flag == 0:
                         if x['data'][0] == mov_reg_rm and 'modrm' in x:
