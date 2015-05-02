@@ -343,15 +343,14 @@ def get_length(s, oldlen):
                 regs[reg] = size
                 deleted.add(i)
             else:
-                # mov [mem], reg
-                assert(modrm[0] == 3 or (modrm[0] == 0 and modrm[2] == 5))  # move to register or explicit address
+                # mov [reg+N], reg
+                assert(modrm[0] != 3)  # move to register disallowed
+                assert(not (modrm[0] == 0 and modrm[2] == 5))  # move to explicit address disallowed
                 assert(regs[reg] == size)  # get a value with the same size as stored
                 regs[reg] = None
                 x = process_operands(x)
-                if dest is None:
+                if dest is None or dest[0] == x[0] and dest[1] > x[1]:
                     dest = x
-                elif dest[0] == x[0] and dest[1] > x[1]:
-                    dest[1] = x[1]
                 curlen += size
             i = j
         elif op == lea:
