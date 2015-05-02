@@ -361,10 +361,8 @@ def get_length(s, oldlen):
             if reg <= Reg.dx:
                 regs[reg] = -1  # mark register as occupied
             x = process_operands(x)
-            if dest is None:
+            if dest is None or dest[0] == x[0] and dest[1] > x[1]:
                 dest = x
-            elif dest[0] == x[0] and dest[1] > x[1]:
-                dest[1] = x[1]
             _lea = dict(dest=modrm[1], src=Operand(base_reg=x[0], disp=x[1]))
             i = j
         else:

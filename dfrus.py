@@ -235,7 +235,7 @@ for off, string in strings:
                 src = off_to_rva_ex(str_off, new_section)+image_base
                 mach, new_ref_off = mach_memcpy(src, x['dest'], len(translation)+1)
                 if x['lea'] is not None:
-                    mach += mach_lea(*x['lea'])
+                    mach += mach_lea(**x['lea'])
 
                 start_rva = off_to_rva_ex(start, sections[code])
 
@@ -276,7 +276,7 @@ for off, string in strings:
 
 def fix_it(_, fix):
     global new_section_offset
-    src_off, mach, dest = fix
+    src_off, mach, dest, _ = fix
     hook_off = new_section_offset
     hook_rva = off_to_rva_ex(hook_off, new_section)
     dest_rva = off_to_rva_ex(dest, sections[code])

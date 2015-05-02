@@ -152,7 +152,7 @@ class Operand:
             return result
 
 
-def mach_lea(dest_reg, src):
+def mach_lea(dest, src):
     mach = bytearray()
     mach.append(lea)
 
@@ -164,10 +164,10 @@ def mach_lea(dest_reg, src):
         md = 2
 
     if src.base_reg == Reg.esp:
-        mach.append(join_byte(md, dest_reg, 4))  # mod r/m byte
+        mach.append(join_byte(md, dest, 4))  # mod r/m byte
         mach.append(join_byte(0, 4, src.base_reg))  # sib byte
     else:
-        mach.append(join_byte(md, dest_reg, src.base_reg))  # just mod r/m byte
+        mach.append(join_byte(md, dest, src.base_reg))  # just mod r/m byte
 
     if md == 1:
         mach.append(src.disp)
