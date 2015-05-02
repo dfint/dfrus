@@ -67,9 +67,17 @@ def write_words(file_object, words):
         put_integer16(file_object, x)
 
 
-def pad_tail(target, size, ch=b' '):
+def pad_tail(target, size, ch=None):
+    if ch is None:
+        if type(target) is bytearray:
+            ch = b'\0'
+        else:
+            ch = ' '
     if type(ch) is int:
-        ch = bytes((ch,))
+        if type(target) is bytearray:
+            ch = bytes((ch,))
+        else:
+            ch = chr(ch)
     if len(target) < size:
         target += ch*(len(target)-size)
     return target
