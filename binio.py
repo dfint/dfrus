@@ -67,7 +67,9 @@ def write_words(file_object, words):
         put_integer16(file_object, x)
 
 
-def pad_tail(target, size, ch=' '):
+def pad_tail(target, size, ch=b' '):
+    if type(ch) is int:
+        ch = bytes((ch,))
     if len(target) < size:
         target += ch*(len(target)-size)
     return target
