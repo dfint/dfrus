@@ -13,7 +13,7 @@ def to_bytes(x, length):
     if x < 0:
         x += 2**(length*8)
     assert(x < 2**(length*8))
-    s = bytearray(b'\0'*length)
+    s = bytearray(length)
     for i in range(length-1, -1, -1):
         s[i] = x % 0x100
         x //= 0x100
