@@ -93,7 +93,7 @@ image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
 sections = get_section_table(fn, pe_offset)
 
 # Getting addresses of all relocatable entries
-relocs = get_relocations(fn, sections)
+relocs = set(get_relocations(fn, sections))
 relocs_modified = False
 
 # Getting cross-references:
