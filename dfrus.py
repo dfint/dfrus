@@ -232,9 +232,8 @@ for off, string in strings:
                 pre = fpeek(fn, ref-3, 3)
                 start = ref-get_start(pre)
                 x = get_length(fpeek(fn, start, 100), len(string)+1)
-
                 src = off_to_rva_ex(str_off, new_section)+image_base
-                mach, new_ref_off = mach_memcpy(src, x[2], len(translation)+1)
+                mach, new_ref_off = mach_memcpy(src, x['dest'], len(translation)+1)
                 if x['lea'] is not None:
                     mach += mach_lea(*x['lea'])
 
