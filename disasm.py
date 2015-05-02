@@ -108,7 +108,10 @@ class Operand:
 
     def __repr__(self):
         if self.value is not None:
-            return asmhex(self.value)
+            if self.value >= 0:
+                return asmhex(self.value)
+            else:
+                return '-' + asmhex(-self.value)
         elif self.reg is not None:
             return regs[self.reg][self.data_size]
         elif self.seg_reg is not None:
@@ -331,7 +334,6 @@ def disasm(s, start_address=0):
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
             x, i = analyse_modrm(s, i+1)
-            # print(x)
             operands = unify_operands(x)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='lea', operands=operands)
         elif (s[i] & 0xFC) == op_rm_imm and (s[i] & 3) != 2:
