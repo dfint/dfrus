@@ -1,6 +1,6 @@
 
 from opcodes import *
-from binio import from_bytes
+from binio import from_bytes, to_bytes
 
 def align(n, edge=4):
     return (n+edge-1) & (-edge)
