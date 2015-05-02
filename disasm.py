@@ -208,10 +208,10 @@ def unify_operands(x):
 def process_operands(x):
     _, op = unify_operands(x)
     if op.base_reg is not None:
-        base_reg = x.base_reg
+        base_reg = op.base_reg
     else:
-        base_reg = x.index_reg
-    disp = x.disp
+        base_reg = op.index_reg
+    disp = op.disp
     return base_reg, disp
 
 
