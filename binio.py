@@ -69,17 +69,17 @@ def write_words(file_object, words):
 
 def pad_tail(target, size, ch=None):
     if ch is None:
-        if type(target) is bytearray:
-            ch = b'\0'
-        else:
+        if type(target) is str:
             ch = ' '
+        else:
+            ch = b'\0'
     if type(ch) is int:
         if type(target) is bytearray:
             ch = bytes((ch,))
         else:
             ch = chr(ch)
     if len(target) < size:
-        target += ch*(len(target)-size)
+        target += ch*(size-len(target))
     return target
 
 
@@ -90,12 +90,12 @@ def write_string(file_object, s, off=None, new_len=None, encoding=None):
     if new_len is None:
         new_len = len(s)+1
 
-    s = pad_tail(s, new_len, '\0')
-    
     if encoding is None:
-        file_object.write(s.encode())
+        s = s.encode()
     else:
-        file_object.write(s.encode(encoding))
+        s = s.encode(encoding)
+
+    file_object.write(pad_tail(s, new_len, b'\0'))
 
 
 def fpeek4u(file_object, off, count=1):
