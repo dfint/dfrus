@@ -1,5 +1,4 @@
 import struct
-from collections import namedtuple
 from binio import *
 import bisect
 
@@ -75,7 +74,8 @@ DD_EXPORT, DD_IMPORT, DD_RESOURCE, DD_EXCEPTION, \
 def get_data_directory(fn):
     pe = fpeek4u(fn, MZ_LFANEW)
     fn.seek(pe + PE_DATA_DIRECTORY)
-    return [get_dwords(fn, 2) for i in range(IMAGE_NUMBEROF_DIRECTORY_ENTRIES)]
+    return [get_dwords(fn, 2) for _ in range(IMAGE_NUMBEROF_DIRECTORY_ENTRIES)]
+
 
 def update_data_directory(fn, dd):
     pe = fpeek4u(fn, MZ_LFANEW)
@@ -102,6 +102,13 @@ class Section():
 
     def pack(self):
         return self._struct.pack(*self)
+
+    @classmethod
+    def read(cls, file):
+        return cls.unpack(file.read(cls._struct.size))
+
+    def write(self, file):
+        file.write(self.pack())
 
     def __init__(self, name, virtual_size, rva, physical_size, physical_offset, flags):
         self.name = name
@@ -131,13 +138,7 @@ def get_section_table(fn, pe=None):
         pe = fpeek4u(fn, MZ_LFANEW)
     n = fpeek2u(fn, pe + PE_NUMBER_OF_SECTIONS)
     fn.seek(pe + SIZEOF_PE_HEADER)
-    return [Section.unpack(fn.read(SIZEOF_IMAGE_SECTION_HEADER))
-            for _ in range(n)]
-
-
-def put_section_info(fn, off, sect_info):
-    fn.seek(off)
-    fn.write(sect_info.pack())
+    return [Section.read(fn) for _ in range(n)]
 
 
 IMAGE_SCN_CNT_CODE = 0x00000020
@@ -269,4 +270,4 @@ if __name__ == "__main__":
     assert(check_pe(TestFileObject()) is None)
     assert(check_pe(TestPeObject()) is not None)
     assert(len(TestPeObject().read(10)) == 10)
-    put_section_info(TestPeObject(), 0, [b'123', 1, 2, 3, 4, 5])
+    Section(b'123', 1, 2, 3, 4, 5).write(TestPeObject())

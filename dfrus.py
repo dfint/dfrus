@@ -356,9 +356,8 @@ if new_section_offset > new_section.physical_offset:
     new_section.virtual_size = new_section_offset - new_section.physical_offset
 
     # Write the new section info
-    put_section_info(fn,
-                     pe_offset + SIZEOF_PE_HEADER + len(sections)*SIZEOF_IMAGE_SECTION_HEADER,
-                     new_section)
+    fn.seek(pe_offset + SIZEOF_PE_HEADER + len(sections)*SIZEOF_IMAGE_SECTION_HEADER)
+    new_section.write(fn)
 
     # Fix number of sections
     fpoke2(fn, pe_offset + PE_NUMBER_OF_SECTIONS, len(sections)+1)
