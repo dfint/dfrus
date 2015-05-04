@@ -6,11 +6,19 @@ def align(n, edge=4):
     return (n+edge-1) & (-edge)
 
 
-def signed(x, width):
+def to_signed(x, width):
     pow2w = 2**width
     assert(x < pow2w)
     if x & (pow2w//2):
         x -= pow2w
+    return x
+
+
+def to_unsigned(x, width):
+    pow2w = 2**width
+    if x < 0:
+        x += pow2w
+    assert(x < pow2w)
     return x
 
 
@@ -51,11 +59,11 @@ def analyse_modrm(s, i):
                 i += 1
 
             if modrm[0] == 1:
-                disp = signed(s[i], 8)
+                disp = to_signed(s[i], 8)
                 result['disp'] = disp
                 i += 1
             elif modrm[0] == 2:
-                disp = signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
+                disp = to_signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
                 result['disp'] = disp
                 i += 4
 
@@ -314,14 +322,14 @@ def disasm(s, start_address=0):
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
             i += 5
-            immediate = start_address+i+signed(int.from_bytes(s[j+1:i], byteorder='little'), 32)
+            immediate = start_address+i+to_signed(int.from_bytes(s[j+1:i], byteorder='little'), 32)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
                               operands=[Operand(value=immediate)])
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
-            immediate = start_address+i+2+signed(s[i+1], 8)
+            immediate = start_address+i+2+to_signed(s[i+1], 8)
             if s[i] == jmp_short:
                 mnemonic = "jmp short"
             else:
@@ -526,7 +534,7 @@ def disasm(s, start_address=0):
                 condition = s[i] & 0x0F
                 mnemonic = "j%s near" % conditions[condition]
                 i += 1
-                immediate = start_address+i+4+signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
+                immediate = start_address+i+4+to_signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
                 i += 4
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=Operand(value=immediate))
             elif s[i] & 0xFE in {x0f_movzx, x0f_movsx}:
