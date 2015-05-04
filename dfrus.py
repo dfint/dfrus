@@ -137,7 +137,7 @@ from disasm import align
 # New section prototype
 
 new_section = Section(
-    name='.rus',
+    name=b'.rus',
     virtual_size=0,  # for now
     rva=align(last_section.rva+last_section.virtual_size,
               section_alignment),
@@ -350,7 +350,7 @@ if new_section_offset > new_section.physical_offset:
     # Align file size
     if file_size > new_section_offset:
         fn.seek(file_size-1)
-        fn.write('\0')
+        fn.write(b'\0')
 
     # Set the new section virtual size
     new_section.virtual_size = new_section_offset - new_section.physical_offset

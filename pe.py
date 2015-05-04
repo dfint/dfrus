@@ -89,12 +89,24 @@ def update_data_directory(fn, dd):
 
 SIZEOF_IMAGE_SECTION_HEADER = 0x28
 
-Section0 = namedtuple('Section', ['name', 'virtual_size', 'rva', 'physical_size',
-                                  'physical_offset', 'flags'])
 
+class Section():
+    # __slots__ = ()
+    def __init__(self, name, virtual_size, rva, physical_size, physical_offset, flags):
+        self.name = name
+        self.virtual_size = virtual_size
+        self.rva = rva
+        self.physical_size = physical_size
+        self.physical_offset = physical_offset
+        self.flags = flags
 
-class Section(Section0):
-    __slots__ = ()
+    def __iter__(self):
+        yield self.name
+        yield self.virtual_size
+        yield self.rva
+        yield self.physical_size
+        yield self.physical_offset
+        yield self.flags
 
     def __repr__(self):
         """Return a nicely formatted representation string"""
@@ -113,7 +125,7 @@ def get_section_table(fn, pe=None):
         pe = fpeek4u(fn, MZ_LFANEW)
     n = fpeek2u(fn, pe + PE_NUMBER_OF_SECTIONS)
     fn.seek(pe + SIZEOF_PE_HEADER)
-    return [Section._make(SectionStruct.unpack(fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
+    return [Section(*SectionStruct.unpack(fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
             for _ in range(n)]
 
 
