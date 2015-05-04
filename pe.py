@@ -91,7 +91,7 @@ SIZEOF_IMAGE_SECTION_HEADER = 0x28
 
 
 class Section():
-    # __slots__ = ()
+    __slots__ = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
 
     _struct = struct.Struct('<8s4L12xL')
     assert (_struct.size == SIZEOF_IMAGE_SECTION_HEADER)
