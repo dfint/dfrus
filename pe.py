@@ -223,7 +223,6 @@ def get_relocations(fn, sections=None, offset=None, size=None):
 
 def relocs_to_table(relocs):
     reloc_table = dict()
-    cur_page = 0
     for item in relocs:
         page = item & 0xFFFFF000
         off = item & 0x00000FFF
