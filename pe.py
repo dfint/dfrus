@@ -92,6 +92,17 @@ SIZEOF_IMAGE_SECTION_HEADER = 0x28
 
 class Section():
     # __slots__ = ()
+
+    _struct = struct.Struct('<8s4L12xL')
+    assert (_struct.size == SIZEOF_IMAGE_SECTION_HEADER)
+
+    @classmethod
+    def unpack(cls, x):
+        return cls(*cls._struct.unpack(x))
+
+    def pack(self):
+        return self._struct.pack(*self)
+
     def __init__(self, name, virtual_size, rva, physical_size, physical_offset, flags):
         self.name = name
         self.virtual_size = virtual_size
@@ -115,23 +126,18 @@ class Section():
                 self)
 
 
-SectionStruct = struct.Struct('<8s4L12xL')
-
-assert (SectionStruct.size == SIZEOF_IMAGE_SECTION_HEADER)
-
-
 def get_section_table(fn, pe=None):
     if pe is None:
         pe = fpeek4u(fn, MZ_LFANEW)
     n = fpeek2u(fn, pe + PE_NUMBER_OF_SECTIONS)
     fn.seek(pe + SIZEOF_PE_HEADER)
-    return [Section(*SectionStruct.unpack(fn.read(SIZEOF_IMAGE_SECTION_HEADER)))
+    return [Section.unpack(fn.read(SIZEOF_IMAGE_SECTION_HEADER))
             for _ in range(n)]
 
 
 def put_section_info(fn, off, sect_info):
     fn.seek(off)
-    fn.write(SectionStruct.pack(*sect_info))
+    fn.write(sect_info.pack())
 
 
 IMAGE_SCN_CNT_CODE = 0x00000020
