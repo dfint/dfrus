@@ -73,11 +73,12 @@ def pad_tail(target, size, ch=None):
             ch = ' '
         else:
             ch = b'\0'
-    if type(ch) is int:
-        if type(target) is bytearray:
-            ch = bytes((ch,))
-        else:
+    elif type(ch) is int:
+        if type(target) is str:
             ch = chr(ch)
+        else:
+            ch = bytes((ch,))
+            
     if len(target) < size:
         target += ch*(size-len(target))
     return target
