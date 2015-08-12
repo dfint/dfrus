@@ -153,7 +153,7 @@ def fix_len(fn, offset, oldlen, newlen):
                         
                         for line in disasm(aft):
                             assert(line.mnemonic != 'db')
-                            if str(line) == 'mov [esp], edi':
+                            if str(line).startswith('mov [esp') and str(line).endswith('], edi'):
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
                                 if mov_esp_edi:
