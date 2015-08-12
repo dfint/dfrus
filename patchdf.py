@@ -140,8 +140,17 @@ def fix_len(fn, offset, oldlen, newlen):
                     # mov edi, len before
                     if oldlen == 15 and aft:
                         # Trying to fix the case when the edi value is used as a stl-string cap size
+                        # Sample code for this case:
+                        # mov edi, 0fh
+                        # mov eax, strz_You_last_spoke__db24d8
+                        # lea esi, [esp+40h]
+                        # mov [esp+54h], edi  ; Equivalent to mov [esi+14h], edi
+                        # mov dword ptr [esp+50h], 0
+                        # mov byte ptr [esp+40h], 0
+                        # call sub_40f650
+                        
                         mov_esp_edi = False
-
+                        
                         for line in disasm(aft):
                             assert(line.mnemonic != 'db')
                             if str(line) == 'mov [esp], edi':
@@ -151,7 +160,7 @@ def fix_len(fn, offset, oldlen, newlen):
                                     disp = to_signed(from_bytes(line.data[1:5]), 32)
                                     return (
                                         next_off+line.address,
-                                        ((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, 0x15, 0, 0, 0),  # mov [esi+14h], 15
+                                        ((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, 0x0f, 0, 0, 0),  # mov [esi+14h], 0fh
                                         next_off+line.address+4+disp,
                                         aft[line.address]
                                     )
