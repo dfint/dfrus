@@ -269,19 +269,23 @@ def asmhex(n):
 
 
 class DisasmLine:
-    __slots__ = ('address', 'data', 'mnemonic', 'operands')
+    __slots__ = ('address', 'data', 'mnemonic', 'operands', '__str')
 
     def __init__(self, address, data, mnemonic, operands=None):
         self.address = address
         self.data = data
         self.mnemonic = mnemonic
         self.operands = operands
+        self.__str = None
 
-    def __repr__(self):
-        if not self.operands:
-            return self.mnemonic
-        else:
-            return self.mnemonic + ' ' + ', '.join(str(item) for item in self.operands)
+    def __str__(self):
+        if not self.__str:
+            if not self.operands:
+                self.__str = self.mnemonic
+            else:
+                self.__str = self.mnemonic + ' ' + ', '.join(str(item) for item in self.operands)
+        
+        return self.__str
 
 
 class BytesLine(DisasmLine):
