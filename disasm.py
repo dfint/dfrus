@@ -1,6 +1,6 @@
 
 from opcodes import *
-from binio import from_bytes, to_bytes
+
 
 def align(n, edge=4):
     return (n+edge-1) & (-edge)
@@ -180,7 +180,7 @@ def mach_lea(dest, src):
     if md == 1:
         mach.append(src.disp)
     else:
-        mach += to_bytes(src.disp, 4)
+        mach += src.disp.to_bytes(4, byteorder='little')
     return mach
 
 
@@ -232,7 +232,7 @@ def analyse_mach(s, i=0):
     result = dict(data=data)
     i += 1
     if op & 0xfe == mov_acc_mem:
-        result.update(reg=Reg.eax, imm=from_bytes(s[i:i+4]))
+        result.update(reg=Reg.eax, imm=int.from_bytes(s[i:i+4], byteorder='little'))
         i += 4
     elif op & 0xfc == mov_rm_reg or s[i] == lea:
         modrm, i = analyse_modrm(s, i)
