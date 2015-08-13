@@ -246,7 +246,7 @@ for off, string in strings:
                     dest_off = new_section_offset
                     dest_rva = off_to_rva_ex(dest_off, new_section)
                     disp = dest_rva-(start_rva+5)
-                    mach = bytearray((call_near,))+to_bytes(disp, 4)
+                    mach = bytearray((call_near,))+disp.to_bytes(4, byteorder='little')
                     if len(mach) > x['length']:
                         if debug:
                             print('|%s|%s| <- %x (%x)' %
@@ -282,7 +282,7 @@ def fix_it(_, fix):
     dest_rva = off_to_rva_ex(dest, sections[code])
     disp = dest_rva-(hook_rva+len(mach)+5)  # displacement for jump from the hook
     # Add jump from the hook
-    mach += bytearray((jmp_near,)) + to_bytes(disp, 4)
+    mach += bytearray((jmp_near,)) + disp.to_bytes(4, byteorder='little')
     # Write the hook to the new section
     new_section_offset = add_to_new_section(fn, hook_off, mach)
 
@@ -317,7 +317,7 @@ def add_call_hook(dest, val):
 
     # Jump back to the function
     mach.append(jmp_near)
-    mach += to_bytes(disp, 4)
+    mach += disp.to_bytes(4, byteorder='little')
     new_section_offset = add_to_new_section(fn, hook_off, mach)
 
     # Add jump from the function to the hook

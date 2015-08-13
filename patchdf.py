@@ -134,7 +134,7 @@ def fix_len(fn, offset, oldlen, newlen):
         reg = pre[-1] & 7
         if reg == Reg.eax:
             # mov eax, offset str
-            if from_bytes(pre[-5:-2]) == oldlen:
+            if int.from_bytes(pre[-5:-2], byteorder='little') == oldlen:
                 fpoke4(fn, offset-5, newlen)
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi:
                     # mov edi, len before
@@ -157,7 +157,7 @@ def fix_len(fn, offset, oldlen, newlen):
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
                                 if mov_esp_edi:
-                                    disp = to_signed(from_bytes(line.data[1:5]), 32)
+                                    disp = to_signed(int.from_bytes(line.data[1:5], byteorder='little'), 32)
                                     return (
                                         next_off+line.address,
                                         ((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, 0x0f, 0, 0, 0),  # mov [esi+14h], 0fh
@@ -187,7 +187,7 @@ def fix_len(fn, offset, oldlen, newlen):
                     # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
-                        disp = to_signed(from_bytes(aft[i+1:i+5]), 32)
+                        disp = to_signed(int.from_bytes(aft[i+1:i+5], byteorder='little'), 32)
                         return (
                             next_off+i,
                             mach_strlen((mov_rm_reg+1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
@@ -199,14 +199,14 @@ def fix_len(fn, offset, oldlen, newlen):
                 # There's no code in DF that passes this condition. Leaved just in case.
                 i = find_instruction(aft, call_near)
                 if i is not None:
-                    disp = to_signed(from_bytes(aft[i+1:i+5]), 32)
+                    disp = to_signed(int.from_bytes(aft[i+1:i+5], byteorder='little'), 32)
                     return (
                         next_off+i,
                         mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
                         next_off+i+4+disp,
                         call_near
                     )
-            elif aft and aft[0] == mov_reg_imm | 8 | Reg.edi and from_bytes(aft[1:5]) == oldlen:
+            elif aft and aft[0] == mov_reg_imm | 8 | Reg.edi and int.from_bytes(aft[1:5], byteorder='little') == oldlen:
                 # mov edi, len ; after
                 if not jmp:
                     fpoke4(fn, next_off+1, newlen)
@@ -221,7 +221,7 @@ def fix_len(fn, offset, oldlen, newlen):
                 else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
-                        disp = to_signed(from_bytes(aft[i+1:i+5]), 32)
+                        disp = to_signed(int.from_bytes(aft[i+1:i+5], byteorder='little'), 32)
                         return (
                             next_off+i,
                             mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
@@ -244,7 +244,7 @@ def fix_len(fn, offset, oldlen, newlen):
                 return 1
         elif reg == Reg.esi:
             # mov esi, offset str
-            if pre[-6] == mov_reg_imm | 8 | Reg.ecx and from_bytes(pre[-5:-1]) == (oldlen+1)//4:
+            if pre[-6] == mov_reg_imm | 8 | Reg.ecx and int.from_bytes(pre[-5:-1], byteorder='little') == (oldlen+1)//4:
                 # mov ecx, (len+1)//4
                 r = (oldlen+1) % 4
                 fpoke4(fn, offset-5, (newlen+1-r+3)//4)
@@ -396,7 +396,7 @@ def mach_memcpy(src, dest, count):
 
     mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
     new_reference = len(mach)
-    mach += to_bytes(src, 4)  # imm32
+    mach += src.to_bytes(4, byteorder='little')  # imm32
     mach += bytearray((Prefix.rep, movsd))  # rep movsd
     mach.append(popad)  # popad
 

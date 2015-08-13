@@ -1,25 +1,4 @@
 
-def from_bytes(s):
-    assert(len(s) <= 4)
-    x = 0
-    mul = 1
-    for i in s:
-        x += i * mul
-        mul <<= 8
-    return x
-
-
-def to_bytes(x, length):
-    if x < 0:
-        x += 2**(length*8)
-    assert(x < 2**(length*8))
-    s = bytearray(length)
-    for i in range(length):
-        s[i] = x % 0x100
-        x //= 0x100
-    return bytes(s)
-
-
 def get_integer32(file_object):
     return int.from_bytes(file_object.read(4), byteorder='little')
 
@@ -29,15 +8,15 @@ def get_integer16(file_object):
 
 
 def put_integer32(file_object, val):
-    file_object.write(to_bytes(val, 4))
+    file_object.write(val.to_bytes(4, byteorder='little'))
 
 
 def put_integer16(file_object, val):
-    file_object.write(to_bytes(val, 2))
+    file_object.write(val.to_bytes(2, byteorder='little'))
 
 
 def put_integer8(file_object, val):
-    file_object.write(to_bytes(val, 1))
+    file_object.write(val.to_bytes(1, byteorder='little'))
 
 
 def fpeek(file_object, off, count=1):
@@ -141,10 +120,10 @@ def fpoke(file_object, off, x):
     if isinstance(x, collections.Iterable):
         file_object.seek(off)
         for item in x:
-            file_object.write(to_bytes(item, 1))
+            file_object.write(item.to_bytes(1, byteorder='little'))
     else:
         file_object.seek(off)
-        file_object.write(to_bytes(x, 1))
+        file_object.write(x.to_bytes(1, byteorder='little'))
 
 
 import random
