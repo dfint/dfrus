@@ -114,7 +114,7 @@ class Operand:
         assert(value is None or 0 <= value <= 2)
         self._data_size = value
 
-    def __repr__(self):
+    def __str__(self):
         if self.value is not None:
             if self.value >= 0:
                 return asmhex(self.value)
