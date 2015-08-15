@@ -153,7 +153,6 @@ if debug:
     print("String offsets (from-to): %x %x" % (strings[0][0], strings[-1][0]))
     string_indices = {x[0]: i for i, x in enumerate(strings)}
 
-    # TODO: add slicing of the string list for the debugging purposes
     if len(cmd) == 1:
         offset = int(cmd[0], base=16)
         if offset in string_indices:
