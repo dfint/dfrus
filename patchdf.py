@@ -160,7 +160,7 @@ def fix_len(fn, offset, oldlen, newlen):
                                     return (
                                         next_off+line.address,
                                         ((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, 0x0f, 0, 0, 0),  # mov [esi+14h], 0fh
-                                        next_off+line.address+4+disp,
+                                        next_off+line.address+5+disp, # call_near - 1 byte, displacement - 4 bytes
                                         aft[line.address]
                                     )
                                 else:
@@ -190,8 +190,8 @@ def fix_len(fn, offset, oldlen, newlen):
                         return (
                             next_off+i,
                             mach_strlen((mov_rm_reg+1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
-                            next_off+i+4+disp,
-                            call_near
+                            next_off+i+5+disp,
+                            aft[i]
                         )
             elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
@@ -202,8 +202,8 @@ def fix_len(fn, offset, oldlen, newlen):
                     return (
                         next_off+i,
                         mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
-                        next_off+i+4+disp,
-                        call_near
+                        next_off+i+5+disp,
+                        aft[i]
                     )
             elif aft and aft[0] == mov_reg_imm | 8 | Reg.edi and int.from_bytes(aft[1:5], byteorder='little') == oldlen:
                 # mov edi, len ; after
@@ -224,8 +224,8 @@ def fix_len(fn, offset, oldlen, newlen):
                         return (
                             next_off+i,
                             mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
-                            next_off+i+4+disp,
-                            call_near
+                            next_off+i+5+disp,
+                            aft[i]
                         )
             elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0):
                 # lea edi, [reg+N] ; assume that reg+N == oldlen
@@ -235,10 +235,12 @@ def fix_len(fn, offset, oldlen, newlen):
                     fpoke(fn, offset-2, newlen)
                     return 1
                 elif pre[-3] & 7 != Reg.esp:
+                    # lea edi, [reg+oldlen+N]
                     fpoke(fn, offset-2, newlen-oldlen+disp)
                     return 1
             elif (aft and not jmp and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
                   aft[2] == push_imm8 and aft[3] == oldlen):
+                # mov ecx, reg; push imm8
                 fpoke(fn, next_off+3, newlen)
                 return 1
         elif reg == Reg.esi:
