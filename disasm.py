@@ -1,25 +1,9 @@
 
 from opcodes import *
-
+from binio import to_signed
 
 def align(n, edge=4):
     return (n+edge-1) & (-edge)
-
-
-def to_signed(x, width):
-    pow2w = 2**width
-    assert(x < pow2w)
-    if x & (pow2w//2):
-        x -= pow2w
-    return x
-
-
-def to_unsigned(x, width):
-    pow2w = 2**width
-    if x < 0:
-        x += pow2w
-    assert(x < pow2w)
-    return x
 
 
 def split_byte(x):

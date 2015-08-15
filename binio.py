@@ -119,11 +119,10 @@ def fpoke2(file_object, off, x):
 def fpoke(file_object, off, x):
     if isinstance(x, collections.Iterable):
         file_object.seek(off)
-        for item in x:
-            file_object.write(item.to_bytes(1, byteorder='little'))
+        file_object.write(bytes(to_unsigned(item, 8) for item in x))
     else:
         file_object.seek(off)
-        file_object.write(x.to_bytes(1, byteorder='little'))
+        file_object.write(bytes([to_unsigned(x, 8)]))
 
 
 import random
@@ -148,6 +147,23 @@ class TestFileObject(object):
         
     def tell(self):
         return self.position
+
+
+def to_signed(x, width):
+    pow2w = 2**width
+    assert(x < pow2w)
+    if x & (pow2w//2):
+        x -= pow2w
+    return x
+
+
+def to_unsigned(x, width):
+    pow2w = 2**width
+    if x < 0:
+        x += pow2w
+    assert(x < pow2w)
+    return x
+
 
 if __name__ == "__main__":
     fn = TestFileObject()

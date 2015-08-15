@@ -119,7 +119,7 @@ def fix_len(fn, offset, oldlen, newlen):
             disp = to_signed(aft[1], width=8)
             next_off += 2 + disp
         else:
-            disp = to_signed(from_bytes(aft[1:5]), width=32)
+            disp = to_signed(int.from_bytes(aft[1:5], byteorder='little'), width=32)
             next_off += 5 + disp
         jmp = aft[0]
         aft = fpeek(fn, next_off, count_after)
