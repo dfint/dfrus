@@ -361,6 +361,14 @@ if relocs_modified:
     new_size, reloc_table = relocs_to_table(relocs)
     dd = get_data_directory(fn)
     reloc_off = rva_to_off(dd[DD_BASERELOC][0], sections)
+    reloc_size = dd[DD_BASERELOC][1]
+    write_relocation_table(fn, reloc_off, reloc_table)
+    dd[DD_BASERELOC][1] = new_size
+    update_data_directory(fn, dd)
+    if new_size < reloc_size:
+        fn.seek(reloc_off + new_size)
+        fn.write(b'\0' * (reloc_size - new_size))
+
 
 # Add new section to the executable
 if new_section_offset > new_section.physical_offset:
