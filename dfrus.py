@@ -15,15 +15,6 @@ else:
 
 import os.path
 
-
-def abort():
-    """
-
-    :rtype : None
-    """
-    input("Press Enter...")
-    sys.exit()
-
 df1 = None
 
 if len(path) == 0 or not os.path.exists(path):
@@ -47,7 +38,7 @@ try:
         # TODO: Add necessary check (timedate etc.)
 except OSError:
     print("Unable to open '%s'" % df1)
-    abort()
+    sys.exit()
 
 # --------------------------------------------------------
 from patchdf import *
@@ -65,7 +56,7 @@ try:
     copy(df1, df2)
 except IOError:
     print("Failed.")
-    abort()
+    sys.exit()
 else:
     print("Success.")
 
@@ -76,7 +67,7 @@ try:
     fn = open(df2, "r+b")
 except OSError:
     print("Failed to open '%s'" % df2)
-    abort()
+    sys.exit()
 
 pe_offset = check_pe(fn)
 
@@ -84,7 +75,7 @@ if pe_offset is None:
     print("Failed. '%s' is not an executable file." % df2)
     fn.close()
     os.remove(df2)
-    abort()
+    sys.exit()
 
 from pe import *
 
@@ -113,7 +104,7 @@ for obj_off in xref_table:
 if needle is None:
     fn.close()
     print("Unicode table not found.")
-    abort()
+    sys.exit()
 
 patch_unicode_table(fn, needle)
 
@@ -126,7 +117,7 @@ last_section = sections[-1]
 if last_section.name.startswith(b'.rus'):
     fn.close()
     print("There is '.rus' section in the file already.")
-    abort()
+    sys.exit()
 
 file_alignment = fpeek4u(fn, pe_offset+PE_FILE_ALIGNMENT)
 section_alignment = fpeek4u(fn, pe_offset+PE_SECTION_ALIGNMENT)
