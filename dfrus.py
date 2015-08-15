@@ -39,7 +39,7 @@ else:
 df2 = os.path.join(path, "Dwarf Fortress Rus.exe")
 
 # --------------------------------------------------------
-from pe import *
+from pe import check_pe
 
 try:
     with open(df1, "rb") as fn:
@@ -86,7 +86,6 @@ if pe_offset is None:
     os.remove(df2)
     abort()
 
-# from binio import fpeek4u
 from pe import *
 
 image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
@@ -160,6 +159,8 @@ if debug:
     print("%d strings extracted.\n" % len(strings))
     # TODO: add slicing of the string list for the debugging purposes
 
+from opcodes import *
+from collections import defaultdict
 funcs = defaultdict(lambda: defaultdict(list))
 fixes = dict()
 
