@@ -264,32 +264,31 @@ def fix_len(fn, offset, oldlen, newlen):
             r = (oldlen+1)//4
             next_off = offset - get_start(pre)
             aft = fpeek(fn, next_off, count_after)
-            i = 0
             flag = 0
             reg = None
             move_to_reg = None
-            while i < len(aft) and flag < 2:
-                x = analyse_mach(aft, i)
-                if x is None:
-                    break
-                x, j = x
+            for x, i in analyse_mach(aft):
                 if r == 1:
                     if flag == 0:
                         if x['data'][0] == mov_reg_rm and 'modrm' in x:
+                            # Copying 1 byte from memory to a register
                             modrm = x['modrm']
                             if modrm[0] == 0 and modrm[2] == 5:
                                 reg = modrm[1]
                                 move_to_reg = i
                                 flag += 1
                         elif x['data'][0] == mov_acc_mem:
+                            # Copying 1 byte from memory to accumulator (al)
                             reg = Reg.eax
                             move_to_reg = i
                             flag += 1
                     else:
                         if x['data'][0] == mov_rm_reg and 'modrm' in x:
+                            # Copying from register to memory
                             modrm = x['modrm']
-                            if modrm[0] != 3 and modrm[2] == reg:
+                            if modrm[0] != 3 and modrm[1] == reg:
                                 move_to_mem = i
+                                # Make code move 4 bytes instead of 1:
                                 opcode = aft[move_to_reg]
                                 fpoke(fn, next_off+move_to_reg, opcode | 1)  # set size flag of the opcode
                                 opcode = aft[move_to_mem]
@@ -305,7 +304,6 @@ def fix_len(fn, offset, oldlen, newlen):
                             fpoke(fn, next_off+move_to_reg, nop)  # clear operand size prefix
                             fpoke(fn, next_off+move_to_mem, nop)  # clear operand size prefix
                             return 1
-                i = j
                 assert(flag < 2)
         else:
             return 0
