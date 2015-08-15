@@ -26,14 +26,12 @@ def patch_unicode_table(fn, off):
 
 
 def load_trans_file(fn):
-    trans = {}
     for line in fn:
         line = line.replace('\\r', '\r')
         line = line.replace('\\t', '\t')
         parts = line.split('|')
         if len(parts) > 3 and len(parts[1]) > 0:
-            trans[parts[1]] = parts[2]
-    return trans
+            yield parts[1], parts[2]
 
 from collections import defaultdict
 
