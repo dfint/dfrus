@@ -47,7 +47,7 @@ print("Loading translation file...")
 
 trans_filename = "trans.txt"
 with open(trans_filename, encoding="cp1251") as trans:
-    trans_table = load_trans_file(trans)
+    trans_table = dict(load_trans_file(trans))
     
 # --------------------------------------------------------
 from shutil import copy
