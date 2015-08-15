@@ -47,7 +47,33 @@ print("Loading translation file...")
 
 trans_filename = "trans.txt"
 with open(trans_filename, encoding="cp1251") as trans:
-    trans_table = dict(load_trans_file(trans))
+    trans_table = load_trans_file(trans)
+
+    if not debug:
+        trans_table = dict(trans_table)
+    else:
+        trans_table = list(trans_table)
+        print('%d translation pairs loaded.' % len(trans_table))
+        if len(cmd) == 1:
+            i = int(cmd[0])
+            if 0 <= i < len(trans_table):
+                trans_table = [trans_table[i]]
+            else:
+                print('Translation index is too high or too low. Using all the translations.')
+
+        elif len(cmd) > 1:
+            start_index = int(cmd[0])
+            end_index = int(cmd[1])
+            if not 0 <= start_index <= end_index < len(trans_table):
+                print('Translation indices are too high or too low. Using all the translations.')
+            else:
+                print('Slicing translations (low, mid, high): %d %d %d' %
+                      (start_index, (start_index+end_index)//2, end_index))
+                trans_table = trans_table[start_index:end_index+1]
+                print('Leaving %d translations.' % len(trans_table))
+
+        trans_table = dict(trans_table)
+
     
 # --------------------------------------------------------
 from shutil import copy
@@ -149,34 +175,12 @@ strings = list(extract_strings(fn, xref_table))
 
 if debug:
     print("%d strings extracted." % len(strings))
-    assert(all(x[0] < strings[i+1][0] for i, x in enumerate(strings[:-1])))
-    print("String offsets from %x to %x" % (strings[0][0], strings[-1][0]))
-    string_indices = {x[0]: i for i, x in enumerate(strings)}
 
-    if len(cmd) == 1:
-        offset = int(cmd[0], base=16)
-        if offset in string_indices:
-            string = [strings[string_indices[offset]]]
-        else:
-            print('No strings with the given offset. Using the full list of strings.')
-    elif len(cmd) > 1:
-        off_start = int(cmd[0], base=16)
-        off_end = int(cmd[1], base=16)
-
-        import bisect
-        offsets = [x[0] for x in strings]
-        # Find the actual offset grater or equal to the given off_start:
-        off_start = offsets[bisect.bisect_left(offsets, off_start)]
-        # Find the actual offset lesser or equal to the given off_start:
-        off_end = offsets[bisect.bisect_right(offsets, off_end) - 1]
-        print('Current string slice (start, middle, end): %x %x %x' % (off_start, (off_end + off_start)//2, off_end))
-        i_start = string_indices[off_start]
-        i_end = string_indices[off_end]+1
-        print('Strings remaining: %d' % (i_end - i_start))
-        strings = strings[i_start:i_end]
-
-    if len(strings) <= 16:
-        print('All strings:')
+    print("Leaving only strings, which have translations.")
+    strings = [x for x in strings if x[1] in trans_table]
+    print("%d strings remaining." % len(strings))
+    if 0 < len(strings) <= 16:
+        print('All remaining strings:')
         for item in strings:
             print("0x%x : %r" % item)
 
