@@ -115,7 +115,7 @@ if debug:
 
 last_section = sections[-1]
 
-if last_section.name.startswith(b'.rus'):
+if last_section.name.startswith(b'.rus\0'):
     fn.close()
     print("There is '.rus' section in the file already.")
     sys.exit()
@@ -150,7 +150,7 @@ strings = list(extract_strings(fn, xref_table))
 if debug:
     print("%d strings extracted." % len(strings))
     assert(all(x[0] < strings[i+1][0] for i, x in enumerate(strings[:-1])))
-    print("String offsets (from-to): %x %x" % (strings[0][0], strings[-1][0]))
+    print("String offsets from %x to %x" % (strings[0][0], strings[-1][0]))
     string_indices = {x[0]: i for i, x in enumerate(strings)}
 
     if len(cmd) == 1:
