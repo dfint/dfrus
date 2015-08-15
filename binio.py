@@ -22,7 +22,7 @@ def put_integer8(file_object, val):
 def fpeek(file_object, off, count=1):
     if count == 1:
         file_object.seek(off)
-        return int(file_object.read(1))
+        return file_object.read(1)[0]
     elif count > 1:
         file_object.seek(off)
         return file_object.read(count)
