@@ -1,7 +1,8 @@
 
 from disasm import *
-from binio import *
+from binio import fpeek, fpoke4, fpoke, pad_tail
 from pe import rva_to_off
+from opcodes import *
 
 
 def patch_unicode_table(fn, off):
