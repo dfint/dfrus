@@ -2,6 +2,7 @@
 from opcodes import *
 from binio import to_signed
 
+
 def align(n, edge=4):
     return (n+edge-1) & (-edge)
 
@@ -47,7 +48,7 @@ def analyse_modrm(s, i):
                 result['disp'] = disp
                 i += 1
             elif modrm[0] == 2:
-                disp = to_signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
+                disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 result['disp'] = disp
                 i += 4
 
@@ -310,7 +311,7 @@ def disasm(s, start_address=0):
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
             i += 5
-            immediate = start_address+i+to_signed(int.from_bytes(s[j+1:i], byteorder='little'), 32)
+            immediate = start_address+i+int.from_bytes(s[j+1:i], byteorder='little', signed=True)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
                               operands=[Operand(value=immediate)])
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
@@ -522,7 +523,7 @@ def disasm(s, start_address=0):
                 condition = s[i] & 0x0F
                 mnemonic = "j%s near" % conditions[condition]
                 i += 1
-                immediate = start_address+i+4+to_signed(int.from_bytes(s[i:i+4], byteorder='little'), 32)
+                immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 i += 4
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=Operand(value=immediate))
             elif s[i] & 0xFE in {x0f_movzx, x0f_movsx}:
