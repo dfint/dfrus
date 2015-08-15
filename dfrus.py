@@ -304,17 +304,17 @@ def add_call_hook(dest, val):
     dest_rva = off_to_rva_ex(dest, sections[code])
 
     # Save the beginning of the function (at least 5 bytes for jump)
-    funccode = fpeek(fn, dest, 0x10)
+    func_start = fpeek(fn, dest, 0x10)
     n = None
-    for line in disasm(funccode):
+    for line in disasm(func_start):
         assert(line.mnemonic != 'db')
         if line.address >= 5:
             n = line.address
             break
 
-    saved_code = funccode[:n]
-    mach += saved_code
-    disp = dest_rva+len(saved_code)-(hook_rva+len(mach)+5)
+    func_start = func_start[:n]
+    mach += func_start
+    disp = dest_rva+len(func_start)-(hook_rva+len(mach)+5)
 
     # Jump back to the function
     mach.append(jmp_near)
@@ -332,7 +332,6 @@ def add_call_hook(dest, val):
 if make_call_hooks:
     for func in funcs:
         add_call_hook(func, funcs[func])
-
 
 
 # Write relocation table to the executable
