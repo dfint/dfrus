@@ -261,7 +261,7 @@ def fix_len(fn, offset, oldlen, newlen):
         if newlen <= oldlen:
             return -1
         elif newlen+1 <= align(oldlen+1):
-            r = (oldlen+1)//4
+            r = (oldlen+1) % 4
             next_off = offset - get_start(pre)
             aft = fpeek(fn, next_off, count_after)
             flag = 0
