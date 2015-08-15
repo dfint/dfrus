@@ -1,6 +1,6 @@
 import sys
 
-cmd = sys.argv
+cmd = sys.argv[1:]
 
 debug = 'debug' in cmd
 if debug:
@@ -8,8 +8,9 @@ if debug:
 
 make_call_hooks = False
 
-if len(cmd) > 1:
-    path = cmd[1]
+if len(cmd) >= 1:
+    path = cmd[0]
+    cmd = cmd[1:]
 else:
     path = ""
 
@@ -19,7 +20,7 @@ df1 = None
 
 if len(path) == 0 or not os.path.exists(path):
     if debug:
-        print("Path was not given or doesn't exist. Using defaults")
+        print("Path was not given or doesn't exist. Using defaults.")
     df1 = "Dwarf Fortress.exe"
 elif os.path.isdir(path):
     df1 = os.path.join(path, "Dwarf Fortress.exe")
@@ -147,8 +148,39 @@ from extract_strings import extract_strings
 strings = list(extract_strings(fn, xref_table))
 
 if debug:
-    print("%d strings extracted.\n" % len(strings))
+    print("%d strings extracted." % len(strings))
+    assert(all(x[0] < strings[i+1][0] for i, x in enumerate(strings[:-1])))
+    print("String offsets (from-to): %x %x" % (strings[0][0], strings[-1][0]))
+    string_indices = {x[0]: i for i, x in enumerate(strings)}
+
     # TODO: add slicing of the string list for the debugging purposes
+    if len(cmd) == 1:
+        offset = int(cmd[0], base=16)
+        if offset in string_indices:
+            string = [strings[string_indices[offset]]]
+        else:
+            print('No strings with the given offset. Using the full list of strings.')
+    elif len(cmd) > 1:
+        off_start = int(cmd[0], base=16)
+        off_end = int(cmd[1], base=16)
+
+        import bisect
+        offsets = [x[0] for x in strings]
+        # Find the actual offset grater or equal to the given off_start:
+        off_start = offsets[bisect.bisect_left(offsets, off_start)]
+        # Find the actual offset lesser or equal to the given off_start:
+        off_end = offsets[bisect.bisect_right(offsets, off_end) - 1]
+        print('Current string slice (start, middle, end): %x %x %x' % (off_start, (off_end + off_start)//2, off_end))
+        i_start = string_indices[off_start]
+        i_end = string_indices[off_end]+1
+        print('Strings remaining: %d' % (i_end - i_start))
+        strings = strings[i_start:i_end]
+
+    if len(strings) <= 16:
+        print('All strings:')
+        for item in strings:
+            print("0x%x : %r" % item)
+
 
 from opcodes import *
 from collections import defaultdict
@@ -164,7 +196,7 @@ for off, string in strings:
         
         refs = xref_table[off]
         
-        # Find the earliest reference to the string
+        # Find the earliest reference to the string (even if it is a reference to the middle of the string)
         k = 4
         while off+k in xref_table and k < len(string)+1:
             for j, ref in enumerate(refs):
