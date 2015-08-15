@@ -282,7 +282,7 @@ def fix_it(_, fix):
     dest_rva = off_to_rva_ex(dest, sections[code])
     disp = dest_rva-(hook_rva+len(mach)+5)  # displacement for jump from the hook
     # Add jump from the hook
-    mach += bytearray((jmp_near,)) + to_unsigned(disp, 32).to_bytes(4, byteorder='little')
+    mach += bytearray((jmp_near,)) + disp.to_bytes(4, byteorder='little', signed=True)
     # Write the hook to the new section
     new_section_offset = add_to_new_section(fn, hook_off, mach)
 
