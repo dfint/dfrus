@@ -133,7 +133,7 @@ def fix_len(fn, offset, oldlen, newlen):
         reg = pre[-1] & 7
         if reg == Reg.eax:
             # mov eax, offset str
-            if int.from_bytes(pre[-5:-2], byteorder='little') == oldlen:
+            if int.from_bytes(pre[-5:-1], byteorder='little') == oldlen:
                 fpoke4(fn, offset-5, newlen)
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi:
                     # mov edi, len before
