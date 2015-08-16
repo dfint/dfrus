@@ -320,7 +320,7 @@ for fix in fixes:
 
 def add_call_hook(dest, val):
     global new_section_offset
-    mach = sum(val.keys(), bytearray())
+    mach = sum(val.keys(), bytearray())  # Flatten and convert to bytearray()
     hook_off = new_section_offset
     hook_rva = off_to_rva_ex(hook_off, new_section)
     dest_rva = off_to_rva_ex(dest, sections[code])
@@ -340,7 +340,7 @@ def add_call_hook(dest, val):
 
     # Jump back to the function
     mach.append(jmp_near)
-    mach += disp.to_bytes(4, byteorder='little')
+    mach += disp.to_bytes(4, byteorder='little', signed=True)
     new_section_offset = add_to_new_section(fn, hook_off, mach)
 
     # Add jump from the function to the hook
@@ -348,7 +348,7 @@ def add_call_hook(dest, val):
     src_rva = off_to_rva_ex(src_off, sections[code])
     disp = hook_rva-(src_rva+5)
     fpoke(fn, src_off, jmp_near)
-    fpoke4(fn, src_off+1, disp)
+    fpoke(fn, src_off+1, disp.to_bytes(4, byteorder='little', signed=True))
 
 # Adding call hooks
 if make_call_hooks:
