@@ -301,9 +301,9 @@ for off, string in strings:
                 fpoke(fn, start, mach)
 
 
-def fix_it(_, fix):
-    global new_section_offset
-    src_off, mach, dest, _ = fix
+# Delayed fix
+for fix in fixes:
+    src_off, mach, dest, _ = fixes[fix]
     hook_off = new_section_offset
     hook_rva = off_to_rva_ex(hook_off, new_section)
     dest_rva = off_to_rva_ex(dest, sections[code])
@@ -315,11 +315,7 @@ def fix_it(_, fix):
 
     src_rva = off_to_rva_ex(src_off, sections[code])
     disp = hook_rva-(src_rva+5)  # displacement for jump to the hook
-    fpoke4(fn, src_off+1, disp)
-
-# Delayed fix
-for fix in fixes:
-    fix_it(fix, fixes[fix])
+    fpoke(fn, src_off+1, disp.to_bytes(4, byteorder='little', signed=True))
 
 
 def add_call_hook(dest, val):

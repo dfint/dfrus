@@ -177,7 +177,7 @@ def fix_len(fn, offset, oldlen, newlen):
                     return 1
                 elif jmp == jmp_near:
                     return (
-                        oldnext+1,
+                        oldnext,
                         (push_imm8, newlen),
                         next_off+2,
                         jmp
@@ -212,7 +212,7 @@ def fix_len(fn, offset, oldlen, newlen):
                     return 1
                 elif jmp == jmp_near:
                     return (
-                        oldnext+1,
+                        oldnext,
                         bytes((mov_reg_imm | 8 | Reg.edi,)) + newlen.to_bytes(length=4, byteorder='little'),
                         next_off+5,
                         jmp
