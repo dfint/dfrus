@@ -185,10 +185,10 @@ def mach_lea(dest, src):
         mode = 2
 
     if src.base_reg == Reg.esp:
-        mach.append(ModRM(mode=mode, reg=dest, regmem=4).join())  # mod r/m byte
-        mach.append(Sib(scale=0, index_reg=4, base_reg=src.base_reg).join())  # sib byte
+        mach.append(join_byte(mode, dest, 4))  # mod r/m byte
+        mach.append(join_byte(0, 4, src.base_reg))  # sib byte
     else:
-        mach.append(ModRM(mode=mode, reg=dest, regmem=src.base_reg).join())  # just mod r/m byte
+        mach.append(join_byte(mode, dest, src.base_reg))  # just mod r/m byte
 
     if mode == 1:
         mach.append(src.disp)
