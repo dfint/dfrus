@@ -275,8 +275,8 @@ def fix_len(fn, offset, oldlen, newlen):
                         if x['data'][0] == mov_reg_rm and 'modrm' in x:
                             # Copying 1 byte from memory to a register
                             modrm = x['modrm']
-                            if modrm[0] == 0 and modrm[2] == 5:
-                                reg = modrm[1]
+                            if modrm.mode == 0 and modrm.regmem == 5:
+                                reg = modrm.reg
                                 move_to_reg = i
                                 flag += 1
                         elif x['data'][0] == mov_acc_mem:
@@ -288,7 +288,7 @@ def fix_len(fn, offset, oldlen, newlen):
                         if x['data'][0] == mov_rm_reg and 'modrm' in x:
                             # Copying from register to memory
                             modrm = x['modrm']
-                            if modrm[0] != 3 and modrm[1] == reg:
+                            if modrm.mode != 3 and modrm.reg == reg:
                                 move_to_mem = i
                                 # Make code move 4 bytes instead of 1:
                                 opcode = aft[move_to_reg]
@@ -341,19 +341,19 @@ def get_length(s, oldlen):
                 size = 1
             x, j = analyse_modrm(s, i)
             modrm = x['modrm']
-            reg = modrm[1]
+            reg = modrm.reg
             assert(reg <= Reg.dx)  # reg in {Reg.ax, Reg.cx, Reg.dx})
             i += 1  # assume there's no sib byte
             if op & 2:
                 # mov reg, [mem]
-                assert(modrm[0] == 0 and modrm[2] == 5)  # move from explicit address to register
+                assert(modrm.mode == 0 and modrm.regmem == 5)  # move from explicit address to register
                 assert(regs[reg] is None)  # register value was not saved
                 regs[reg] = size
                 deleted.add(i)
             else:
                 # mov [reg+N], reg
-                assert(modrm[0] != 3)  # move to register disallowed
-                assert(not (modrm[0] == 0 and modrm[2] == 5))  # move to explicit address disallowed
+                assert(modrm.mode != 3)  # move to register disallowed
+                assert(not (modrm.mode == 0 and modrm.regmem == 5))  # move to explicit address disallowed
                 assert(regs[reg] == size)  # get a value with the same size as stored
                 regs[reg] = None
                 x = process_operands(x)
@@ -364,14 +364,14 @@ def get_length(s, oldlen):
         elif op == lea:
             x, j = analyse_modrm(s, i)
             modrm = x['modrm']
-            assert(modrm[0] != 3)
-            reg = modrm[1]
+            assert(modrm.mode != 3)
+            reg = modrm.reg
             if reg <= Reg.dx:
                 regs[reg] = -1  # mark register as occupied
             x = process_operands(x)
             if dest is None or dest[0] == x[0] and dest[1] > x[1]:
                 dest = x
-            _lea = dict(dest=modrm[1], src=Operand(base_reg=x[0], disp=x[1]))
+            _lea = dict(dest=modrm.reg, src=Operand(base_reg=x[0], disp=x[1]))
             i = j
         else:
             raise AssertionError
