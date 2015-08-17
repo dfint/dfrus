@@ -328,15 +328,17 @@ def disasm(s, start_address=0):
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
-            immediate = int.from_bytes(bytes(s[i+1:i+2]), byteorder='little')
-            line = DisasmLine(start_address+j, data=s[i:i+4], mnemonic='retn', operands=[Operand(value=immediate)])
-            i += 3
+            i += 1
+            immediate = int.from_bytes(bytes(s[i:i+2]), byteorder='little')
+            i += 2
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='retn', operands=[Operand(value=immediate)])
         elif s[i] in {call_near, jmp_near}:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
-            i += 5
-            immediate = start_address+i+int.from_bytes(s[j+1:i], byteorder='little', signed=True)
+            i += 1
+            immediate = start_address+i+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
+            i += 4
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
                               operands=[Operand(value=immediate)])
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
@@ -579,7 +581,12 @@ if __name__ == "__main__":
                 sections = get_section_table(fn, pe_offset)
                 entry_point = fpeek4u(fn, pe_offset+PE_ENTRY_POINT_RVA)
                 mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 0x500)
+                prev_addr = None
+                prev_size = None
                 for disasm_line in disasm(mach, image_base+entry_point):
+                    assert(prev_addr is None or disasm_line.address-prev_addr == prev_size)
+                    prev_addr = disasm_line.address
+                    prev_size = len(disasm_line.data)
                     print("%08x\t%s" %
                           (disasm_line.address, disasm_line))
                     if disasm_line.mnemonic == 'db':
