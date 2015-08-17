@@ -367,13 +367,7 @@ def disasm(s, start_address=0):
             mnemonic = mnemonics[x['modrm'][1]]
             _, op = unify_operands(x)
             if op.reg is None:
-                # todo: check this code and simplify
-                if flags == 0:
-                    op.data_size = 0
-                elif size_prefix:
-                    op.data_size = 1
-                else:
-                    op.data_size = 2
+                op.data_size = 2*bool(flags)-size_prefix
             if flags == 1:
                 immediate = int.from_bytes(s[i:i+4], byteorder='little')
                 i += 4
