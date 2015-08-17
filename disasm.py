@@ -380,25 +380,24 @@ def disasm(s, start_address=0):
                 i += 1
             op2 = Operand(value=immediate)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, op2])
-        elif (s[i] & 0xFE) in op_FE_width_REG_RM:
+        elif (s[i] & 0xFE) in op_FE_width_REG_RM or (s[i] & 0xFE == mov_rm_imm and (s[i+1] & 0x38) == 0):
             # Operation between register and register/memory without direction flag (xchg or test)
-            mnemonic = op_FE_width_REG_RM[s[i] & 0xFE]
-            flag_size = s[i] & 1
+            # or move immediate value to memory
+            si = s[i]
+            mnemonic = op_FE_width_REG_RM.get(si & 0xFE, 'mov')
+            flag_size = si & 1
             x, i = analyse_modrm(s, i+1)
             op1, op2 = unify_operands(x)
-            op1.data_size = flag_size*2-size_prefix
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
-        elif (s[i] & 0xFE) == mov_rm_imm and (s[i+1] & 0x38) == 0:
-            # todo: combine with the previous case
-            mnemonic = "mov"
-            flag_size = s[i] & 1
-            x, i = analyse_modrm(s, i+1)
-            _, op = unify_operands(x)
-            op.data_size = flag_size*2-size_prefix
-            imm_size = 1 << op.data_size
-            immediate = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
-            i += imm_size
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
+            if (si & 0xFE) == mov_rm_imm:
+                op = op2
+                op.data_size = flag_size*2-size_prefix
+                imm_size = 1 << op.data_size
+                immediate = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
+                i += imm_size
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
+            else:
+                op1.data_size = flag_size*2-size_prefix
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
         elif (s[i] & 0xFC) in op_FC_dir_width_REG_RM:
             # Operation between a register and register/memory with direction flag
             mnemonic = op_FC_dir_width_REG_RM[s[i] & 0xFC]
