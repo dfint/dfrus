@@ -1,6 +1,7 @@
 
 from opcodes import *
 from binio import to_signed
+from collections import namedtuple
 
 
 def align(n, edge=4):
@@ -20,34 +21,61 @@ def join_byte(*parts):
     return s
 
 
+class ModRM(namedtuple('ModRM', ['mode', 'reg', 'regmem'])):
+    __slots__ = ()
+    
+    @classmethod
+    def split(cls, x):
+        return cls(*split_byte(x))
+    
+    def join(self):
+        return join_byte(*self)
+    
+    __int__ = join
+
+
+
+class Sib(namedtuple('Sib', ['scale', 'index_reg', 'base_reg'])):
+    __slots__ = ()
+    
+    @classmethod
+    def split(cls, x):
+        return cls(*split_byte(x))
+    
+    def join(self):
+        return join_byte(*self)
+    
+    __int__ = join
+
+
 def analyse_modrm(s, i):
     result = dict()
 
-    modrm = split_byte(s[i])
+    modrm = ModRM.split(s[i])
     result['modrm'] = modrm
 
     i += 1
 
-    if modrm[0] != 3:
+    if modrm.mode != 3:
         # Not register addressing
-        if modrm[0] == 0 and modrm[2] == 5:
+        if modrm.mode == 0 and modrm.regmem == 5:
             # Direct addressing: [imm32]
             imm32 = int.from_bytes(s[i:i+4], byteorder='little')
             result['disp'] = imm32
             i += 4
         else:
             # Indirect addressing
-            if modrm[2] == 4:
+            if modrm.regmem == 4:
                 # Indirect addressing with scale
-                sib = split_byte(s[i])
+                sib = Sib.split(s[i])
                 result['sib'] = sib
                 i += 1
 
-            if modrm[0] == 1:
+            if modrm.mode == 1:
                 disp = to_signed(s[i], 8)
                 result['disp'] = disp
                 i += 1
-            elif modrm[0] == 2:
+            elif modrm.mode == 2:
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 result['disp'] = disp
                 i += 4
@@ -150,19 +178,19 @@ def mach_lea(dest, src):
     mach.append(lea)
 
     if src.disp == 0 and src.base_reg != Reg.ebp:
-        md = 0
+        mode = 0
     elif -0x80 <= src.disp < 0x80:
-        md = 1
+        mode = 1
     else:
-        md = 2
+        mode = 2
 
     if src.base_reg == Reg.esp:
-        mach.append(join_byte(md, dest, 4))  # mod r/m byte
-        mach.append(join_byte(0, 4, src.base_reg))  # sib byte
+        mach.append(ModRM(mode=mode, reg=dest, regmem=4).join())  # mod r/m byte
+        mach.append(Sib(scale=0, index_reg=4, base_reg=src.base_reg).join())  # sib byte
     else:
-        mach.append(join_byte(md, dest, src.base_reg))  # just mod r/m byte
+        mach.append(ModRM(mode=mode, reg=dest, regmem=src.base_reg).join())  # just mod r/m byte
 
-    if md == 1:
+    if mode == 1:
         mach.append(src.disp)
     else:
         mach += src.disp.to_bytes(4, byteorder='little')
@@ -171,28 +199,28 @@ def mach_lea(dest, src):
 
 def unify_operands(x):
     modrm = x['modrm']
-    op1 = Operand(reg=modrm[1])
-    if modrm[0] == 3:
+    op1 = Operand(reg=modrm.reg)
+    if modrm.mode == 3:
         # Register addressing
-        op2 = Operand(reg=modrm[2])
+        op2 = Operand(reg=modrm.regmem)
     else:
-        if modrm[0] == 0 and modrm[2] == 5:
+        if modrm.mode == 0 and modrm.regmem == 5:
             # Direct addressing
             op2 = Operand(disp=x['disp'])
         else:
-            if modrm[2] != 4:
+            if modrm.regmem != 4:
                 # Without SIB-byte
-                op2 = Operand(base_reg=modrm[2])
+                op2 = Operand(base_reg=modrm.regmem)
             else:
                 # Use the SIB, Luke
                 sib = x['sib']
-                if sib[1] == 4:
+                if sib.index_reg == 4:
                     # Don't use index register
-                    op2 = Operand(scale=sib[0], base_reg=sib[2])
+                    op2 = Operand(scale=sib.scale, base_reg=sib.base_reg)
                 else:
-                    op2 = Operand(scale=sib[0], index_reg=sib[1], base_reg=sib[2])
+                    op2 = Operand(scale=sib.scale, index_reg=sib.index_reg, base_reg=sib.base_reg)
 
-            if modrm[0] > 0:
+            if modrm.mode > 0:
                 op2.disp = x['disp']
 
     return op1, op2
