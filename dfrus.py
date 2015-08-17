@@ -6,6 +6,10 @@ debug = 'debug' in cmd
 if debug:
     cmd.remove('debug')
 
+cyr = 'nocyr' not in cmd
+if not cyr:
+    cmd.remove('nocyr')
+
 make_call_hooks = False
 
 if len(cmd) >= 1:
@@ -117,23 +121,24 @@ relocs_modified = False
 xref_table = get_cross_references(fn, relocs, sections, image_base)
 
 # --------------------------------------------------------
-print("Enabling the cyrillic alphabet...")
+if cyr:
+    print("Enabling the cyrillic alphabet...")
 
-unicode_table_start = [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
+    unicode_table_start = [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
 
-needle = None
-for obj_off in xref_table:
-    buf = fpeek4u(fn, obj_off, len(unicode_table_start))
-    if buf == unicode_table_start:
-        needle = obj_off
-        break
+    needle = None
+    for obj_off in xref_table:
+        buf = fpeek4u(fn, obj_off, len(unicode_table_start))
+        if buf == unicode_table_start:
+            needle = obj_off
+            break
 
-if needle is None:
-    fn.close()
-    print("Unicode table not found.")
-    sys.exit()
+    if needle is None:
+        fn.close()
+        print("Unicode table not found.")
+        sys.exit()
 
-patch_unicode_table(fn, needle)
+    patch_unicode_table(fn, needle)
 
 # --------------------------------------------------------
 if debug:
