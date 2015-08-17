@@ -28,11 +28,8 @@ class ModRM(namedtuple('ModRM', ['mode', 'reg', 'regmem'])):
     def split(cls, x):
         return cls(*split_byte(x))
     
-    def join(self):
+    def __int__(self):
         return join_byte(*self)
-    
-    __int__ = join
-
 
 
 class Sib(namedtuple('Sib', ['scale', 'index_reg', 'base_reg'])):
@@ -42,10 +39,8 @@ class Sib(namedtuple('Sib', ['scale', 'index_reg', 'base_reg'])):
     def split(cls, x):
         return cls(*split_byte(x))
     
-    def join(self):
+    def __int__(self):
         return join_byte(*self)
-    
-    __int__ = join
 
 
 def analyse_modrm(s, i):
