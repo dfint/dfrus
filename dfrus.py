@@ -191,7 +191,7 @@ if debug:
 
 
 from opcodes import *
-from collections import defaultdict
+from collections import defaultdict, Sequence
 funcs = defaultdict(lambda: defaultdict(list))
 fixes = dict()
 
@@ -231,7 +231,7 @@ for off, string in strings:
         # Fix string length for each reference
         for ref in refs:
             fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation))
-            if type(fix) is not int:
+            if isinstance(fix, Sequence):
                 # fix_len() failed to fix length
                 if len(fix) < 4:
                     if debug:
@@ -239,17 +239,17 @@ for off, string in strings:
                               (off_to_rva_ex(fix[0], sections[code]) + image_base,
                                string, translation, off_to_rva_ex(fix[2], sections[code])+image_base))
                 else:
-                    src_off, newcode, dest_off, op = fix
-                    newcode = bytes(newcode)
+                    src_off, new_code, dest_off, op = fix
+                    new_code = bytes(new_code)
                     if op == call_near and make_call_hooks:
-                        funcs[dest_off][newcode].append(off_to_rva_ex(src_off, sections[code]))
+                        funcs[dest_off][new_code].append(off_to_rva_ex(src_off, sections[code]))
                     else:
                         if src_off in fixes:
-                            oldfix = fixes[src_off]
-                            oldcode = oldfix[1]
-                            if newcode not in oldcode:
-                                newcode = oldcode + newcode
-                        fixes[src_off] = src_off, newcode, dest_off, op
+                            old_fix = fixes[src_off]
+                            old_code = old_fix[1]
+                            if new_code not in old_code:
+                                new_code = old_code + new_code
+                        fixes[src_off] = src_off, new_code, dest_off, op
                 fix = -1
 
             if fix != 0:
@@ -364,12 +364,12 @@ if make_call_hooks:
 # Write relocation table to the executable
 if relocs_modified:
     new_size, reloc_table = relocs_to_table(relocs)
-    dd = get_data_directory(fn)
-    reloc_off = rva_to_off(dd[DD_BASERELOC][0], sections)
-    reloc_size = dd[DD_BASERELOC][1]
+    data_directory = get_data_directory(fn)
+    reloc_off = rva_to_off(data_directory[DD_BASERELOC][0], sections)
+    reloc_size = data_directory[DD_BASERELOC][1]
     write_relocation_table(fn, reloc_off, reloc_table)
-    dd[DD_BASERELOC][1] = new_size
-    update_data_directory(fn, dd)
+    data_directory[DD_BASERELOC][1] = new_size
+    update_data_directory(fn, data_directory)
     if new_size < reloc_size:
         fn.seek(reloc_off + new_size)
         fn.write(b'\0' * (reloc_size - new_size))
