@@ -9,11 +9,11 @@ parser.add_argument('-p', '--dfpath', dest='path',
 parser.add_argument('-n', '--destname', dest='dest',
                     default='Dwarf Fortress Patched.exe',
                     help='name of the patched DF executable, default="Dwarf Fortress Patched.exe"')
-parser.add_argument('-d', '--dict', action='store', default='dict.txt', dest='dictionary',
+parser.add_argument('-d', '--dict', default='dict.txt', dest='dictionary',
                     help='path to the dictionary file, default=dict.txt')
 parser.add_argument('--debug', action='store_true', help='enable debugging mode')
 parser.add_argument('--cyr', action='store_true', help='enable cyrillic cp1251 codepage')
-parser.add_argument('-s', '--slice', action='store', help='slice the original dictionary, eg. 0:100',
+parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
                     type=lambda s: tuple(int(x) for x in s.split(':')))
 
 args = parser.parse_args(sys.argv[1:])
