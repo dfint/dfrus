@@ -160,7 +160,7 @@ def fix_len(fn, offset, oldlen, newlen):
                                     return (
                                         next_off+line.address,
                                         ((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, 0x0f, 0, 0, 0),  # mov [esi+14h], 0fh
-                                        next_off+line.address+5+disp, # call_near - 1 byte, displacement - 4 bytes
+                                        next_off+line.address+5+disp,  # call_near - 1 byte, displacement - 4 bytes
                                         aft[line.address]
                                     )
                                 else:
