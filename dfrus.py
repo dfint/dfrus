@@ -1,25 +1,30 @@
 import sys
 
-cmd = sys.argv[1:]
+import argparse
 
-debug = 'debug' in cmd
-if debug:
-    cmd.remove('debug')
+parser = argparse.ArgumentParser(add_help=True, description='A patcher for the hardcoded strings of the Dwarf Fortress')
+parser.add_argument('-p', '--dfpath', dest='path',
+                    default='Dwarf Fortress.exe',
+                    help='path to the DF directory or to the Dwarf Fortress.exe itself, default="Dwarf Fortress.exe"')
+parser.add_argument('-n', '--destname', dest='dest',
+                    default='Dwarf Fortress Patched.exe',
+                    help='name of the patched DF executable, default="Dwarf Fortress Patched.exe"')
+parser.add_argument('-d', '--dict', action='store', default='dict.txt', dest='dictionary',
+                    help='path to the dictionary file, default=dict.txt')
+parser.add_argument('--debug', action='store_true', help='enable debugging mode')
+parser.add_argument('--cyr', action='store_true', help='enable cyrillic cp1251 codepage')
+parser.add_argument('-s', '--slice', action='store', help='slice the original dictionary, eg. 0:100',
+                    type=lambda s: tuple(int(x) for x in s.split(':')))
 
-cyr = 'nocyr' not in cmd
-if not cyr:
-    cmd.remove('nocyr')
+args = parser.parse_args(sys.argv[1:])
+
+debug = args.debug
 
 make_call_hooks = False
 
-if len(cmd) >= 1:
-    path = cmd[0]
-    cmd = cmd[1:]
-else:
-    path = ""
-
 import os.path
 
+path = args.path
 df1 = None
 
 if len(path) == 0 or not os.path.exists(path):
@@ -32,7 +37,15 @@ else:
     df1 = path
     path = os.path.dirname(path)
 
-df2 = os.path.join(path, "Dwarf Fortress Rus.exe")
+if args.dest:
+    dest_path, dest_name = os.path.split(args.dest)
+    if not dest_path:
+        dest_path = path
+else:
+    dest_path = path
+    dest_name = 'Dwarf Fortress Patched.exe'
+
+df2 = os.path.join(dest_path, dest_name)
 
 # --------------------------------------------------------
 from pe import check_pe
@@ -49,35 +62,42 @@ except OSError:
 from patchdf import *
 print("Loading translation file...")
 
-trans_filename = "trans.txt"
-with open(trans_filename, encoding="cp1251") as trans:
-    trans_table = load_trans_file(trans)
+encoding = 'cp1251' if args.cyr else 'cp437'
+try:
+    with open(args.dictionary, encoding=encoding) as trans:
+        trans_table = load_trans_file(trans)
 
-    if not debug:
-        trans_table = dict(trans_table)
-    else:
-        trans_table = list(trans_table)
-        print('%d translation pairs loaded.' % len(trans_table))
-        if len(cmd) == 1:
-            i = int(cmd[0])
-            if 0 <= i < len(trans_table):
-                trans_table = [trans_table[i]]
-            else:
-                print('Translation index is too high or too low. Using all the translations.')
+        if not debug:
+            trans_table = dict(trans_table)
+        else:
+            trans_table = list(trans_table)
+            print('%d translation pairs loaded.' % len(trans_table))
+            
+            if not args.slice:
+                pass
+            elif len(args.slice) == 1:
+                i = args.slice[0]
+                if 0 <= i < len(trans_table):
+                    trans_table = [trans_table[i]]
+                else:
+                    print('Warning: Translation index is too high or too low. Using all the translations.')
 
-        elif len(cmd) > 1:
-            start_index = int(cmd[0])
-            end_index = int(cmd[1])
-            if not 0 <= start_index <= end_index < len(trans_table):
-                print('Translation indices are too high or too low. Using all the translations.')
-            else:
-                print('Slicing translations (low, mid, high): %d %d %d' %
-                      (start_index, (start_index+end_index)//2, end_index))
-                trans_table = trans_table[start_index:end_index+1]
-                print('Leaving %d translations.' % len(trans_table))
+            elif len(args.slice) > 1:
+                start_index = args.slice[0]
+                end_index = args.slice[1]
+                
+                if not 0 <= start_index <= end_index < len(trans_table):
+                    print('Warning: Translation indices are too high or too low. Using all the translations.')
+                else:
+                    print('Slicing translations (low, mid, high): %d:%d:%d' %
+                          (start_index, (start_index+end_index)//2, end_index))
+                    trans_table = trans_table[start_index:end_index+1]
+                    print('Leaving %d translations.' % len(trans_table))
 
-        trans_table = dict(trans_table)
-
+            trans_table = dict(trans_table)
+except FileNotFoundError:
+    print('Error: "%s" file not found.' % args.dictionary)
+    sys.exit()
     
 # --------------------------------------------------------
 from shutil import copy
@@ -121,7 +141,7 @@ relocs_modified = False
 xref_table = get_cross_references(fn, relocs, sections, image_base)
 
 # --------------------------------------------------------
-if cyr:
+if args.cyr:
     print("Enabling the cyrillic alphabet...")
 
     unicode_table_start = [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
@@ -146,9 +166,9 @@ if debug:
 
 last_section = sections[-1]
 
-if last_section.name.startswith(b'.rus\0'):
+if last_section.name.startswith(b'.new\0'):
     fn.close()
-    print("There is '.rus' section in the file already.")
+    print("There is '.new' section in the file already.")
     sys.exit()
 
 file_alignment = fpeek4u(fn, pe_offset+PE_FILE_ALIGNMENT)
@@ -159,7 +179,7 @@ from disasm import align
 # New section prototype
 
 new_section = Section(
-    name=b'.rus',
+    name=b'.new',
     virtual_size=0,  # for now
     rva=align(last_section.rva+last_section.virtual_size,
               section_alignment),
@@ -219,14 +239,14 @@ for off, string in strings:
         if not is_long:
             # Overwrite the string with the translation in-place
             write_string(fn, translation,
-                         off=off, encoding='cp1251',
+                         off=off, encoding=encoding,
                          new_len=aligned_len)
             str_off = None
         else:
             # Add the translation to the separate section
             str_off = new_section_offset
             new_section_offset = add_to_new_section(fn, new_section_offset,
-                                                    bytes(translation + '\0', encoding='cp1251'))
+                                                    bytes(translation + '\0', encoding=encoding))
 
         # Fix string length for each reference
         for ref in refs:
