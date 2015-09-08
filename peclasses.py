@@ -5,11 +5,11 @@ from collections import OrderedDict, namedtuple
 
 
 class ImageDosHeader:
-    _size = 0x40
+    size = 0x40
     
     def __init__(self, file, offset=0):
         file.seek(offset)
-        self.raw = file.read(self._size)
+        self.raw = file.read(self.size)
         self.signature = self.raw[:2]
         if self.signature != b'MZ':
             raise ValueError('IMAGE_DOS_HEADER wrong signature: %r' % self.signature)
@@ -17,7 +17,7 @@ class ImageDosHeader:
 
 
 class ImageFileHeader:
-    _size = 0x14
+    size = 0x14
     _template = '2H 3L 2H'
     _field_names = ('machine', 'number_of_sections', 'timedate_stamp', 'pointer_to_symbol_table',
                     'number_of_symbols', 'size_of_optional_header', 'characteristics')
@@ -26,7 +26,7 @@ class ImageFileHeader:
     def __init__(self, file, offset=None):
         if offset is not None:
             file.seek(offset)
-        self.raw = file.read(self._size)
+        self.raw = file.read(self.size)
         self.items = OrderedDict(zip(self._field_names, struct.unpack(self._template, self.raw)))
     
     def __getattr__(self, attr):
@@ -84,8 +84,8 @@ class ImageOptionalHeader:
     def __init__(self, file, offset=None, size=224):
         if offset is not None:
             file.seek(offset)
-        self._size = size
-        self.raw = file.read(self._size)
+        self.size = size
+        self.raw = file.read(self.size)
         self.items = OrderedDict(zip(self._field_names,
                                      struct.unpack(self._template, self.raw[:self._data_directory_offset])))
 
@@ -101,17 +101,48 @@ class ImageOptionalHeader:
         return 'ImageOptionalHeader(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
                                                      for i, name in enumerate(self._field_names))
 
+
 class ImageNTHeaders:
     def __init__(self, file, offset):
+        self.offset = offset
         file.seek(offset)
         self.signature = file.read(4)
         assert self.signature == b'PE\0\0'
         if self.signature != b'PE\0\0':
             raise ValueError('IMAGE_NT_HEADERS wrong signature: %r' % self.signature)
         self.file_header = ImageFileHeader(file)
-        assert self.file_header.size_of_optional_header > 0
+        assert self.file_header.size_of_optional_header == 224
         self.optional_header = ImageOptionalHeader(file)
+        self.size = 4 + self.file_header.size + self.optional_header.size
 
+
+class Section:
+    _struct = struct.Struct('8s4L12xL')
+    _size = _struct.size
+    _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
+    _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
+
+    def __init__(self, name, virtual_size, rva, physical_size, physical_offset, flags):
+        self.raw = None
+        self.items = OrderedDict(name=name, virtual_size=virtual_size, rva=rva, physical_size=physical_size,
+                                 physical_offset=physical_offset, flags=flags)
+
+    @classmethod
+    def read(cls, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+
+        raw = file.read(cls._size)
+        section = Section(*cls._struct.unpack(raw))
+        section.raw = raw
+        return section
+
+    def __getattr__(self, attr):
+        return self.items[attr]
+
+    def __repr__(self):
+        return 'Section(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+                                        for i, name in enumerate(self._field_names))
 
 class Pe:
     def __init__(self, file):
@@ -120,6 +151,16 @@ class Pe:
         self.file_header = self.nt_headers.file_header
         self.optional_header = self.nt_headers.optional_header
         self.data_directory = self.optional_header.data_directory
+        self._section_table = None
+
+    @property
+    def section_table(self):
+        if self._section_table is None:
+            n = self.file_header.number_of_sections
+            file.seek(self.nt_headers.offset + self.nt_headers.size)
+            self._section_table = [Section.read(file) for _ in range(n)]
+
+        return self._section_table
 
     def info(self):
         return ('DOS signature: %s\n' % self.dos_header.signature +
@@ -127,7 +168,9 @@ class Pe:
                 'PE signature: %s\n' % self.nt_headers.signature +
                 'Image file header:\n%s\n' % self.file_header +
                 'Image optional header:\n%s\n' % self.optional_header +
-                'Data directory:\n%r\n' % self.data_directory.items)
+                'Data directory:\n%r\n' % self.data_directory.items +
+                'Section table:\n%r\n' % self.section_table)
+
 
 if __name__ == "__main__":
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
