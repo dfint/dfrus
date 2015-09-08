@@ -119,6 +119,7 @@ class Pe:
         self.nt_headers = ImageNTHeaders(file, self.dos_header.e_lfanew)
         self.file_header = self.nt_headers.file_header
         self.optional_header = self.nt_headers.optional_header
+        self.data_directory = self.optional_header.data_directory
 
     def info(self):
         return ('DOS signature: %s\n' % self.dos_header.signature +
@@ -126,7 +127,7 @@ class Pe:
                 'PE signature: %s\n' % self.nt_headers.signature +
                 'Image file header:\n%s\n' % self.file_header +
                 'Image optional header:\n%s\n' % self.optional_header +
-                'Data directory:\n%r\n' % self.optional_header.data_directory.items)
+                'Data directory:\n%r\n' % self.data_directory.items)
 
 if __name__ == "__main__":
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
