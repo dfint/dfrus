@@ -21,7 +21,8 @@ class ImageFileHeader:
     _template = '2H 3L 2H'
     _field_names = ('machine', 'number_of_sections', 'timedate_stamp', 'pointer_to_symbol_table',
                     'number_of_symbols', 'size_of_optional_header', 'characteristics')
-    
+    _formatters = '0x%x %d 0x%x 0x%x %d 0x%x 0x%x'.split()
+
     def __init__(self, file, offset=None):
         if offset is not None:
             file.seek(offset)
@@ -31,6 +32,10 @@ class ImageFileHeader:
     def __getattr__(self, attr):
         return self.items[attr]
 
+    def __str__(self):
+        return 'ImageFileHeader(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+                                                 for i, name in enumerate(self._field_names))
+
 
 data_directory_entry = namedtuple('data_directory_entry', ('virtual_address', 'size'))
 
@@ -38,8 +43,7 @@ data_directory_entry = namedtuple('data_directory_entry', ('virtual_address', 's
 class DataDirectory:
     _number_of_directory_entries = 16
     _field_names = ('export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright,'
-                    'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor',
-                    'reserved_1', 'reserved_2')
+                    'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
 
     def __init__(self, raw):
         self.raw = raw
@@ -54,17 +58,26 @@ class ImageOptionalHeader:
     _template = 'H B B 9L 6H 4L 2H 6L'
     _field_names = (
         'magic', 'major_linker_version', 'minor_linker_version', 'size_of_code',
-        'size_of_initialized_data', 'size_of_uninitialized_data',
-        'address_of_entry_point', 'base_of_code', 'base_of_data',
-        'image_base', 'section_alignment', 'file_alignment',
+        'size_of_initialized_data', 'size_of_uninitialized_data', 'address_of_entry_point', 'base_of_code',
+        'base_of_data', 'image_base', 'section_alignment', 'file_alignment',
+
         'major_operating_system_version', 'minor_operating_system_version',
         'major_image_version', 'minor_image_version',
         'major_subsystem_version', 'minor_subsystem_version',
-        'win32_version_value', 'size_of_image', 'size_of_headers', 'check_sum', 'subsystem',
-        'dll_characteristics', 'size_of_stack_reserve', 'size_of_stack_commit',
-        'size_of_heap_reserve', 'size_of_heap_commit',
-        'loader_flags', 'number_of_rva_and_sizes'
+        'win32_version_value', 'size_of_image', 'size_of_headers', 'check_sum',
+        'subsystem', 'dll_characteristics', 'size_of_stack_reserve', 'size_of_stack_commit',
+        'size_of_heap_reserve', 'size_of_heap_commit', 'loader_flags', 'number_of_rva_and_sizes'
     )
+
+    _formatters = '''0x%x %d %d 0x%x
+                     0x%x 0x%x 0x%x 0x%x
+                     0x%x 0x%x 0x%x 0x%x
+                     %d %d
+                     %d %d
+                     %d %d
+                     %d 0x%x 0x%x 0x%x
+                     %d 0x%x 0x%x 0x%x
+                     0x%x 0x%x 0x%x 0x%x'''.split()
 
     _data_directory_offset = 0x60
 
@@ -84,6 +97,9 @@ class ImageOptionalHeader:
         else:
             return self.items[attr]
 
+    def __str__(self):
+        return 'ImageOptionalHeader(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+                                                     for i, name in enumerate(self._field_names))
 
 class ImageNTHeaders:
     def __init__(self, file, offset):
@@ -104,10 +120,15 @@ class Pe:
         self.file_header = self.nt_headers.file_header
         self.optional_header = self.nt_headers.optional_header
 
+    def info(self):
+        return ('DOS signature: %s\n' % self.dos_header.signature +
+                'e_lfanew: 0x%x\n' % self.dos_header.e_lfanew +
+                'PE signature: %s\n' % self.nt_headers.signature +
+                'Image file header:\n%s\n' % self.file_header +
+                'Image optional header:\n%s\n' % self.optional_header +
+                'Data directory:\n%r\n' % self.optional_header.data_directory.items)
 
 if __name__ == "__main__":
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
         pe = Pe(file)
-        print(pe.dos_header.signature)
-        print(hex(pe.dos_header.e_lfanew))
-        print(pe.file_header.items)
+        print(pe.info())
