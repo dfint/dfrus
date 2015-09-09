@@ -1,6 +1,15 @@
 import sys
-
+import os.path
 import argparse
+from shutil import copy
+from collections import defaultdict, Sequence
+
+from disasm import align
+from extract_strings import extract_strings
+from pe import *
+from pe import check_pe
+from patchdf import *
+from opcodes import *
 
 parser = argparse.ArgumentParser(add_help=True, description='A patcher for the hardcoded strings of the Dwarf Fortress')
 parser.add_argument('-p', '--dfpath', dest='path',
@@ -21,8 +30,6 @@ args = parser.parse_args(sys.argv[1:])
 debug = args.debug
 
 make_call_hooks = False
-
-import os.path
 
 path = args.path
 df1 = None
@@ -48,8 +55,6 @@ else:
 df2 = os.path.join(dest_path, dest_name)
 
 # --------------------------------------------------------
-from pe import check_pe
-
 try:
     with open(df1, "rb") as fn:
         pass
@@ -59,7 +64,6 @@ except OSError:
     sys.exit()
 
 # --------------------------------------------------------
-from patchdf import *
 print("Loading translation file...")
 
 encoding = 'cp1251' if args.cyr else 'cp437'
@@ -72,7 +76,7 @@ try:
         else:
             trans_table = list(trans_table)
             print('%d translation pairs loaded.' % len(trans_table))
-            
+
             if not args.slice:
                 pass
             elif len(args.slice) == 1:
@@ -85,22 +89,21 @@ try:
             elif len(args.slice) > 1:
                 start_index = args.slice[0]
                 end_index = args.slice[1]
-                
+
                 if not 0 <= start_index <= end_index < len(trans_table):
                     print('Warning: Translation indices are too high or too low. Using all the translations.')
                 else:
                     print('Slicing translations (low, mid, high): %d:%d:%d' %
-                          (start_index, (start_index+end_index)//2, end_index))
-                    trans_table = trans_table[start_index:end_index+1]
+                          (start_index, (start_index + end_index) // 2, end_index))
+                    trans_table = trans_table[start_index:end_index + 1]
                     print('Leaving %d translations.' % len(trans_table))
 
             trans_table = dict(trans_table)
 except FileNotFoundError:
     print('Error: "%s" file not found.' % args.dictionary)
     sys.exit()
-    
+
 # --------------------------------------------------------
-from shutil import copy
 print("Copying '%s'\nTo '%s'..." % (df1, df2))
 
 try:
@@ -128,9 +131,7 @@ if pe_offset is None:
     os.remove(df2)
     sys.exit()
 
-from pe import *
-
-image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
+image_base = fpeek4u(fn, pe_offset + PE_IMAGE_BASE)
 sections = get_section_table(fn, pe_offset)
 
 # Getting addresses of all relocatable entries
@@ -171,17 +172,15 @@ if last_section.name.startswith(b'.new\0'):
     print("There is '.new' section in the file already.")
     sys.exit()
 
-file_alignment = fpeek4u(fn, pe_offset+PE_FILE_ALIGNMENT)
-section_alignment = fpeek4u(fn, pe_offset+PE_SECTION_ALIGNMENT)
-
-from disasm import align
+file_alignment = fpeek4u(fn, pe_offset + PE_FILE_ALIGNMENT)
+section_alignment = fpeek4u(fn, pe_offset + PE_SECTION_ALIGNMENT)
 
 # New section prototype
 
 new_section = Section(
     name=b'.new',
     virtual_size=0,  # for now
-    rva=align(last_section.rva+last_section.virtual_size,
+    rva=align(last_section.rva + last_section.virtual_size,
               section_alignment),
     physical_size=0,  # for now
     physical_offset=align(last_section.physical_offset +
@@ -193,8 +192,6 @@ new_section_offset = new_section.physical_offset
 
 # --------------------------------------------------------
 print("Translating...")
-
-from extract_strings import extract_strings
 
 strings = list(extract_strings(fn, xref_table))
 
@@ -209,33 +206,30 @@ if debug:
         for item in strings:
             print("0x%x : %r" % item)
 
-
-from opcodes import *
-from collections import defaultdict, Sequence
 funcs = defaultdict(lambda: defaultdict(list))
 fixes = dict()
 
 for off, string in strings:
     if string in trans_table:
         translation = trans_table[string]
-        
+
         if string == translation:
             continue
-        
+
         refs = xref_table[off]
-        
+
         # Find the earliest reference to the string (even if it is a reference to the middle of the string)
         k = 4
-        while off+k in xref_table and k < len(string)+1:
+        while off + k in xref_table and k < len(string) + 1:
             for j, ref in enumerate(refs):
-                mid_refs = xref_table[off+k]
+                mid_refs = xref_table[off + k]
                 delta = ref - mid_refs[0]
                 if len(mid_refs) == 1 and 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
                     refs[j] = mid_refs[0]
             k += 4
-        
-        aligned_len = align(len(string)+1)
-        is_long = aligned_len < len(translation)+1
+
+        aligned_len = align(len(string) + 1)
+        is_long = aligned_len < len(translation) + 1
         if not is_long:
             # Overwrite the string with the translation in-place
             write_string(fn, translation,
@@ -257,7 +251,7 @@ for off, string in strings:
                     if debug:
                         print('Unable to add jump/call hook at 0x%x for |%s|%s| (jump or call to address 0x%x)' %
                               (off_to_rva_ex(fix[0], sections[code]) + image_base,
-                               string, translation, off_to_rva_ex(fix[2], sections[code])+image_base))
+                               string, translation, off_to_rva_ex(fix[2], sections[code]) + image_base))
                 else:
                     src_off, new_code, dest_off, op = fix
                     new_code = bytes(new_code)
@@ -275,17 +269,17 @@ for off, string in strings:
             if fix != 0:
                 if fix == -2 and debug:
                     print('|%s|%s| <- %x (%x)' %
-                          (string, translation, ref, off_to_rva_ex(ref, sections[code])+image_base))
+                          (string, translation, ref, off_to_rva_ex(ref, sections[code]) + image_base))
                     print('SUSPICIOUS: Failed to fix length. Probably the code is broken.')
 
                 if is_long:
-                    fpoke4(fn, ref, off_to_rva_ex(str_off, new_section)+image_base)
+                    fpoke4(fn, ref, off_to_rva_ex(str_off, new_section) + image_base)
             elif is_long:
-                pre = fpeek(fn, ref-3, 3)
-                start = ref-get_start(pre)
-                x = get_length(fpeek(fn, start, 100), len(string)+1)
-                src = off_to_rva_ex(str_off, new_section)+image_base
-                mach, new_ref_off = mach_memcpy(src, x['dest'], len(translation)+1)
+                pre = fpeek(fn, ref - 3, 3)
+                start = ref - get_start(pre)
+                x = get_length(fpeek(fn, start, 100), len(string) + 1)
+                src = off_to_rva_ex(str_off, new_section) + image_base
+                mach, new_ref_off = mach_memcpy(src, x['dest'], len(translation) + 1)
                 if x['lea'] is not None:
                     mach += mach_lea(**x['lea'])
 
@@ -297,24 +291,24 @@ for off, string in strings:
                     proc = mach
                     dest_off = new_section_offset
                     dest_rva = off_to_rva_ex(dest_off, new_section)
-                    disp = dest_rva-(start_rva+5)
-                    mach = bytearray((call_near,))+disp.to_bytes(4, byteorder='little')
+                    disp = dest_rva - (start_rva + 5)
+                    mach = bytearray((call_near,)) + disp.to_bytes(4, byteorder='little')
                     if len(mach) > x['length']:
                         if debug:
                             print('|%s|%s| <- %x (%x)' %
-                                  (string, translation, ref, off_to_rva_ex(ref, sections[code])+image_base))
+                                  (string, translation, ref, off_to_rva_ex(ref, sections[code]) + image_base))
                             print('Replacement machine code is too long (%d against %d).' % (len(mach), x['length']))
                         continue
                     new_sect_off = add_to_new_section(fn, dest_off, proc)
-                    new_ref = dest_rva+new_ref_off
+                    new_ref = dest_rva + new_ref_off
                 else:
-                    new_ref = start_rva+new_ref_off
+                    new_ref = start_rva + new_ref_off
 
                 # Fix relocations
                 # Remove relocations of the overwritten references
                 deleted_relocs = x['deleted']
                 for i, item in enumerate(deleted_relocs):
-                    relocs.remove(item+start_rva)
+                    relocs.remove(item + start_rva)
 
                 # Add relocation for the new reference
                 relocs.add(new_ref)
@@ -332,15 +326,15 @@ for fix in fixes:
     hook_off = new_section_offset
     hook_rva = off_to_rva_ex(hook_off, new_section)
     dest_rva = off_to_rva_ex(dest, sections[code])
-    disp = dest_rva-(hook_rva+len(mach)+5)  # displacement for jump from the hook
+    disp = dest_rva - (hook_rva + len(mach) + 5)  # displacement for jump from the hook
     # Add jump from the hook
     mach += bytearray((jmp_near,)) + disp.to_bytes(4, byteorder='little', signed=True)
     # Write the hook to the new section
     new_section_offset = add_to_new_section(fn, hook_off, mach)
 
     src_rva = off_to_rva_ex(src_off, sections[code])
-    disp = hook_rva-(src_rva+5)  # displacement for jump to the hook
-    fpoke(fn, src_off+1, disp.to_bytes(4, byteorder='little', signed=True))
+    disp = hook_rva - (src_rva + 5)  # displacement for jump to the hook
+    fpoke(fn, src_off + 1, disp.to_bytes(4, byteorder='little', signed=True))
 
 
 def add_call_hook(dest, val):
@@ -354,14 +348,14 @@ def add_call_hook(dest, val):
     func_start = fpeek(fn, dest, 0x10)
     n = None
     for line in disasm(func_start):
-        assert(line.mnemonic != 'db')
+        assert (line.mnemonic != 'db')
         if line.address >= 5:
             n = line.address
             break
 
     func_start = func_start[:n]
     mach += func_start
-    disp = dest_rva+len(func_start)-(hook_rva+len(mach)+5)
+    disp = dest_rva + len(func_start) - (hook_rva + len(mach) + 5)
 
     # Jump back to the function
     mach.append(jmp_near)
@@ -371,9 +365,10 @@ def add_call_hook(dest, val):
     # Add jump from the function to the hook
     src_off = dest
     src_rva = off_to_rva_ex(src_off, sections[code])
-    disp = hook_rva-(src_rva+5)
+    disp = hook_rva - (src_rva + 5)
     fpoke(fn, src_off, jmp_near)
-    fpoke(fn, src_off+1, disp.to_bytes(4, byteorder='little', signed=True))
+    fpoke(fn, src_off + 1, disp.to_bytes(4, byteorder='little', signed=True))
+
 
 # Adding call hooks
 if make_call_hooks:
@@ -404,18 +399,18 @@ if new_section_offset > new_section.physical_offset:
 
     # Align file size
     if file_size > new_section_offset:
-        fn.seek(file_size-1)
+        fn.seek(file_size - 1)
         fn.write(b'\0')
 
     # Set the new section virtual size
     new_section.virtual_size = new_section_offset - new_section.physical_offset
 
     # Write the new section info
-    fn.seek(pe_offset + SIZEOF_PE_HEADER + len(sections)*SIZEOF_IMAGE_SECTION_HEADER)
+    fn.seek(pe_offset + SIZEOF_PE_HEADER + len(sections) * SIZEOF_IMAGE_SECTION_HEADER)
     new_section.write(fn)
 
     # Fix number of sections
-    fpoke2(fn, pe_offset + PE_NUMBER_OF_SECTIONS, len(sections)+1)
+    fpoke2(fn, pe_offset + PE_NUMBER_OF_SECTIONS, len(sections) + 1)
 
     # Fix ImageSize field of the PE header
     fpoke4(fn, pe_offset + PE_SIZE_OF_IMAGE,
