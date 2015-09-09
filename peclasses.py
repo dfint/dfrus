@@ -154,7 +154,6 @@ class Section:
 class SectionTable(list):
     def __init__(self, sections):
         super().__init__(sections)
-
         # Make auxiliary lists to perform conversions offset to rva and aback:
         rvas = [section.rva for section in self]
         assert all(x < rvas[i+1] for i, x in enumerate(rvas[:-1]))
@@ -181,7 +180,8 @@ class SectionTable(list):
             return bisect.bisect(self._offsets, offset) - 1
         elif rva is not None:
             return bisect.bisect(self._rvas, rva) - 1
-        return None
+        else:
+            return None
 
 
 class Pe:
