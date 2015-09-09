@@ -193,15 +193,12 @@ class Pe:
         self.data_directory = self.optional_header.data_directory
         self._section_table = None
 
-    def _init_section_table(self):
+    @property
+    def section_table(self):
         if self._section_table is None:
             n = self.file_header.number_of_sections
             offset = self.nt_headers.offset + self.nt_headers.size
             self._section_table = SectionTable.read(offset, n)
-
-    @property
-    def section_table(self):
-        self._init_section_table()
         return self._section_table
 
     def info(self):
