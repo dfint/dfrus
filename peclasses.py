@@ -120,7 +120,7 @@ class ImageNTHeaders:
         self.file_header = ImageFileHeader(file)
         assert self.file_header.size_of_optional_header == 224
         self.optional_header = ImageOptionalHeader(file)
-        self.size = 4 + self.file_header.size + self.optional_header.size
+        self.size = len(self.signature) + self.file_header.size + self.optional_header.size
 
 
 class Section:
