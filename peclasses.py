@@ -150,6 +150,39 @@ class Section:
                                          for i, name in enumerate(self._field_names))
 
 
+class SectionTable(list):
+    def __init__(self, sections):
+        super().__init__(sections)
+
+        # Make auxiliary lists to perform conversions offset to rva and aback:
+        rvas = [section.rva for section in self]
+        assert all(x < rvas[i+1] for i, x in enumerate(rvas[:-1]))
+        offsets = [section.physical_offset for section in self]
+        assert all(x < offsets[i+1] for i, x in enumerate(offsets[:-1]))
+        self._offsets = offsets
+        self._rvas = rvas
+
+    @classmethod
+    def read(cls, offset, number):
+        file.seek(offset)
+        return cls([Section.read(file) for _ in range(number)])
+
+    def offset_to_rva(self, offset):
+        i = bisect.bisect(self._offsets, offset) - 1
+        return self[i].offset_to_rva(offset)
+
+    def rva_to_offset(self, rva):
+        i = bisect.bisect(self._rvas, rva) - 1
+        return self[i].offset_to_rva(rva)
+
+    def which_section(self, offset=None, rva=None):
+        if offset is not None:
+            return bisect.bisect(self._offsets, offset) - 1
+        elif rva is not None:
+            return bisect.bisect(self._rvas, rva) - 1
+        return None
+
+
 class Pe:
     def __init__(self, file):
         self.dos_header = ImageDosHeader(file)
@@ -158,52 +191,34 @@ class Pe:
         self.optional_header = self.nt_headers.optional_header
         self.data_directory = self.optional_header.data_directory
         self._section_table = None
-        self._section_offsets = None
-        self._section_rvas = None
 
     def _init_section_table(self):
         if self._section_table is None:
             n = self.file_header.number_of_sections
-            file.seek(self.nt_headers.offset + self.nt_headers.size)
-            self._section_table = [Section.read(file) for _ in range(n)]
-            # Make auxiliary lists to perform conversions offset to rva and aback:
-            self._section_rvas = [section.rva for section in self._section_table]
-            self._section_offsets = [section.physical_offset for section in self._section_table]
+            offset = self.nt_headers.offset + self.nt_headers.size
+            self._section_table = SectionTable.read(offset, n)
 
     @property
     def section_table(self):
         self._init_section_table()
         return self._section_table
 
-    def offset_to_rva(self, offset):
-        self._init_section_table()
-        i = bisect.bisect_left(self._section_offsets, offset)
-        return self._section_table[i].offset_to_rva(offset)
-
-    def rva_to_offset(self, rva):
-        self._init_section_table()
-        i = bisect.bisect_left(self._section_rvas, rva)
-        return self._section_table[i].rva_to_offset(rva)
-
-    def which_section(self, offset=None, rva=None):
-        self._init_section_table()
-        if offset is not None:
-            return bisect.bisect_left(self._section_offsets, offset)
-        elif rva is not None:
-            return bisect.bisect_left(self._section_rvas, rva)
-        return None
-
     def info(self):
-        return ('DOS signature: %s\n' % self.dos_header.signature +
-                'e_lfanew: 0x%x\n' % self.dos_header.e_lfanew +
-                'PE signature: %s\n' % self.nt_headers.signature +
-                'Image file header:\n%s\n' % self.file_header +
-                'Image optional header:\n%s\n' % self.optional_header +
-                'Data directory:\n%r\n' % self.data_directory.items +
-                'Section table:\n%r\n' % self.section_table)
+        return (
+            'DOS signature: %s\n' % self.dos_header.signature +
+            'e_lfanew: 0x%x\n' % self.dos_header.e_lfanew +
+            'PE signature: %s\n' % self.nt_headers.signature +
+            'Image file header:\n%s\n' % self.file_header +
+            'Image optional header:\n%s\n' % self.optional_header +
+            'Data directory:\n%r\n' % self.data_directory.items +
+            'Section table:\n%r\n' % self.section_table
+        )
 
 
 if __name__ == "__main__":
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
         pe = Pe(file)
         print(pe.info())
+        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset-1) == -1
+        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset) == 0
+        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset+1) == 0
