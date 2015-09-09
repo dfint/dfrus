@@ -1,6 +1,5 @@
 #! python3
-import struct
-# from operator import itemgetter
+import struct, bisect
 from collections import OrderedDict, namedtuple
 
 
@@ -159,6 +158,8 @@ class Pe:
         self.optional_header = self.nt_headers.optional_header
         self.data_directory = self.optional_header.data_directory
         self._section_table = None
+        self._section_offsets = None
+        self._section_rvas = None
 
     @property
     def section_table(self):
@@ -166,8 +167,19 @@ class Pe:
             n = self.file_header.number_of_sections
             file.seek(self.nt_headers.offset + self.nt_headers.size)
             self._section_table = [Section.read(file) for _ in range(n)]
+            # Make auxiliary lists to perform conversions offset to rva and aback:
+            self._section_rvas = [section.rva for section in self._section_table]
+            self._section_offsets = [section.physical_offset for section in self._section_table]
 
         return self._section_table
+
+    def offset_to_rva(self, offset):
+        i = bisect.bisect_left(self._section_offsets, offset)
+        return self._section_table[i].offset_to_rva(offset)
+
+    def rva_to_offset(self, rva):
+        i = bisect.bisect_left(self._section_rvas, rva)
+        return self._section_table[i].rva_to_offset(rva)
 
     def info(self):
         return ('DOS signature: %s\n' % self.dos_header.signature +
