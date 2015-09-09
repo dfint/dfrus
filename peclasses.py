@@ -153,6 +153,15 @@ class Section:
     def rva_to_offset(self, rva):
         return rva - self.rva + self.physical_offset
 
+    def __bytes__(self):
+        return self._struct.pack(self)
+
+    def write(self, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+
+        file.write(bytes(self))
+    
     def __repr__(self):
         return 'Section(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
                                          for i, name in enumerate(self._field_names))
@@ -173,6 +182,13 @@ class SectionTable(list):
     def read(cls, file, offset, number):
         file.seek(offset)
         return cls([Section.read(file) for _ in range(number)])
+
+    def write(self, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+
+        for section in self:
+            file.write(bytes(section))
 
     def offset_to_rva(self, offset):
         i = bisect.bisect(self._offsets, offset) - 1
