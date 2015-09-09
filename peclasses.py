@@ -215,9 +215,33 @@ IMAGE_REL_BASED_HIGHLOW = 3
 
 
 class RelocationTable:
-    def __init__(self, raw_table):
-        self.raw = raw_table
-        self.plain = self._raw_to_plain(self.raw)
+    def __init__(self, raw=None, plain=None):
+        if raw is not None:
+            self._raw = raw
+            self._plain = self._raw_to_plain(self.raw)
+            self._size = None
+        elif plain is not None:
+            self._plain = sorted(list(plain))
+            self._size = None
+            self._raw = None
+
+    @property
+    def plain(self):
+        return self._plain
+
+    @property
+    def raw(self):
+        if self._raw is None:
+            self._raw = self._plain_to_raw(self.plain)
+        return self._raw
+
+    @property
+    def size(self):
+        if self._size is None:
+            raw_table = self.raw
+            padding_words = sum(len(raw_table[page]) % 2 for page in raw_table)
+            self._size = len(raw_table) * 8 + (len(raw_table) + padding_words) * 2
+        return self._size
 
     @staticmethod
     def _raw_to_plain(raw_table):
@@ -225,6 +249,17 @@ class RelocationTable:
             for record in records:
                 if record >> 12 == IMAGE_REL_BASED_HIGHLOW:
                     yield cur_page | (record & 0x0FFF)
+
+    @staticmethod
+    def _plain_to_raw(plain):
+        reloc_table = dict()
+        for item in plain:
+            page = item & 0xFFFFF000
+            off = item & 0x00000FFF
+            if page not in reloc_table:
+                reloc_table[page] = []
+            bisect.insort(reloc_table[page], off)
+        return reloc_table
 
     @staticmethod
     def _read_raw_table(file, offset, size):
@@ -243,7 +278,24 @@ class RelocationTable:
     @classmethod
     def read(cls, file, offset, size):
         raw_table = cls._read_raw_table(file, offset, size)
-        return cls(raw_table)
+        reloc_table = cls(raw_table)
+        reloc_table._size = size
+        return reloc_table
+
+    def write(self, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+
+        raw_table = self.raw
+        for page in sorted(raw_table):
+            for i, item in enumerate(raw_table[page]):
+                raw_table[page][i] = item | IMAGE_REL_BASED_HIGHLOW << 12
+            if len(raw_table[page]) % 2 == 1:
+                raw_table[page].append(IMAGE_REL_BASED_ABSOLUTE << 12 + 0)
+            records = raw_table[page]
+            block_size = len(records) * 2 + 8
+            array('L', [page, block_size]).tofile(file)
+            array('H', records).tofile(file)
 
     def __iter__(self):
         return self.plain
