@@ -1,5 +1,6 @@
 #! python3
-import struct, bisect
+import struct
+import bisect
 from collections import OrderedDict, namedtuple
 from array import array
 
@@ -42,7 +43,7 @@ data_directory_entry = namedtuple('data_directory_entry', ('virtual_address', 's
 
 class DataDirectory:
     _number_of_directory_entries = 16
-    _field_names = ('export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright,'
+    _field_names = ('export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright',
                     'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
 
     def __init__(self, raw):
@@ -174,7 +175,7 @@ class SectionTable(list):
 
     def rva_to_offset(self, rva):
         i = bisect.bisect(self._rvas, rva) - 1
-        return self[i].offset_to_rva(rva)
+        return self[i].rva_to_offset(rva)
 
     def which_section(self, offset=None, rva=None):
         if offset is not None:
@@ -210,7 +211,8 @@ class RelocationTable:
             block_size = int.from_bytes(file.read(4), 'little')
             assert (block_size > 8)
             assert ((block_size - 8) % 2 == 0)
-            relocs = array('H').fromfile(file, (block_size - 8) // 2)
+            relocs = array('H')
+            relocs.fromfile(file, (block_size - 8) // 2)
             yield cur_page, relocs
             cur_off += block_size
 
@@ -218,6 +220,9 @@ class RelocationTable:
     def read(cls, file, offset, size):
         raw_table = cls._read_raw_table(file, offset, size)
         return cls(raw_table)
+
+    def __list__(self):
+        return list(self.plain)
 
 
 class Pe:
@@ -243,8 +248,13 @@ class Pe:
     def relocation_table(self):
         if self._relocation_table is None:
             rva = self.data_directory.basereloc.virtual_address
+            print('rva: 0x%x' % rva)
+            i = self.section_table.which_section(rva=rva)
+            print('section: %r' % self.section_table[i])
             offset = self.section_table.rva_to_offset(rva)
+            print('offset: 0x%x' % offset)
             size = self.data_directory.basereloc.size
+            print('size: 0x%x' % size)
             self._relocation_table = RelocationTable.read(self.file, offset, size)
         return self._relocation_table
 
@@ -260,10 +270,14 @@ class Pe:
         )
 
 
-if __name__ == "__main__":
+def main():
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
         pe = Pe(file)
         print(pe.info())
+        # print(list(pe.relocation_table.plain))
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset-1) == -1
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset) == 0
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset+1) == 0
+
+if __name__ == "__main__":
+    main()
