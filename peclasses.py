@@ -140,9 +140,16 @@ class Section:
     def __getattr__(self, attr):
         return self.items[attr]
 
+    def offset_to_rva(self, offset):
+        return offset - self.physical_offset + self.rva
+
+    def rva_to_offset(self, rva):
+        return rva - self.rva + self.physical_offset
+
     def __repr__(self):
         return 'Section(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
-                                        for i, name in enumerate(self._field_names))
+                                         for i, name in enumerate(self._field_names))
+
 
 class Pe:
     def __init__(self, file):
