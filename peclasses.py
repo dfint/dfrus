@@ -109,7 +109,6 @@ class ImageNTHeaders:
         self.offset = offset
         file.seek(offset)
         self.signature = file.read(4)
-        assert self.signature == b'PE\0\0'
         if self.signature != b'PE\0\0':
             raise ValueError('IMAGE_NT_HEADERS wrong signature: %r' % self.signature)
         self.file_header = ImageFileHeader(file)
