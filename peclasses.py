@@ -224,7 +224,7 @@ class RelocationTable:
         return list(self.plain)
 
 
-class Pe:
+class PortableExecutable:
     def __init__(self, file):
         self.file = file
         self.dos_header = ImageDosHeader(file)
@@ -266,7 +266,7 @@ class Pe:
 
 def main():
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
-        pe = Pe(file)
+        pe = PortableExecutable(file)
         print(pe.info())
         # print(list(pe.relocation_table.plain))
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset-1) == -1

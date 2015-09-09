@@ -562,26 +562,30 @@ def disasm(s, start_address=0):
 
         yield line
 
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 2:
+def main(argv):
+    if len(argv) < 2:
         pass
     else:
-        with open(sys.argv[1], "r+b") as fn:
-            from pe import *
-            pe_offset = check_pe(fn)
-            if pe_offset:
-                image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
-                sections = get_section_table(fn, pe_offset)
-                entry_point = fpeek4u(fn, pe_offset+PE_ENTRY_POINT_RVA)
-                mach = fpeek(fn, rva_to_off_ex(entry_point, sections[0]), 0x500)
-                prev_addr = None
-                prev_size = None
-                for disasm_line in disasm(mach, image_base+entry_point):
-                    assert(prev_addr is None or disasm_line.address-prev_addr == prev_size)
-                    prev_addr = disasm_line.address
-                    prev_size = len(disasm_line.data)
-                    print("%08x\t%s" %
-                          (disasm_line.address, disasm_line))
-                    if disasm_line.mnemonic == 'db':
-                        break
+        with open(argv[1], "r+b") as fn:
+            from peclasses import PortableExecutable
+            pe = PortableExecutable(fn)
+            image_base = pe.optional_header.image_base
+            sections = pe.section_table
+            entry_point = pe.optional_header.address_of_entry_point
+            entry_point_offset = sections.rva_to_offset(entry_point)
+            fn.seek(entry_point_offset)
+            mach = fn.read(0x500)
+            prev_addr = None
+            prev_size = None
+            print('Entry point: 0x%x\n' % (image_base+entry_point))
+            for disasm_line in disasm(mach, image_base+entry_point):
+                assert(prev_addr is None or disasm_line.address-prev_addr == prev_size)
+                prev_addr = disasm_line.address
+                prev_size = len(disasm_line.data)
+                print("%08x\t%s" % (disasm_line.address, disasm_line))
+                if disasm_line.mnemonic == 'db':
+                    break
+
+if __name__ == "__main__":
+    import sys
+    main(sys.argv)
