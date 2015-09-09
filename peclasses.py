@@ -247,13 +247,8 @@ class Pe:
     def relocation_table(self):
         if self._relocation_table is None:
             rva = self.data_directory.basereloc.virtual_address
-            print('rva: 0x%x' % rva)
-            i = self.section_table.which_section(rva=rva)
-            print('section: %r' % self.section_table[i])
             offset = self.section_table.rva_to_offset(rva)
-            print('offset: 0x%x' % offset)
             size = self.data_directory.basereloc.size
-            print('size: 0x%x' % size)
             self._relocation_table = RelocationTable.read(self.file, offset, size)
         return self._relocation_table
 
