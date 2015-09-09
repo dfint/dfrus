@@ -1,4 +1,4 @@
-from __future__ import print_function
+#! python3
 
 forbidden = set("$;@^`{|}")
 
@@ -46,12 +46,12 @@ if __name__ == "__main__":
             input("Press Enter...")
             sys.exit()
         from binio import fpeek4u
-        from pe import *
+        from peclasses import PortableExecutable
         from patchdf import get_cross_references
-        pe_offset = check_pe(fn)
-        image_base = fpeek4u(fn, pe_offset+PE_IMAGE_BASE)
-        sections = get_section_table(fn, pe_offset)
-        relocs = get_relocations(fn, sections)
+        pe = PortableExecutable(fn)
+        image_base = pe.optional_header.image_base
+        sections = pe.section_table
+        relocs = pe.relocation_table
         xrefs = get_cross_references(fn, relocs, sections, image_base)
         strings = extract_strings(fn, xrefs)
         for _, s in strings:
