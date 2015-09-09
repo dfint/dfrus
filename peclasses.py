@@ -161,8 +161,7 @@ class Pe:
         self._section_offsets = None
         self._section_rvas = None
 
-    @property
-    def section_table(self):
+    def _init_section_table(self):
         if self._section_table is None:
             n = self.file_header.number_of_sections
             file.seek(self.nt_headers.offset + self.nt_headers.size)
@@ -171,15 +170,28 @@ class Pe:
             self._section_rvas = [section.rva for section in self._section_table]
             self._section_offsets = [section.physical_offset for section in self._section_table]
 
+    @property
+    def section_table(self):
+        self._init_section_table()
         return self._section_table
 
     def offset_to_rva(self, offset):
+        self._init_section_table()
         i = bisect.bisect_left(self._section_offsets, offset)
         return self._section_table[i].offset_to_rva(offset)
 
     def rva_to_offset(self, rva):
+        self._init_section_table()
         i = bisect.bisect_left(self._section_rvas, rva)
         return self._section_table[i].rva_to_offset(rva)
+
+    def which_section(self, offset=None, rva=None):
+        self._init_section_table()
+        if offset is not None:
+            return bisect.bisect_left(self._section_offsets, offset)
+        elif rva is not None:
+            return bisect.bisect_left(self._section_rvas, rva)
+        return None
 
     def info(self):
         return ('DOS signature: %s\n' % self.dos_header.signature +
