@@ -34,11 +34,13 @@ class ImageFileHeader:
         return self.items[attr]
 
     def __str__(self):
-        return 'ImageFileHeader(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+        return 'ImageFileHeader(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self.items[name])
                                                  for i, name in enumerate(self._field_names))
 
 
-data_directory_entry = namedtuple('data_directory_entry', ('virtual_address', 'size'))
+class DataDirectoryEntry(namedtuple('DataDirectoryEntry', ('virtual_address', 'size'))):
+    def __repr__(self):
+        return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
 
 
 class DataDirectory:
@@ -49,10 +51,14 @@ class DataDirectory:
     def __init__(self, raw):
         self.raw = raw
         self.items = OrderedDict(zip(self._field_names,
-                                     (data_directory_entry._make(x) for x in struct.iter_unpack('LL', self.raw))))
+                                     (DataDirectoryEntry._make(x) for x in struct.iter_unpack('LL', self.raw))))
 
     def __getattr__(self, attr):
         return self.items[attr]
+        
+    def __str__(self):
+        return 'DataDirectory(\n\t%s\n)' % ',\n\t'.join('%-14s = %s' % (name, self.items[name])
+                                                        for i, name in enumerate(self._field_names))
 
 
 class ImageOptionalHeader:
@@ -100,8 +106,8 @@ class ImageOptionalHeader:
             return self.items[attr]
 
     def __str__(self):
-        return 'ImageOptionalHeader(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
-                                                     for i, name in enumerate(self._field_names))
+        return 'ImageOptionalHeader(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+                                                              for i, name in enumerate(self._field_names))
 
 
 class ImageNTHeaders:
@@ -183,6 +189,9 @@ class SectionTable(list):
             return bisect.bisect(self._rvas, rva) - 1
         else:
             return None
+    
+    def __repr__(self):
+        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self)
 
 
 IMAGE_REL_BASED_ABSOLUTE = 0
@@ -220,8 +229,8 @@ class RelocationTable:
         raw_table = cls._read_raw_table(file, offset, size)
         return cls(raw_table)
 
-    def __list__(self):
-        return list(self.plain)
+    def __iter__(self):
+        return self.plain
 
 
 class PortableExecutable:
@@ -257,10 +266,10 @@ class PortableExecutable:
             'DOS signature: %s\n' % self.dos_header.signature +
             'e_lfanew: 0x%x\n' % self.dos_header.e_lfanew +
             'PE signature: %s\n' % self.nt_headers.signature +
-            'Image file header:\n%s\n' % self.file_header +
-            'Image optional header:\n%s\n' % self.optional_header +
-            'Data directory:\n%r\n' % self.data_directory.items +
-            'Section table:\n%r\n' % self.section_table
+            '%s\n' % self.file_header +
+            '%s\n' % self.optional_header +
+            '%s\n' % self.data_directory +
+            '%r\n' % self.section_table
         )
 
 
@@ -268,7 +277,6 @@ def main():
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
         pe = PortableExecutable(file)
         print(pe.info())
-        # print(list(pe.relocation_table.plain))
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset-1) == -1
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset) == 0
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset+1) == 0
