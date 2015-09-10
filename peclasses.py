@@ -195,10 +195,16 @@ class Section:
     _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
     _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
 
-    def __init__(self, name, virtual_size, rva, physical_size, physical_offset, flags):
-        self.raw = None
-        self.items = OrderedDict(name=name, virtual_size=virtual_size, rva=rva, physical_size=physical_size,
-                                 physical_offset=physical_offset, flags=flags)
+    def __init__(self, *args, **kwargs):
+        if len(args) > 0:
+            assert len(args) == len(self._field_names)
+            self.raw = None
+            self.items = OrderedDict(zip(self._field_names, args))
+        elif len(kwargs) > 0:
+            assert all(field in kwargs for field in self._field_names)
+            assert all(key in self._field_names for key in kwargs)
+            self.raw = None
+            self.items = OrderedDict(zip(self._field_names, (kwargs[key] for key in self._field_names)))
 
     @classmethod
     def read(cls, file, offset=None):
