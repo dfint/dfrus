@@ -162,23 +162,6 @@ class ImageNTHeaders:
         self.optional_header = ImageOptionalHeader(file)
         self.sizeof = len(self.signature) + self.file_header.sizeof + self.optional_header.sizeof
 
-# TODO: rename Section fields according to the following structure:
-# typedef struct _IMAGE_SECTION_HEADER {
-  # BYTE  Name[IMAGE_SIZEOF_SHORT_NAME];
-  # union {
-    # DWORD PhysicalAddress;
-    # DWORD VirtualSize;
-  # } Misc;
-  # DWORD VirtualAddress;
-  # DWORD SizeOfRawData;
-  # DWORD PointerToRawData;
-  # DWORD PointerToRelocations;
-  # DWORD PointerToLinenumbers;
-  # WORD  NumberOfRelocations;
-  # WORD  NumberOfLinenumbers;
-  # DWORD Characteristics;
-# } IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
-
 
 class Section:
     IMAGE_SCN_CNT_CODE = 0x00000020
@@ -239,6 +222,27 @@ class Section:
                                          for i, name in enumerate(self._field_names))
 
 
+class ImageSectionHeader(Section):
+    _struct = struct.Struct('8s 6L 2H L')
+    sizeof = _struct.size
+    assert sizeof == Section.sizeof
+    _field_names = (
+        'name', 'physical_address', 'virtual_address', 'size_of_raw_data', 'pointer_to_raw_data',
+        'pointer_to_relocations', 'pointer_to_linenumbers', 'number_of_relocations', 'number_of_linenumbers',
+        'characteristics'
+    )
+    _formatters = '''
+        %s 0x%x 0x%x 0x%x 0x%x
+        0x%x 0x%x %d %d 0x%x
+    '''.split()
+
+    def offset_to_rva(self, offset):
+        return offset - self.pointer_to_raw_data + self.virtual_address
+
+    def rva_to_offset(self, virtual_address):
+        return virtual_address - self.virtual_address + self.pointer_to_raw_data
+
+
 class Key:
     def __init__(self, iterable, key):
         self.iterable = iterable
@@ -292,11 +296,10 @@ class SectionTable(list):
         return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self)
 
 
-IMAGE_REL_BASED_ABSOLUTE = 0
-IMAGE_REL_BASED_HIGHLOW = 3
-
-
 class RelocationTable:
+    IMAGE_REL_BASED_ABSOLUTE = 0
+    IMAGE_REL_BASED_HIGHLOW = 3
+
     def __init__(self, raw=None, plain=None):
         if raw is not None:
             self._raw = raw
@@ -329,7 +332,7 @@ class RelocationTable:
     def _raw_to_plain(raw_table):
         for cur_page, records in raw_table:
             for record in records:
-                if record >> 12 == IMAGE_REL_BASED_HIGHLOW:
+                if record >> 12 == RelocationTable.IMAGE_REL_BASED_HIGHLOW:
                     yield cur_page | (record & 0x0FFF)
 
     @staticmethod
@@ -371,9 +374,9 @@ class RelocationTable:
         raw_table = self.raw
         for page in sorted(raw_table):
             for i, item in enumerate(raw_table[page]):
-                raw_table[page][i] = item | IMAGE_REL_BASED_HIGHLOW << 12
+                raw_table[page][i] = item | RelocationTable.IMAGE_REL_BASED_HIGHLOW << 12
             if len(raw_table[page]) % 2 == 1:
-                raw_table[page].append(IMAGE_REL_BASED_ABSOLUTE << 12 + 0)
+                raw_table[page].append(RelocationTable.IMAGE_REL_BASED_ABSOLUTE << 12 + 0)
             records = raw_table[page]
             block_size = len(records) * 2 + 8
             array('L', [page, block_size]).tofile(file)
