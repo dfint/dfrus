@@ -39,8 +39,22 @@ class ImageFileHeader:
 
 
 class DataDirectoryEntry(namedtuple('DataDirectoryEntry', ('virtual_address', 'size'))):
+    _struct = struct.Struct('2L')
+    size = _struct.size
+
     def __repr__(self):
         return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
+
+    @classmethod
+    def iter_unpack(cls, data):
+        return (cls(*x) for x in cls._struct.iter_unpack(data))
+
+    @classmethod
+    def unpack(cls, data):
+        return cls(*(cls._struct.unpack(data)))
+
+    def __bytes__(self):
+        return self._struct.pack(self)
 
 
 class DataDirectory:
@@ -49,13 +63,16 @@ class DataDirectory:
                     'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
 
     def __init__(self, raw):
-        self.raw = raw
-        self.items = OrderedDict(zip(self._field_names,
-                                     (DataDirectoryEntry(*x) for x in struct.iter_unpack('2L', self.raw))))
+        self.items = OrderedDict(zip(self._field_names, DataDirectoryEntry.iter_unpack(raw)))
+        self.offset = None
 
     def __getattr__(self, attr):
         return self.items[attr]
-        
+
+    def __bytes__(self):
+        return bytes(sum((bytes(self.items[field]) for field in self._field_names), bytearray()) +
+                     bytes(DataDirectoryEntry.size))
+
     def __str__(self):
         return 'DataDirectory(\n\t%s\n)' % ',\n\t'.join('%-14s = %s' % (name, self.items[name])
                                                         for i, name in enumerate(self._field_names))
@@ -92,12 +109,16 @@ class ImageOptionalHeader:
     def __init__(self, file, offset=None, size=224):
         if offset is not None:
             file.seek(offset)
+        else:
+            offset = file.tell()
+        self.offset = offset
         self.size = size
         self.raw = file.read(self.size)
         self.items = OrderedDict(zip(self._field_names,
                                      struct.unpack(self._template, self.raw[:self._data_directory_offset])))
 
         self._data_directory = DataDirectory(self.raw[self._data_directory_offset:])
+        self._data_directory.offset = offset + self._data_directory_offset
 
     def __getattr__(self, attr):
         if attr == 'data_directory':
@@ -329,11 +350,16 @@ class PortableExecutable:
             self._relocation_table = RelocationTable.read(self.file, offset, size)
         return self._relocation_table
 
+    def reread(self):
+        self.__init__(self.file)
+
     def info(self):
         return (
             'DOS signature: %s\n' % self.dos_header.signature +
             'e_lfanew: 0x%x\n' % self.dos_header.e_lfanew +
             'PE signature: %s\n' % self.nt_headers.signature +
+            'Entry point address: 0x%x\n' % (self.optional_header.address_of_entry_point +
+                                             self.optional_header.image_base) +
             '%s\n' % self.file_header +
             '%s\n' % self.optional_header +
             '%s\n' % self.data_directory +

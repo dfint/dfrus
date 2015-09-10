@@ -1,5 +1,6 @@
+#! python3
 import sys
-import pe
+from peclasses import PortableExecutable, RelocationTable, DataDirectoryEntry
 
 cmd = sys.argv
 
@@ -47,11 +48,13 @@ else:
     args = list(group_args(cmd[2:]))
 
     with open(cmd[1], 'r+b') as fn:
-        dd = pe.get_data_directory(fn)
-        sections = pe.get_section_table(fn)
-        reloc_off = pe.rva_to_off(dd[pe.DD_BASERELOC][0], sections)
-        reloc_size = dd[pe.DD_BASERELOC][1]
-        relocs = set(pe.get_relocations(fn, offset=reloc_off, size=reloc_size))
+        peobj = PortableExecutable(fn)
+        dd = peobj.data_directory
+        sections = peobj.section_table
+        reloc_rva = dd.basereloc.virtual_address
+        reloc_off = sections.rva_to_offset(reloc_rva)
+        reloc_size = dd.basereloc.size
+        relocs = set(peobj.relocation_table)
 
         for op, items in args:
             if op == '+':
@@ -69,13 +72,20 @@ else:
             else:
                 print('Wrong operation: "%s". Skipped.' % cmd[2])
 
-        new_size, reloc_table = pe.relocs_to_table(relocs)
-        pe.write_relocation_table(fn, reloc_off, reloc_table)
-        dd[pe.DD_BASERELOC][1] = new_size
-        pe.update_data_directory(fn, dd)
+        new_reloc_table = RelocationTable(plain=relocs)
+        new_size = new_reloc_table.size
+        assert new_size <= reloc_size
+
+        new_reloc_table.write(fn, reloc_off)
 
         if new_size < reloc_size:
             fn.seek(reloc_off + new_size)
-            fn.write(b'\0' * (reloc_size - new_size))
+            fn.write(bytes(reloc_size - new_size))
 
-        assert (set(pe.get_relocations(fn)) == relocs)
+        # Update data directory table
+        dd.basereloc = DataDirectoryEntry(reloc_rva, new_size)
+        fn.seek(dd.offset)
+        fn.write(bytes(dd))
+
+        peobj.reread()
+        assert (set(peobj.relocation_table) == relocs)
