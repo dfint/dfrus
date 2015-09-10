@@ -5,6 +5,64 @@ from collections import OrderedDict
 from array import array
 
 
+class Structure:
+    _struct = struct.Struct('L')
+
+    @property
+    @classmethod
+    def sizeof(cls):
+        return cls._struct.size
+
+    _field_names = ('foo',)
+    _formatters = '%x'.split()
+
+    def __init__(self, *args, **kwargs):
+        if len(args) > 0:
+            assert len(args) == len(self._field_names)
+            self.raw = None
+            self.items = OrderedDict(zip(self._field_names, args))
+        elif len(kwargs) > 0:
+            assert all(field in kwargs for field in self._field_names)
+            assert all(key in self._field_names for key in kwargs)
+            self.raw = None
+            self.items = OrderedDict(zip(self._field_names, (kwargs[key] for key in self._field_names)))
+
+    @classmethod
+    def from_bytes(cls, buffer):
+        new_obj = cls(cls._struct.unpack(buffer))
+        new_obj.raw = buffer
+        return new_obj
+
+    @classmethod
+    def read(cls, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+
+        raw = file.read(cls.sizeof)
+        new_obj = cls(*cls._struct.unpack(raw))
+        new_obj.raw = raw
+        return new_obj
+
+    def __getattr__(self, attr):
+        return self.items[attr]
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __bytes__(self):
+        return self._struct.pack(self)
+
+    def write(self, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+
+        file.write(bytes(self))
+
+    def __repr__(self):
+        return 'Section(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+                                         for i, name in enumerate(self._field_names))
+
+
 class ImageDosHeader:
     sizeof = 0x40
 
@@ -163,7 +221,7 @@ class ImageNTHeaders:
         self.sizeof = len(self.signature) + self.file_header.sizeof + self.optional_header.sizeof
 
 
-class Section:
+class Section(Structure):
     IMAGE_SCN_CNT_CODE = 0x00000020
     IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
     IMAGE_SCN_CNT_UNINITIALIZED_DATA = 0x00000080
@@ -178,51 +236,14 @@ class Section:
     _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
     _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
 
-    def __init__(self, *args, **kwargs):
-        if len(args) > 0:
-            assert len(args) == len(self._field_names)
-            self.raw = None
-            self.items = OrderedDict(zip(self._field_names, args))
-        elif len(kwargs) > 0:
-            assert all(field in kwargs for field in self._field_names)
-            assert all(key in self._field_names for key in kwargs)
-            self.raw = None
-            self.items = OrderedDict(zip(self._field_names, (kwargs[key] for key in self._field_names)))
-
-    @classmethod
-    def read(cls, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-
-        raw = file.read(cls.sizeof)
-        section = Section(*cls._struct.unpack(raw))
-        section.raw = raw
-        return section
-
-    def __getattr__(self, attr):
-        return self.items[attr]
-
     def offset_to_rva(self, offset):
         return offset - self.physical_offset + self.rva
 
     def rva_to_offset(self, rva):
         return rva - self.rva + self.physical_offset
 
-    def __bytes__(self):
-        return self._struct.pack(self)
 
-    def write(self, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-
-        file.write(bytes(self))
-    
-    def __repr__(self):
-        return 'Section(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
-                                         for i, name in enumerate(self._field_names))
-
-
-class ImageSectionHeader(Section):
+class ImageSectionHeader(Structure):
     _struct = struct.Struct('8s 6L 2H L')
     sizeof = _struct.size
     assert sizeof == Section.sizeof
