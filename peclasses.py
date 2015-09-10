@@ -35,7 +35,7 @@ class ImageFileHeader:
 
     def __str__(self):
         return 'ImageFileHeader(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self.items[name])
-                                                 for i, name in enumerate(self._field_names))
+                                                          for i, name in enumerate(self._field_names))
 
 
 class DataDirectoryEntry(namedtuple('DataDirectoryEntry', ('virtual_address', 'size'))):
