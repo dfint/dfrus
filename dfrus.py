@@ -1,13 +1,14 @@
 import sys
 import os.path
 import argparse
+
 from shutil import copy
 from collections import defaultdict, Sequence
 
 from disasm import align
 from extract_strings import extract_strings
-from pe import *
-from pe import check_pe
+from binio import fpeek4u, write_string
+from peclasses import PortableExecutable, Section, RelocationTable
 from patchdf import *
 from opcodes import *
 
@@ -123,19 +124,19 @@ except OSError:
     print("Failed to open '%s'" % df2)
     sys.exit()
 
-pe_offset = check_pe(fn)
-
-if pe_offset is None:
+try:
+    pe = PortableExecutable(fn)
+except ValueError:
     print("Failed. '%s' is not an executable file." % df2)
     fn.close()
     os.remove(df2)
     sys.exit()
 
-image_base = fpeek4u(fn, pe_offset + PE_IMAGE_BASE)
-sections = get_section_table(fn, pe_offset)
+image_base = pe.optional_header.image_base
+sections = pe.section_table
 
 # Getting addresses of all relocatable entries
-relocs = set(get_relocations(fn, sections))
+relocs = set(pe.relocation_table)
 relocs_modified = False
 
 # Getting cross-references:
@@ -172,11 +173,10 @@ if last_section.name.startswith(b'.new\0'):
     print("There is '.new' section in the file already.")
     sys.exit()
 
-file_alignment = fpeek4u(fn, pe_offset + PE_FILE_ALIGNMENT)
-section_alignment = fpeek4u(fn, pe_offset + PE_SECTION_ALIGNMENT)
+file_alignment = pe.optional_header.file_alignment
+section_alignment = pe.optional_header.section_alignment
 
 # New section prototype
-
 new_section = Section(
     name=b'.new',
     virtual_size=0,  # for now
@@ -185,7 +185,7 @@ new_section = Section(
     physical_size=0,  # for now
     physical_offset=align(last_section.physical_offset +
                           last_section.physical_size, file_alignment),
-    flags=IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE
+    flags=Section.IMAGE_SCN_CNT_INITIALIZED_DATA | Section.IMAGE_SCN_MEM_READ | Section.IMAGE_SCN_MEM_EXECUTE
 )
 
 new_section_offset = new_section.physical_offset
@@ -250,13 +250,13 @@ for off, string in strings:
                 if len(fix) < 4:
                     if debug:
                         print('Unable to add jump/call hook at 0x%x for |%s|%s| (jump or call to address 0x%x)' %
-                              (off_to_rva_ex(fix[0], sections[code]) + image_base,
-                               string, translation, off_to_rva_ex(fix[2], sections[code]) + image_base))
+                              (sections[code].offset_to_rva(fix[0]) + image_base,
+                               string, translation, sections[code].offset_to_rva(fix[2]) + image_base))
                 else:
                     src_off, new_code, dest_off, op = fix
                     new_code = bytes(new_code)
                     if op == call_near and make_call_hooks:
-                        funcs[dest_off][new_code].append(off_to_rva_ex(src_off, sections[code]))
+                        funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
                     else:
                         if src_off in fixes:
                             old_fix = fixes[src_off]
@@ -269,34 +269,34 @@ for off, string in strings:
             if fix != 0:
                 if fix == -2 and debug:
                     print('|%s|%s| <- %x (%x)' %
-                          (string, translation, ref, off_to_rva_ex(ref, sections[code]) + image_base))
+                          (string, translation, ref, sections[code].offset_to_rva(ref) + image_base))
                     print('SUSPICIOUS: Failed to fix length. Probably the code is broken.')
 
                 if is_long:
-                    fpoke4(fn, ref, off_to_rva_ex(str_off, new_section) + image_base)
+                    fpoke4(fn, ref, new_section.offset_to_rva(str_off) + image_base)
             elif is_long:
                 pre = fpeek(fn, ref - 3, 3)
                 start = ref - get_start(pre)
                 x = get_length(fpeek(fn, start, 100), len(string) + 1)
-                src = off_to_rva_ex(str_off, new_section) + image_base
+                src = new_section.offset_to_rva(str_off) + image_base
                 mach, new_ref_off = mach_memcpy(src, x['dest'], len(translation) + 1)
                 if x['lea'] is not None:
                     mach += mach_lea(**x['lea'])
 
-                start_rva = off_to_rva_ex(start, sections[code])
+                start_rva = sections[code].offset_to_rva(start)
 
                 if len(mach) > x['length']:
                     # if memcpy code is to long, try to write it into the new section and make call to it
                     mach.append(ret_near)
                     proc = mach
                     dest_off = new_section_offset
-                    dest_rva = off_to_rva_ex(dest_off, new_section)
+                    dest_rva = new_section.offset_to_rva(dest_off)
                     disp = dest_rva - (start_rva + 5)
                     mach = bytearray((call_near,)) + disp.to_bytes(4, byteorder='little')
                     if len(mach) > x['length']:
                         if debug:
                             print('|%s|%s| <- %x (%x)' %
-                                  (string, translation, ref, off_to_rva_ex(ref, sections[code]) + image_base))
+                                  (string, translation, ref, sections[code].offset_to_rva(ref) + image_base))
                             print('Replacement machine code is too long (%d against %d).' % (len(mach), x['length']))
                         continue
                     new_sect_off = add_to_new_section(fn, dest_off, proc)
@@ -324,15 +324,15 @@ for off, string in strings:
 for fix in fixes:
     src_off, mach, dest, _ = fixes[fix]
     hook_off = new_section_offset
-    hook_rva = off_to_rva_ex(hook_off, new_section)
-    dest_rva = off_to_rva_ex(dest, sections[code])
+    hook_rva = new_section.offset_to_rva(hook_off)
+    dest_rva = sections[code].offset_to_rva(dest)
     disp = dest_rva - (hook_rva + len(mach) + 5)  # displacement for jump from the hook
     # Add jump from the hook
     mach += bytearray((jmp_near,)) + disp.to_bytes(4, byteorder='little', signed=True)
     # Write the hook to the new section
     new_section_offset = add_to_new_section(fn, hook_off, mach)
 
-    src_rva = off_to_rva_ex(src_off, sections[code])
+    src_rva = sections[code].offset_to_rva(src_off)
     disp = hook_rva - (src_rva + 5)  # displacement for jump to the hook
     fpoke(fn, src_off + 1, disp.to_bytes(4, byteorder='little', signed=True))
 
@@ -341,8 +341,8 @@ def add_call_hook(dest, val):
     global new_section_offset
     mach = sum(val.keys(), bytearray())  # Flatten and convert to bytearray()
     hook_off = new_section_offset
-    hook_rva = off_to_rva_ex(hook_off, new_section)
-    dest_rva = off_to_rva_ex(dest, sections[code])
+    hook_rva = new_section.offset_to_rva(hook_off)
+    dest_rva = sections[code].offset_to_rva(dest)
 
     # Save the beginning of the function (at least 5 bytes for jump)
     func_start = fpeek(fn, dest, 0x10)
@@ -364,7 +364,7 @@ def add_call_hook(dest, val):
 
     # Add jump from the function to the hook
     src_off = dest
-    src_rva = off_to_rva_ex(src_off, sections[code])
+    src_rva = sections[code].offset_to_rva(src_off)
     disp = hook_rva - (src_rva + 5)
     fpoke(fn, src_off, jmp_near)
     fpoke(fn, src_off + 1, disp.to_bytes(4, byteorder='little', signed=True))
@@ -378,16 +378,19 @@ if make_call_hooks:
 
 # Write relocation table to the executable
 if relocs_modified:
-    new_size, reloc_table = relocs_to_table(relocs)
-    data_directory = get_data_directory(fn)
-    reloc_off = rva_to_off(data_directory[DD_BASERELOC][0], sections)
-    reloc_size = data_directory[DD_BASERELOC][1]
-    write_relocation_table(fn, reloc_off, reloc_table)
-    data_directory[DD_BASERELOC][1] = new_size
-    update_data_directory(fn, data_directory)
+    reloc_table = RelocationTable(relocs)
+    new_size = reloc_table.size
+    data_directory = pe.data_directory
+    reloc_off = sections.rva_to_offset(data_directory.basereloc.virtual_address)
+    reloc_size = data_directory.basereloc.size
+    reloc_table.write(fn, reloc_off)
+    assert new_size <= reloc_size
     if new_size < reloc_size:
         fn.seek(reloc_off + new_size)
-        fn.write(b'\0' * (reloc_size - new_size))
+        fn.write(bytes(reloc_size - new_size))
+    data_directory.basereloc.size = new_size
+    fn.seek(data_directory.offset)
+    fn.write(bytes(data_directory))
 
 
 # Add new section to the executable
@@ -406,15 +409,16 @@ if new_section_offset > new_section.physical_offset:
     new_section.virtual_size = new_section_offset - new_section.physical_offset
 
     # Write the new section info
-    fn.seek(pe_offset + SIZEOF_PE_HEADER + len(sections) * SIZEOF_IMAGE_SECTION_HEADER)
+    fn.seek(pe.nt_headers.offset + pe.nt_headers.sizeof + len(sections) * Section.sizeof)
     new_section.write(fn)
 
     # Fix number of sections
-    fpoke2(fn, pe_offset + PE_NUMBER_OF_SECTIONS, len(sections) + 1)
-
+    pe.optional_header.number_of_sections = len(sections) + 1
     # Fix ImageSize field of the PE header
-    fpoke4(fn, pe_offset + PE_SIZE_OF_IMAGE,
-           align(new_section.rva + new_section.virtual_size, section_alignment))
+    pe.optional_header.size_of_image = align(new_section.rva + new_section.virtual_size, section_alignment)
+
+    fn.seek(pe.optional_header.offset)
+    fn.write(bytes(pe.optional_header))
 
 fn.close()
 print('Done.')

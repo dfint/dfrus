@@ -1,16 +1,16 @@
 #! python3
 import struct
 import bisect
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict
 from array import array
 
 
 class ImageDosHeader:
-    size = 0x40
-    
+    sizeof = 0x40
+
     def __init__(self, file, offset=0):
         file.seek(offset)
-        self.raw = file.read(self.size)
+        self.raw = file.read(self.sizeof)
         self.signature = self.raw[:2]
         if self.signature != b'MZ':
             raise ValueError('IMAGE_DOS_HEADER wrong signature: %r' % self.signature)
@@ -18,7 +18,7 @@ class ImageDosHeader:
 
 
 class ImageFileHeader:
-    size = 0x14
+    sizeof = 0x14
     _template = '2H 3L 2H'
     _field_names = ('machine', 'number_of_sections', 'timedate_stamp', 'pointer_to_symbol_table',
                     'number_of_symbols', 'size_of_optional_header', 'characteristics')
@@ -27,7 +27,10 @@ class ImageFileHeader:
     def __init__(self, file, offset=None):
         if offset is not None:
             file.seek(offset)
-        self.raw = file.read(self.size)
+        else:
+            offset = file.tell()
+        self.offset = offset
+        self.raw = file.read(self.sizeof)
         self.items = OrderedDict(zip(self._field_names, struct.unpack(self._template, self.raw)))
     
     def __getattr__(self, attr):
@@ -41,7 +44,7 @@ class ImageFileHeader:
 class DataDirectoryEntry:
     __slots__ = ('virtual_address', 'size')
     _struct = struct.Struct('2L')
-    struct_size = _struct.size
+    sizeof = _struct.size
 
     def __init__(self, virtual_address, size):
         self.virtual_address = virtual_address
@@ -68,6 +71,7 @@ class DataDirectoryEntry:
 
 class DataDirectory:
     _number_of_directory_entries = 16
+    sizeof = DataDirectoryEntry.sizeof * _number_of_directory_entries
     _field_names = ('export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright',
                     'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
 
@@ -80,7 +84,7 @@ class DataDirectory:
 
     def __bytes__(self):
         return bytes(sum((bytes(self.items[field]) for field in self._field_names), bytearray()) +
-                     bytes(DataDirectoryEntry.struct_size))
+                     bytes(DataDirectoryEntry.sizeof))
 
     def __str__(self):
         return 'DataDirectory(\n\t%s\n)' % ',\n\t'.join('%-14s = %s' % (name, self.items[name])
@@ -88,7 +92,7 @@ class DataDirectory:
 
 
 class ImageOptionalHeader:
-    _template = 'H B B 9L 6H 4L 2H 6L'
+    _struct = struct.Struct('H B B 9L 6H 4L 2H 6L')
     _field_names = (
         'magic', 'major_linker_version', 'minor_linker_version', 'size_of_code',
         'size_of_initialized_data', 'size_of_uninitialized_data', 'address_of_entry_point', 'base_of_code',
@@ -115,16 +119,16 @@ class ImageOptionalHeader:
 
     _data_directory_offset = 0x60
 
-    def __init__(self, file, offset=None, size=224):
+    def __init__(self, file, offset=None, sizeof=224):
         if offset is not None:
             file.seek(offset)
         else:
             offset = file.tell()
         self.offset = offset
-        self.size = size
-        self.raw = file.read(self.size)
+        self.sizeof = sizeof
+        self.raw = file.read(self.sizeof)
         self.items = OrderedDict(zip(self._field_names,
-                                     struct.unpack(self._template, self.raw[:self._data_directory_offset])))
+                                     self._struct.unpack(self.raw[:self._data_directory_offset])))
 
         self._data_directory = DataDirectory(self.raw[self._data_directory_offset:])
         self._data_directory.offset = offset + self._data_directory_offset
@@ -134,6 +138,12 @@ class ImageOptionalHeader:
             return self._data_directory
         else:
             return self.items[attr]
+
+    def __iter__(self):
+        return (self.items[field] for field in self._field_names)
+
+    def __bytes__(self):
+        return self._struct.pack(self)
 
     def __str__(self):
         return 'ImageOptionalHeader(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self.items[name])
@@ -150,12 +160,38 @@ class ImageNTHeaders:
         self.file_header = ImageFileHeader(file)
         assert self.file_header.size_of_optional_header == 224
         self.optional_header = ImageOptionalHeader(file)
-        self.size = len(self.signature) + self.file_header.size + self.optional_header.size
+        self.sizeof = len(self.signature) + self.file_header.sizeof + self.optional_header.sizeof
+
+# TODO: rename Section fields according to the following structure:
+# typedef struct _IMAGE_SECTION_HEADER {
+  # BYTE  Name[IMAGE_SIZEOF_SHORT_NAME];
+  # union {
+    # DWORD PhysicalAddress;
+    # DWORD VirtualSize;
+  # } Misc;
+  # DWORD VirtualAddress;
+  # DWORD SizeOfRawData;
+  # DWORD PointerToRawData;
+  # DWORD PointerToRelocations;
+  # DWORD PointerToLinenumbers;
+  # WORD  NumberOfRelocations;
+  # WORD  NumberOfLinenumbers;
+  # DWORD Characteristics;
+# } IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
 
 
 class Section:
+    IMAGE_SCN_CNT_CODE = 0x00000020
+    IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
+    IMAGE_SCN_CNT_UNINITIALIZED_DATA = 0x00000080
+    IMAGE_SCN_MEM_DISCARDABLE = 0x02000000
+    IMAGE_SCN_MEM_SHARED = 0x10000000
+    IMAGE_SCN_MEM_EXECUTE = 0x20000000
+    IMAGE_SCN_MEM_READ = 0x40000000
+    IMAGE_SCN_MEM_WRITE = 0x80000000
+
     _struct = struct.Struct('8s4L12xL')
-    _size = _struct.size
+    sizeof = _struct.size
     _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
     _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
 
@@ -169,7 +205,7 @@ class Section:
         if offset is not None:
             file.seek(offset)
 
-        raw = file.read(cls._size)
+        raw = file.read(cls.sizeof)
         section = Section(*cls._struct.unpack(raw))
         section.raw = raw
         return section
@@ -197,16 +233,26 @@ class Section:
                                          for i, name in enumerate(self._field_names))
 
 
+class Key:
+    def __init__(self, iterable, key):
+        self.iterable = iterable
+        self.key = key
+
+    def __len__(self):
+        return len(self.iterable)
+
+    def __getitem__(self, i):
+        return self.key(self.iterable[i])
+
+
 class SectionTable(list):
     def __init__(self, sections):
         super().__init__(sections)
-        # Make auxiliary lists to perform conversions offset to rva and aback:
-        rvas = [section.rva for section in self]
-        assert all(x < rvas[i+1] for i, x in enumerate(rvas[:-1]))
-        offsets = [section.physical_offset for section in self]
-        assert all(x < offsets[i+1] for i, x in enumerate(offsets[:-1]))
-        self._offsets = offsets
-        self._rvas = rvas
+        # Make auxiliary objects to perform bisection search among physical offsets and rvas:
+        self._offset_key = Key(self, lambda x: x.physical_offset)
+        self._rva_key = Key(self, lambda x: x.rva)
+        assert all(x.rva < self[i+1].rva for i, x in enumerate(self[:-1]))
+        assert all(x.physical_offset < self[i+1].physical_offset for i, x in enumerate(self[:-1]))
 
     @classmethod
     def read(cls, file, offset, number):
@@ -221,18 +267,18 @@ class SectionTable(list):
             file.write(bytes(section))
 
     def offset_to_rva(self, offset):
-        i = bisect.bisect(self._offsets, offset) - 1
+        i = bisect.bisect(self._offset_key, offset) - 1
         return self[i].offset_to_rva(offset)
 
     def rva_to_offset(self, rva):
-        i = bisect.bisect(self._rvas, rva) - 1
+        i = bisect.bisect(self._rva_key, rva) - 1
         return self[i].rva_to_offset(rva)
 
     def which_section(self, offset=None, rva=None):
         if offset is not None:
-            return bisect.bisect(self._offsets, offset) - 1
+            return bisect.bisect(self._offset_key, offset) - 1
         elif rva is not None:
-            return bisect.bisect(self._rvas, rva) - 1
+            return bisect.bisect(self._rva_key, rva) - 1
         else:
             return None
     
@@ -346,7 +392,7 @@ class PortableExecutable:
     def section_table(self):
         if self._section_table is None:
             n = self.file_header.number_of_sections
-            offset = self.nt_headers.offset + self.nt_headers.size
+            offset = self.nt_headers.offset + self.nt_headers.sizeof
             self._section_table = SectionTable.read(self.file, offset, n)
         return self._section_table
 
