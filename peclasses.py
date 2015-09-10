@@ -51,7 +51,7 @@ class DataDirectory:
     def __init__(self, raw):
         self.raw = raw
         self.items = OrderedDict(zip(self._field_names,
-                                     (DataDirectoryEntry._make(x) for x in struct.iter_unpack('LL', self.raw))))
+                                     (DataDirectoryEntry(*x) for x in struct.iter_unpack('2L', self.raw))))
 
     def __getattr__(self, attr):
         return self.items[attr]
