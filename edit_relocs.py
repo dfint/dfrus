@@ -1,6 +1,6 @@
 #! python3
 import sys
-from peclasses import PortableExecutable, RelocationTable, DataDirectoryEntry
+from peclasses import PortableExecutable, RelocationTable
 
 cmd = sys.argv
 
@@ -51,9 +51,8 @@ else:
         peobj = PortableExecutable(fn)
         dd = peobj.data_directory
         sections = peobj.section_table
-        reloc_rva = dd.basereloc.virtual_address
+        reloc_rva, reloc_size = dd.basereloc
         reloc_off = sections.rva_to_offset(reloc_rva)
-        reloc_size = dd.basereloc.size
         relocs = set(peobj.relocation_table)
 
         for op, items in args:
@@ -66,7 +65,8 @@ else:
                     print('"-*" operation needs 2 arguments. Operation skipped.')
                     continue
                 elif len(items) > 2:
-                    print('"-*" operation needs only 2 arguments. Using only two of them: 0x%x, 0x%x.' % tuple(items[:2]))
+                    print('"-*" operation needs only 2 arguments. Using only two of them: 0x%x, 0x%x.' %
+                          tuple(items[:2]))
                 lower_bound, upper_bound = items[:2]
                 relocs = set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
             else:
@@ -83,7 +83,7 @@ else:
             fn.write(bytes(reloc_size - new_size))
 
         # Update data directory table
-        dd.basereloc = DataDirectoryEntry(reloc_rva, new_size)
+        dd.basereloc.size = new_size
         fn.seek(dd.offset)
         fn.write(bytes(dd))
 

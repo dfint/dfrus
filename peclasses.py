@@ -38,12 +38,17 @@ class ImageFileHeader:
                                                           for i, name in enumerate(self._field_names))
 
 
-class DataDirectoryEntry(namedtuple('DataDirectoryEntry', ('virtual_address', 'size'))):
+class DataDirectoryEntry:
+    __slots__ = ('virtual_address', 'size')
     _struct = struct.Struct('2L')
-    size = _struct.size
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
+    def __init__(self, virtual_address, size):
+        self.virtual_address = virtual_address
+        self.size = size
+
+    def __iter__(self):
+        yield self.virtual_address
+        yield self.size
 
     @classmethod
     def iter_unpack(cls, data):
@@ -55,6 +60,9 @@ class DataDirectoryEntry(namedtuple('DataDirectoryEntry', ('virtual_address', 's
 
     def __bytes__(self):
         return self._struct.pack(self)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
 
 
 class DataDirectory:
