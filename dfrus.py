@@ -378,7 +378,7 @@ if make_call_hooks:
 
 # Write relocation table to the executable
 if relocs_modified:
-    reloc_table = RelocationTable(relocs)
+    reloc_table = RelocationTable(plain=relocs)
     new_size = reloc_table.size
     data_directory = pe.data_directory
     reloc_off = sections.rva_to_offset(data_directory.basereloc.virtual_address)

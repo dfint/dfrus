@@ -47,10 +47,10 @@ class Structure:
         return self.items[attr]
 
     def __iter__(self):
-        return iter(self.items)
+        return iter(self.items.values())
 
     def __bytes__(self):
-        return self._struct.pack(self)
+        return self._struct.pack(*self)
 
     def write(self, file, offset=None):
         if offset is not None:
@@ -121,7 +121,7 @@ class DataDirectoryEntry:
         return cls(*(cls._struct.unpack(data)))
 
     def __bytes__(self):
-        return self._struct.pack(self)
+        return self._struct.pack(*self)
 
     def __repr__(self):
         return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
@@ -141,7 +141,7 @@ class DataDirectory:
         return self.items[attr]
 
     def __bytes__(self):
-        return bytes(sum((bytes(self.items[field]) for field in self._field_names), bytearray()) +
+        return bytes(b''.join(bytes(self.items[field]) for field in self._field_names) +
                      bytes(DataDirectoryEntry.sizeof))
 
     def __str__(self):
@@ -201,7 +201,7 @@ class ImageOptionalHeader:
         return (self.items[field] for field in self._field_names)
 
     def __bytes__(self):
-        return self._struct.pack(self)
+        return self._struct.pack(*self)
 
     def __str__(self):
         return 'ImageOptionalHeader(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self.items[name])
@@ -321,12 +321,14 @@ class RelocationTable:
     IMAGE_REL_BASED_ABSOLUTE = 0
     IMAGE_REL_BASED_HIGHLOW = 3
 
-    def __init__(self, raw=None, plain=None):
+    def __init__(self, plain=None, raw=None):
         if raw is not None:
+            assert type(raw) is dict
             self._raw = raw
-            self._plain = self._raw_to_plain(self.raw)
+            self._plain = self._raw_to_plain(raw)
             self._size = None
         elif plain is not None:
+            assert type(plain) is not dict
             self._plain = sorted(list(plain))
             self._size = None
             self._raw = None
@@ -351,7 +353,7 @@ class RelocationTable:
 
     @staticmethod
     def _raw_to_plain(raw_table):
-        for cur_page, records in raw_table:
+        for cur_page, records in raw_table.items():
             for record in records:
                 if record >> 12 == RelocationTable.IMAGE_REL_BASED_HIGHLOW:
                     yield cur_page | (record & 0x0FFF)
@@ -384,7 +386,7 @@ class RelocationTable:
     @classmethod
     def read(cls, file, offset, size):
         raw_table = cls._read_raw_table(file, offset, size)
-        reloc_table = cls(raw_table)
+        reloc_table = cls(raw=dict(raw_table))
         reloc_table._size = size
         return reloc_table
 
