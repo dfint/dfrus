@@ -72,11 +72,12 @@ else:
             else:
                 print('Wrong operation: "%s". Skipped.' % cmd[2])
 
-        new_reloc_table = RelocationTable(plain=relocs)
+        new_reloc_table = RelocationTable.build(relocs)
         new_size = new_reloc_table.size
         assert new_size <= reloc_size
 
-        new_reloc_table.write(fn, reloc_off)
+        fn.seek(reloc_off)
+        new_reloc_table.to_file(fn)
 
         if new_size < reloc_size:
             fn.seek(reloc_off + new_size)
@@ -88,4 +89,4 @@ else:
         fn.write(bytes(dd))
 
         peobj.reread()
-        assert (set(peobj.relocation_table) == relocs)
+        assert set(peobj.relocation_table) == relocs

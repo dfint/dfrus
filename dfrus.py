@@ -378,12 +378,13 @@ if make_call_hooks:
 
 # Write relocation table to the executable
 if relocs_modified:
-    reloc_table = RelocationTable(plain=relocs)
+    reloc_table = RelocationTable.build(relocs)
     new_size = reloc_table.size
     data_directory = pe.data_directory
     reloc_off = sections.rva_to_offset(data_directory.basereloc.virtual_address)
     reloc_size = data_directory.basereloc.size
-    reloc_table.write(fn, reloc_off)
+    fn.seek(reloc_off)
+    reloc_table.to_file(fn)
     assert new_size <= reloc_size
     if new_size < reloc_size:
         fn.seek(reloc_off + new_size)

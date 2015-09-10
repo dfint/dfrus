@@ -191,7 +191,7 @@ IMAGE_REL_BASED_ABSOLUTE = 0
 IMAGE_REL_BASED_HIGHLOW = 3
 
 
-def get_reloc_table(fn, offset, reloc_size):
+def get_reloc_table(fn, offset, reloc_size) -> iter:
     cur_off = 0
     fn.seek(offset)
     while cur_off < reloc_size:
@@ -204,14 +204,14 @@ def get_reloc_table(fn, offset, reloc_size):
         cur_off += block_size
 
 
-def table_to_relocs(reloc_table):
+def table_to_relocs(reloc_table: collections.Iterable) -> iter:
     for cur_page, records in reloc_table:
         for record in records:
             if record >> 12 == IMAGE_REL_BASED_HIGHLOW:
                 yield cur_page | (record & 0x0FFF)
 
 
-def get_relocations(fn, sections=None, offset=None, size=None):
+def get_relocations(fn, sections=None, offset=None, size=None) -> iter:
     if offset is None or size is None:
         dd = get_data_directory(fn)
         if sections is None:
@@ -221,7 +221,7 @@ def get_relocations(fn, sections=None, offset=None, size=None):
     return table_to_relocs(get_reloc_table(fn, offset, size))
 
 
-def relocs_to_table(relocs):
+def relocs_to_table(relocs: collections.Sequence) -> (int, dict):
     reloc_table = dict()
     for item in relocs:
         page = item & 0xFFFFF000
@@ -234,11 +234,12 @@ def relocs_to_table(relocs):
     return reloc_table_size, reloc_table
 
 
-def write_relocation_table(fn, offset, reloc_table):
+def write_relocation_table(fn, offset, reloc_table: dict):
     fn.seek(offset)
     for page in sorted(reloc_table):
         for i, item in enumerate(reloc_table[page]):
             reloc_table[page][i] = item | IMAGE_REL_BASED_HIGHLOW << 12
+        # Padding records:
         if len(reloc_table[page]) % 2 == 1:
             reloc_table[page].append(IMAGE_REL_BASED_ABSOLUTE << 12 + 0)
         records = reloc_table[page]
