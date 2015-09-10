@@ -1,8 +1,11 @@
 #! python3
 import struct
 import bisect
+import collections
 from collections import OrderedDict
 from array import array
+
+from disasm import align
 
 
 class Structure:
@@ -321,92 +324,58 @@ class RelocationTable:
     IMAGE_REL_BASED_ABSOLUTE = 0
     IMAGE_REL_BASED_HIGHLOW = 3
 
-    def __init__(self, plain=None, raw=None):
-        if raw is not None:
-            assert type(raw) is dict
-            self._raw = raw
-            self._plain = self._raw_to_plain(raw)
-            self._size = None
-        elif plain is not None:
-            assert type(plain) is not dict
-            self._plain = sorted(list(plain))
-            self._size = None
-            self._raw = None
+    def __init__(self, table: dict):
+        if not isinstance(table, dict):
+            raise ValueError
+        self._table = table
 
-    @property
-    def plain(self):
-        return self._plain
-
-    @property
-    def raw(self):
-        if self._raw is None:
-            self._raw = self._plain_to_raw(self.plain)
-        return self._raw
-
-    @property
-    def size(self):
-        if self._size is None:
-            raw_table = self.raw
-            padding_words = sum(len(raw_table[page]) % 2 for page in raw_table)
-            self._size = len(raw_table) * 8 + (len(raw_table) + padding_words) * 2
-        return self._size
-
-    @staticmethod
-    def _raw_to_plain(raw_table):
-        for cur_page, records in raw_table.items():
+    def __iter__(self):
+        for page, records in self._table.items():
             for record in records:
-                if record >> 12 == RelocationTable.IMAGE_REL_BASED_HIGHLOW:
-                    yield cur_page | (record & 0x0FFF)
+                yield page | (record & 0x0FFF)
 
-    @staticmethod
-    def _plain_to_raw(plain):
+    @classmethod
+    def build(cls, relocs: collections.Iterable):
         reloc_table = dict()
-        for item in plain:
+        for item in relocs:
             page = item & 0xFFFFF000
-            off = item & 0x00000FFF
+            offset = item & 0x00000FFF
             if page not in reloc_table:
                 reloc_table[page] = []
-            bisect.insort(reloc_table[page], off)
-        return reloc_table
+            bisect.insort(reloc_table[page], offset)
+        return RelocationTable(reloc_table)
 
     @staticmethod
-    def _read_raw_table(file, offset, size):
-        file.seek(offset)
+    def iter_read(file, reloc_size):
         cur_off = 0
-        while cur_off < size:
+        while cur_off < reloc_size:
             cur_page = int.from_bytes(file.read(4), 'little')
             block_size = int.from_bytes(file.read(4), 'little')
             assert (block_size > 8)
             assert ((block_size - 8) % 2 == 0)
             relocs = array('H')
             relocs.fromfile(file, (block_size - 8) // 2)
-            yield cur_page, relocs
+            yield cur_page, [x for x in relocs if x >> 12 == RelocationTable.IMAGE_REL_BASED_HIGHLOW]
             cur_off += block_size
 
     @classmethod
-    def read(cls, file, offset, size):
-        raw_table = cls._read_raw_table(file, offset, size)
-        reloc_table = cls(raw=dict(raw_table))
-        reloc_table._size = size
-        return reloc_table
+    def from_file(cls, file, reloc_size):
+        return RelocationTable(dict(cls.iter_read(file, reloc_size)))
 
-    def write(self, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
+    @property
+    def size(self):
+        words = sum(align(len(val), 2) for val in self._table.values())
+        return len(self._table) * 8 + words * 2
 
-        raw_table = self.raw
-        for page in sorted(raw_table):
-            for i, item in enumerate(raw_table[page]):
-                raw_table[page][i] = item | RelocationTable.IMAGE_REL_BASED_HIGHLOW << 12
-            if len(raw_table[page]) % 2 == 1:
-                raw_table[page].append(RelocationTable.IMAGE_REL_BASED_ABSOLUTE << 12 + 0)
-            records = raw_table[page]
-            block_size = len(records) * 2 + 8
+    def to_file(self, file):
+        for page in sorted(self._table):
+            records = [item | RelocationTable.IMAGE_REL_BASED_HIGHLOW << 12 for item in self._table[page]]
+            # Padding records:
+            if len(records) % 2 == 1:
+                records.append(RelocationTable.IMAGE_REL_BASED_ABSOLUTE << 12 | 0)
+            block_size = 8 + 2 * len(records)  # 2 dwords + N words
             array('L', [page, block_size]).tofile(file)
             array('H', records).tofile(file)
-
-    def __iter__(self):
-        return self.plain
 
 
 class PortableExecutable:
@@ -434,7 +403,8 @@ class PortableExecutable:
             rva = self.data_directory.basereloc.virtual_address
             offset = self.section_table.rva_to_offset(rva)
             size = self.data_directory.basereloc.size
-            self._relocation_table = RelocationTable.read(self.file, offset, size)
+            self.file.seek(offset)
+            self._relocation_table = RelocationTable.from_file(self.file, size)
         return self._relocation_table
 
     def reread(self):
