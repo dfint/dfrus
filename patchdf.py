@@ -1,7 +1,7 @@
 
 from disasm import *
 from binio import fpeek, fpoke4, fpoke, pad_tail
-from pe import rva_to_off
+# from pe import rva_to_off
 from opcodes import *
 
 
@@ -54,7 +54,8 @@ def get_cross_references(fn, relocs, sections, image_base):
         obj_rva = int.from_bytes(code_section[reloc:reloc+4], 'little') - image_base
         reloc += sections[code].physical_offset
         if data_lower_bound <= obj_rva <= data_upper_bound:
-            obj_off = rva_to_off(obj_rva, sections)
+            # obj_off = rva_to_off(obj_rva, sections)
+            obj_off = sections.rva_to_offset(obj_rva)
             if obj_off is not None:
                 xrefs[obj_off].append(reloc)
     
