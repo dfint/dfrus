@@ -144,6 +144,9 @@ class DataDirectoryEntry:
     def __bytes__(self):
         return self._struct.pack(*self)
 
+    def __eq__(self, other):
+        return all(x == y for x, y in zip(self, other))
+
     def __repr__(self):
         return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
 
