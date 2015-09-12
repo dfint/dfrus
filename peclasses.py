@@ -23,18 +23,22 @@ class Structure:
             assert len(args) > 0
             assert len(args) == len(self._field_names),\
                 'len(args)==%d, len(_field_names)==%d' % (len(args), len(self._field_names))
-            self.raw = None
-            self.items = OrderedDict(zip(self._field_names, args))
+            self._raw = None
+            self._offset = None
+            self._file = None
+            self._items = OrderedDict(zip(self._field_names, args))
         elif len(kwargs) > 0:
             assert all(field in kwargs for field in self._field_names)
             assert all(key in self._field_names for key in kwargs)
-            self.raw = None
-            self.items = OrderedDict(zip(self._field_names, (kwargs[key] for key in self._field_names)))
+            self._raw = None
+            self._offset = None
+            self._file = None
+            self._items = OrderedDict(zip(self._field_names, (kwargs[key] for key in self._field_names)))
 
     @classmethod
     def from_bytes(cls, buffer):
         new_obj = cls(cls._struct.unpack(buffer))
-        new_obj.raw = buffer
+        new_obj._raw = buffer
         return new_obj
 
     @classmethod
@@ -45,15 +49,27 @@ class Structure:
             offset = file.tell()
         raw = file.read(cls.sizeof())
         new_obj = cls(*cls._struct.unpack(raw))
-        new_obj.raw = raw
-        new_obj.offset = offset
+        new_obj._raw = raw
+        new_obj._file = file
+        new_obj._offset = offset
         return new_obj
 
     def __getattr__(self, attr):
-        return self.items[attr]
+        if attr.startswith('_'):
+            return super().__getattribute__(attr)
+        else:
+            return self._items[attr]
+
+    def __setattr__(self, attr, value):
+        if attr.startswith('_'):
+            super().__setattr__(attr, value)
+        elif attr in self._items:
+            self._items[attr] = value
+        else:
+            raise AttributeError("%s class hasn't %s attribute" % (self.__class__.__name__, attr))
 
     def __iter__(self):
-        return iter(self.items.values())
+        return iter(self._items.values())
 
     def __bytes__(self):
         return self._struct.pack(*self)
@@ -64,13 +80,18 @@ class Structure:
 
         file.write(bytes(self))
 
+    def rewrite(self):
+        if self._file is not None and self._offset is not None:
+            self.write(self._file, self._offset)
+        else:
+            raise ValueError('The structure was not read from a file')
+
     def diff(self, another):
-        for field_name in self._field_names:
-            if self.items[field_name] != another.items[field_name]:
-                yield field_name, (self.items[field_name], another.items[field_name])
+        for field_name, formatter in zip(self._field_names, self._formatters):
+            yield field_name, formatter, (self._items[field_name], another.items[field_name])
 
     def __repr__(self):
-        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
                                                             for i, name in enumerate(self._field_names))
 
 
@@ -137,22 +158,56 @@ class DataDirectory:
                     'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
 
     def __init__(self, raw):
-        self.items = OrderedDict(zip(self._field_names, DataDirectoryEntry.iter_unpack(raw)))
-        self.offset = None
+        self._items = OrderedDict(zip(self._field_names, DataDirectoryEntry.iter_unpack(raw)))
+        self._file = None
+        self._offset = None
 
     def __getattr__(self, attr):
-        return self.items[attr]
+        if attr.startswith('_'):
+            return super().__getattribute__(attr)
+        else:
+            return self._items[attr]
+
+    def __setattr__(self, attr, value):
+        if attr.startswith('_'):
+            super().__setattr__(attr, value)
+        else:
+            self._items[attr] = value
+
+    @classmethod
+    def read(cls, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+        else:
+            offset = file.tell()
+
+        obj = cls(file.read(cls.sizeof()))
+        obj._file = file
+        obj._offset = offset
+        return obj
 
     def __bytes__(self):
-        return bytes(b''.join(bytes(self.items[field]) for field in self._field_names) +
+        return bytes(b''.join(bytes(self._items[field]) for field in self._field_names) +
                      bytes(DataDirectoryEntry.sizeof()))
 
+    def write(self, file, offset=None):
+        if offset is not None:
+            file.seek(offset)
+
+        file.write(bytes(self))
+
+    def rewrite(self):
+        if self._file is not None and self._offset is not None:
+            self.write(self._file, self._offset)
+        else:
+            raise ValueError('Data directory array was not read from a file')
+
     def __str__(self):
-        return 'DataDirectory(\n\t%s\n)' % ',\n\t'.join('%-14s = %s' % (name, self.items[name])
+        return 'DataDirectory(\n\t%s\n)' % ',\n\t'.join('%-14s = %s' % (name, self._items[name])
                                                         for i, name in enumerate(self._field_names))
 
 
-class ImageOptionalHeader:
+class ImageOptionalHeader(Structure):
     _struct = struct.Struct('H B B 9L 6H 4L 2H 6L')
     _field_names = (
         'magic', 'major_linker_version', 'minor_linker_version', 'size_of_code',
@@ -178,48 +233,13 @@ class ImageOptionalHeader:
         0x%x 0x%x 0x%x 0x%x
     '''.split()
 
-    @classmethod
-    def sizeof(cls):
-        return cls._struct.size + DataDirectory.sizeof()
-
-    _data_directory_offset = 0x60
-
-    def __init__(self, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-        else:
-            offset = file.tell()
-        self.offset = offset
-        self.raw = file.read(self.sizeof())
-        self.items = OrderedDict(zip(self._field_names,
-                                     self._struct.unpack(self.raw[:self._data_directory_offset])))
-
-        self._data_directory = DataDirectory(self.raw[self._data_directory_offset:])
-        self._data_directory.offset = offset + self._data_directory_offset
-
-    def __getattr__(self, attr):
-        if attr == 'data_directory':
-            return self._data_directory
-        else:
-            return self.items[attr]
-
-    def __iter__(self):
-        return (self.items[field] for field in self._field_names)
-
-    def __bytes__(self):
-        return self._struct.pack(*self)
-
-    def __str__(self):
-        return 'ImageOptionalHeader(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self.items[name])
-                                                              for i, name in enumerate(self._field_names))
-
 
 class ImageNTHeaders:
     _size_of_signature = 4
 
     @classmethod
     def sizeof(cls):
-        return cls._size_of_signature + ImageFileHeader.sizeof() + ImageOptionalHeader.sizeof()
+        return cls._size_of_signature + ImageFileHeader.sizeof() + ImageOptionalHeader.sizeof() + DataDirectory.sizeof()
 
     def __init__(self, file, offset):
         self.offset = offset
@@ -228,8 +248,8 @@ class ImageNTHeaders:
         if self.signature != b'PE\0\0':
             raise ValueError('IMAGE_NT_HEADERS wrong signature: %r' % self.signature)
         self.file_header = ImageFileHeader.read(file)
-        assert self.file_header.size_of_optional_header == 224
-        self.optional_header = ImageOptionalHeader(file)
+        self.optional_header = ImageOptionalHeader.read(file)
+        self.data_directory = DataDirectory.read(file)
 
 
 class Section(Structure):
@@ -392,7 +412,7 @@ class PortableExecutable:
         self.nt_headers = ImageNTHeaders(file, self.dos_header.e_lfanew)
         self.file_header = self.nt_headers.file_header
         self.optional_header = self.nt_headers.optional_header
-        self.data_directory = self.optional_header.data_directory
+        self.data_directory = self.nt_headers.data_directory
         self._section_table = None
         self._relocation_table = None
 

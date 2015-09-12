@@ -390,9 +390,7 @@ if relocs_modified:
         fn.seek(reloc_off + new_size)
         fn.write(bytes(reloc_size - new_size))
     data_directory.basereloc.size = new_size
-    fn.seek(data_directory.offset)
-    fn.write(bytes(data_directory))
-
+    data_directory.rewrite()
 
 # Add new section to the executable
 if new_section_offset > new_section.physical_offset:
@@ -410,16 +408,16 @@ if new_section_offset > new_section.physical_offset:
     new_section.virtual_size = new_section_offset - new_section.physical_offset
 
     # Write the new section info
-    fn.seek(pe.nt_headers.offset + pe.nt_headers.sizeof + len(sections) * Section.sizeof)
+    fn.seek(pe.nt_headers.offset + pe.nt_headers.sizeof() + len(sections) * Section.sizeof())
     new_section.write(fn)
 
     # Fix number of sections
-    pe.optional_header.number_of_sections = len(sections) + 1
+    pe.file_header.number_of_sections = len(sections) + 1
     # Fix ImageSize field of the PE header
     pe.optional_header.size_of_image = align(new_section.rva + new_section.virtual_size, section_alignment)
 
-    fn.seek(pe.optional_header.offset)
-    fn.write(bytes(pe.optional_header))
+    pe.file_header.rewrite()
+    pe.optional_header.rewrite()
 
 fn.close()
 print('Done.')
