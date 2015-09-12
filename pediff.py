@@ -37,9 +37,9 @@ def main():
             else:
                 for left, right in changes:
                     if left is not None:
-                        print('-', left)
+                        print('-', str(left))
                     if right is not None:
-                        print('+', right)
+                        print('+', str(right))
 
 if __name__ == "__main__":
     main()
