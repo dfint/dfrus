@@ -70,6 +70,9 @@ class Structure:
         else:
             raise AttributeError("%s class hasn't %s attribute" % (self.__class__.__name__, attr))
 
+    def __getitem__(self, item):
+        return self._items[item]
+
     def __iter__(self):
         return iter(self._items.values())
 
@@ -90,8 +93,8 @@ class Structure:
 
     def diff(self, other):
         for field_name, formatter in zip(self._field_names, self._formatters):
-            if self._items[field_name] != other._items[field_name]:
-                yield field_name, formatter, (self._items[field_name], other._items[field_name])
+            if self[field_name] != other[field_name]:
+                yield field_name, formatter, (self[field_name], other[field_name])
 
     def __repr__(self):
         if self._wrap:
