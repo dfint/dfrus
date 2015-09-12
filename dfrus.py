@@ -168,7 +168,7 @@ if debug:
 
 last_section = sections[-1]
 
-if last_section.name.startswith(b'.new\0'):
+if last_section.name == b'.new':
     fn.close()
     print("There is '.new' section in the file already.")
     sys.exit()

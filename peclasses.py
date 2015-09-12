@@ -250,6 +250,10 @@ class Section(Structure):
     _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
     _wrap = False
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = self.name.strip(b'\0')
+
     def offset_to_rva(self, offset):
         return offset - self.physical_offset + self.rva
 
