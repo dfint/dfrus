@@ -11,7 +11,6 @@ from disasm import align
 class Structure:
     _struct = struct.Struct('L')
 
-    @property
     @classmethod
     def sizeof(cls):
         return cls._struct.size
@@ -40,10 +39,12 @@ class Structure:
     def read(cls, file, offset=None):
         if offset is not None:
             file.seek(offset)
-
-        raw = file.read(cls.sizeof)
+        else:
+            offset = file.tell()
+        raw = file.read(cls.sizeof())
         new_obj = cls(*cls._struct.unpack(raw))
         new_obj.raw = raw
+        new_obj.offset = offset
         return new_obj
 
     def __getattr__(self, attr):
@@ -67,45 +68,30 @@ class Structure:
 
 
 class ImageDosHeader:
-    sizeof = 0x40
+    sizeof = lambda _: 0x40
 
     def __init__(self, file, offset=0):
         file.seek(offset)
-        self.raw = file.read(self.sizeof)
+        self.raw = file.read(self.sizeof())
         self.signature = self.raw[:2]
         if self.signature != b'MZ':
             raise ValueError('IMAGE_DOS_HEADER wrong signature: %r' % self.signature)
         self.e_lfanew = int.from_bytes(self.raw[0x3C:], 'little')
 
 
-class ImageFileHeader:
-    sizeof = 0x14
-    _template = '2H 3L 2H'
+class ImageFileHeader(Structure):
+    _struct = struct.Struct('2H 3L 2H')
     _field_names = ('machine', 'number_of_sections', 'timedate_stamp', 'pointer_to_symbol_table',
                     'number_of_symbols', 'size_of_optional_header', 'characteristics')
     _formatters = '0x%x %d 0x%x 0x%x %d 0x%x 0x%x'.split()
-
-    def __init__(self, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-        else:
-            offset = file.tell()
-        self.offset = offset
-        self.raw = file.read(self.sizeof)
-        self.items = OrderedDict(zip(self._field_names, struct.unpack(self._template, self.raw)))
-    
-    def __getattr__(self, attr):
-        return self.items[attr]
-
-    def __str__(self):
-        return 'ImageFileHeader(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self.items[name])
-                                                          for i, name in enumerate(self._field_names))
 
 
 class DataDirectoryEntry:
     __slots__ = ('virtual_address', 'size')
     _struct = struct.Struct('2L')
-    sizeof = _struct.size
+    @classmethod
+    def sizeof(cls):
+        return cls._struct.size
 
     def __init__(self, virtual_address, size):
         self.virtual_address = virtual_address
@@ -132,7 +118,11 @@ class DataDirectoryEntry:
 
 class DataDirectory:
     _number_of_directory_entries = 16
-    sizeof = DataDirectoryEntry.sizeof * _number_of_directory_entries
+
+    @classmethod
+    def sizeof(cls):
+        return DataDirectoryEntry.sizeof() * cls._number_of_directory_entries
+
     _field_names = ('export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright',
                     'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
 
@@ -145,7 +135,7 @@ class DataDirectory:
 
     def __bytes__(self):
         return bytes(b''.join(bytes(self.items[field]) for field in self._field_names) +
-                     bytes(DataDirectoryEntry.sizeof))
+                     bytes(DataDirectoryEntry.sizeof()))
 
     def __str__(self):
         return 'DataDirectory(\n\t%s\n)' % ',\n\t'.join('%-14s = %s' % (name, self.items[name])
@@ -178,16 +168,19 @@ class ImageOptionalHeader:
         0x%x 0x%x 0x%x 0x%x
     '''.split()
 
+    @classmethod
+    def sizeof(cls):
+        return cls._struct.size + DataDirectory.sizeof()
+
     _data_directory_offset = 0x60
 
-    def __init__(self, file, offset=None, sizeof=224):
+    def __init__(self, file, offset=None):
         if offset is not None:
             file.seek(offset)
         else:
             offset = file.tell()
         self.offset = offset
-        self.sizeof = sizeof
-        self.raw = file.read(self.sizeof)
+        self.raw = file.read(self.sizeof())
         self.items = OrderedDict(zip(self._field_names,
                                      self._struct.unpack(self.raw[:self._data_directory_offset])))
 
@@ -212,16 +205,20 @@ class ImageOptionalHeader:
 
 
 class ImageNTHeaders:
+    _size_of_signature = 4
+    @classmethod
+    def sizeof(cls):
+        return cls._size_of_signature + ImageFileHeader.sizeof() + ImageOptionalHeader.sizeof()
+
     def __init__(self, file, offset):
         self.offset = offset
         file.seek(offset)
-        self.signature = file.read(4)
+        self.signature = file.read(self._size_of_signature)
         if self.signature != b'PE\0\0':
             raise ValueError('IMAGE_NT_HEADERS wrong signature: %r' % self.signature)
-        self.file_header = ImageFileHeader(file)
+        self.file_header = ImageFileHeader.read(file)
         assert self.file_header.size_of_optional_header == 224
         self.optional_header = ImageOptionalHeader(file)
-        self.sizeof = len(self.signature) + self.file_header.sizeof + self.optional_header.sizeof
 
 
 class Section(Structure):
@@ -235,7 +232,6 @@ class Section(Structure):
     IMAGE_SCN_MEM_WRITE = 0x80000000
 
     _struct = struct.Struct('8s4L12xL')
-    sizeof = _struct.size
     _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
     _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
 
@@ -248,8 +244,7 @@ class Section(Structure):
 
 class ImageSectionHeader(Structure):
     _struct = struct.Struct('8s 6L 2H L')
-    sizeof = _struct.size
-    assert sizeof == Section.sizeof
+
     _field_names = (
         'name', 'physical_address', 'virtual_address', 'size_of_raw_data', 'pointer_to_raw_data',
         'pointer_to_relocations', 'pointer_to_linenumbers', 'number_of_relocations', 'number_of_linenumbers',
@@ -393,7 +388,7 @@ class PortableExecutable:
     def section_table(self):
         if self._section_table is None:
             n = self.file_header.number_of_sections
-            offset = self.nt_headers.offset + self.nt_headers.sizeof
+            offset = self.nt_headers.offset + self.nt_headers.sizeof()
             self._section_table = SectionTable.read(self.file, offset, n)
         return self._section_table
 
