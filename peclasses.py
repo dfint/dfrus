@@ -88,7 +88,7 @@ class Structure:
 
     def diff(self, another):
         for field_name, formatter in zip(self._field_names, self._formatters):
-            yield field_name, formatter, (self._items[field_name], another.items[field_name])
+            yield field_name, formatter, (self._items[field_name], another._items[field_name])
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
