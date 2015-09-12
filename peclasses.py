@@ -235,6 +235,14 @@ class ImageNTHeaders:
         self.data_directory = DataDirectory.read(file)
 
 
+class Alias(dict):
+    def __getitem__(self, item):
+        if item not in self:
+            return item
+        else:
+            return super().__getitem__(item)
+
+
 class Section(Structure):
     IMAGE_SCN_CNT_CODE = 0x00000020
     IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
@@ -262,6 +270,17 @@ class Section(Structure):
 
     def __eq__(self, other):
         return type(self) == type(other) and all(x == y for x, y in zip(self, other))
+
+    def __str__(self):
+        alias = Alias({
+            'virtual_size': 'vsize',
+            'physical_size': 'psize',
+            'physical_offset': 'poffset',
+        })
+
+        return (self.__class__.__name__ + '(%s)' %
+                ', '.join('%s=%s' % (alias[name], self._formatters[i] % self._items[name])
+                          for i, name in enumerate(self._field_names)))
 
 
 class ImageSectionHeader(Structure):
@@ -340,6 +359,9 @@ class SectionTable(list):
 
     def __repr__(self):
         return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self)
+
+    def __str__(self):
+        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(str(x) for x in self)
 
 
 class RelocationTable:
@@ -443,7 +465,7 @@ class PortableExecutable:
             '%s\n' % self.file_header +
             '%s\n' % self.optional_header +
             '%s\n' % self.data_directory +
-            '%r\n' % self.section_table
+            '%s\n' % self.section_table
         )
 
 
