@@ -4,6 +4,7 @@ import bisect
 import collections
 from collections import OrderedDict
 from array import array
+from itertools import zip_longest
 
 from disasm import align
 
@@ -17,6 +18,7 @@ class Structure:
 
     _field_names = ('foo',)
     _formatters = '%x'.split()
+    _wrap = True
 
     def __init__(self, *args, **kwargs):
         if len(args) > 0:
@@ -86,14 +88,18 @@ class Structure:
         else:
             raise ValueError('The structure was not read from a file')
 
-    def diff(self, another):
+    def diff(self, other):
         for field_name, formatter in zip(self._field_names, self._formatters):
-            if self._items[field_name] != another._items[field_name]:
-                yield field_name, formatter, (self._items[field_name], another._items[field_name])
+            if self._items[field_name] != other._items[field_name]:
+                yield field_name, formatter, (self._items[field_name], other._items[field_name])
 
     def __repr__(self):
-        return self.__class__.__name__ + '(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self._items[name])
-                                                            for i, name in enumerate(self._field_names))
+        if self._wrap:
+            return self.__class__.__name__ + '(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self._items[name])
+                                                                for i, name in enumerate(self._field_names))
+        else:
+            return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
+                                                                for i, name in enumerate(self._field_names))
 
 
 class ImageDosHeader(Structure):
@@ -242,12 +248,16 @@ class Section(Structure):
     _struct = struct.Struct('8s4L12xL')
     _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
     _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
+    _wrap = False
 
     def offset_to_rva(self, offset):
         return offset - self.physical_offset + self.rva
 
     def rva_to_offset(self, rva):
         return rva - self.rva + self.physical_offset
+
+    def __eq__(self, other):
+        return type(self) == type(other) and all(x == y for x, y in zip(self, other))
 
 
 class ImageSectionHeader(Structure):
@@ -318,6 +328,11 @@ class SectionTable(list):
             return bisect.bisect(self._rva_key, rva) - 1
         else:
             return None
+
+    def diff(self, other):
+        for left, right in zip_longest(self, other):
+            if left != right:
+                yield left, right
 
     def __repr__(self):
         return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self)
