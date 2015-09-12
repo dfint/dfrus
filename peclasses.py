@@ -20,7 +20,9 @@ class Structure:
 
     def __init__(self, *args, **kwargs):
         if len(args) > 0:
-            assert len(args) == len(self._field_names)
+            assert len(args) > 0
+            assert len(args) == len(self._field_names),\
+                'len(args)==%d, len(_field_names)==%d' % (len(args), len(self._field_names))
             self.raw = None
             self.items = OrderedDict(zip(self._field_names, args))
         elif len(kwargs) > 0:
@@ -68,20 +70,22 @@ class Structure:
                 yield field_name, (self.items[field_name], another.items[field_name])
 
     def __repr__(self):
-        return 'Section(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
-                                         for i, name in enumerate(self._field_names))
+        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
+                                                            for i, name in enumerate(self._field_names))
 
 
-class ImageDosHeader:
-    sizeof = lambda _: 0x40
+class ImageDosHeader(Structure):
+    _struct = struct.Struct('2s 13H 8x 2H 20x L')
+    _field_names = (
+        'e_magic', 'e_cblp', 'e_cp', 'e_crlc', 'e_cparhdr', 'e_minalloc', 'e_maxalloc',
+        'e_ss', 'e_sp', 'e_csum', 'e_ip', 'e_cs', 'e_lfarlc', 'e_ovno', 'e_oemid', 'e_oeminfo', 'e_lfanew'
+    )
+    _formatters = ['%s'] + ['0x%x']*16
 
-    def __init__(self, file, offset=0):
-        file.seek(offset)
-        self.raw = file.read(self.sizeof())
-        self.signature = self.raw[:2]
-        if self.signature != b'MZ':
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.e_magic != b'MZ':
             raise ValueError('IMAGE_DOS_HEADER wrong signature: %r' % self.signature)
-        self.e_lfanew = int.from_bytes(self.raw[0x3C:], 'little')
 
 
 class ImageFileHeader(Structure):
@@ -94,6 +98,7 @@ class ImageFileHeader(Structure):
 class DataDirectoryEntry:
     __slots__ = ('virtual_address', 'size')
     _struct = struct.Struct('2L')
+
     @classmethod
     def sizeof(cls):
         return cls._struct.size
@@ -211,6 +216,7 @@ class ImageOptionalHeader:
 
 class ImageNTHeaders:
     _size_of_signature = 4
+
     @classmethod
     def sizeof(cls):
         return cls._size_of_signature + ImageFileHeader.sizeof() + ImageOptionalHeader.sizeof()
@@ -285,8 +291,8 @@ class SectionTable(list):
         # Make auxiliary objects to perform bisection search among physical offsets and rvas:
         self._offset_key = Key(self, lambda x: x.physical_offset)
         self._rva_key = Key(self, lambda x: x.rva)
-        assert all(x.rva < self[i+1].rva for i, x in enumerate(self[:-1]))
-        assert all(x.physical_offset < self[i+1].physical_offset for i, x in enumerate(self[:-1]))
+        assert all(x.rva < self[i + 1].rva for i, x in enumerate(self[:-1]))
+        assert all(x.physical_offset < self[i + 1].physical_offset for i, x in enumerate(self[:-1]))
 
     @classmethod
     def read(cls, file, offset, number):
@@ -315,7 +321,7 @@ class SectionTable(list):
             return bisect.bisect(self._rva_key, rva) - 1
         else:
             return None
-    
+
     def __repr__(self):
         return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self)
 
@@ -381,7 +387,8 @@ class RelocationTable:
 class PortableExecutable:
     def __init__(self, file):
         self.file = file
-        self.dos_header = ImageDosHeader(file)
+        self.dos_header = ImageDosHeader.read(file)
+        assert self.dos_header.sizeof() == 0x40
         self.nt_headers = ImageNTHeaders(file, self.dos_header.e_lfanew)
         self.file_header = self.nt_headers.file_header
         self.optional_header = self.nt_headers.optional_header
@@ -412,7 +419,7 @@ class PortableExecutable:
 
     def info(self):
         return (
-            'DOS signature: %s\n' % self.dos_header.signature +
+            'DOS signature: %s\n' % self.dos_header.e_magic +
             'e_lfanew: 0x%x\n' % self.dos_header.e_lfanew +
             'PE signature: %s\n' % self.nt_headers.signature +
             'Entry point address: 0x%x\n' % (self.optional_header.address_of_entry_point +
@@ -428,9 +435,10 @@ def main():
     with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
         pe = PortableExecutable(file)
         print(pe.info())
-        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset-1) == -1
+        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset - 1) == -1
         assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset) == 0
-        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset+1) == 0
+        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset + 1) == 0
+
 
 if __name__ == "__main__":
     main()
