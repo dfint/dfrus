@@ -88,7 +88,8 @@ class Structure:
 
     def diff(self, another):
         for field_name, formatter in zip(self._field_names, self._formatters):
-            yield field_name, formatter, (self._items[field_name], another._items[field_name])
+            if self._items[field_name] != another._items[field_name]:
+                yield field_name, formatter, (self._items[field_name], another._items[field_name])
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
@@ -147,7 +148,7 @@ class DataDirectoryEntry:
         return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
 
 
-class DataDirectory:
+class DataDirectory(Structure):
     _number_of_directory_entries = 16
 
     @classmethod
@@ -157,22 +158,7 @@ class DataDirectory:
     _field_names = ('export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright',
                     'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
 
-    def __init__(self, raw):
-        self._items = OrderedDict(zip(self._field_names, DataDirectoryEntry.iter_unpack(raw)))
-        self._file = None
-        self._offset = None
-
-    def __getattr__(self, attr):
-        if attr.startswith('_'):
-            return super().__getattribute__(attr)
-        else:
-            return self._items[attr]
-
-    def __setattr__(self, attr, value):
-        if attr.startswith('_'):
-            super().__setattr__(attr, value)
-        else:
-            self._items[attr] = value
+    _formatters = ['%s'] * _number_of_directory_entries
 
     @classmethod
     def read(cls, file, offset=None):
@@ -181,7 +167,9 @@ class DataDirectory:
         else:
             offset = file.tell()
 
-        obj = cls(file.read(cls.sizeof()))
+        raw = file.read(cls.sizeof())
+        obj = cls(*DataDirectoryEntry.iter_unpack(raw))
+        obj._raw = raw
         obj._file = file
         obj._offset = offset
         return obj
@@ -189,22 +177,6 @@ class DataDirectory:
     def __bytes__(self):
         return bytes(b''.join(bytes(self._items[field]) for field in self._field_names) +
                      bytes(DataDirectoryEntry.sizeof()))
-
-    def write(self, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-
-        file.write(bytes(self))
-
-    def rewrite(self):
-        if self._file is not None and self._offset is not None:
-            self.write(self._file, self._offset)
-        else:
-            raise ValueError('Data directory array was not read from a file')
-
-    def __str__(self):
-        return 'DataDirectory(\n\t%s\n)' % ',\n\t'.join('%-14s = %s' % (name, self._items[name])
-                                                        for i, name in enumerate(self._field_names))
 
 
 class ImageOptionalHeader(Structure):
