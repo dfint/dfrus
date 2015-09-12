@@ -92,7 +92,7 @@ class Structure:
                 yield field_name, formatter, (self._items[field_name], another._items[field_name])
 
     def __repr__(self):
-        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
+        return self.__class__.__name__ + '(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self._items[name])
                                                             for i, name in enumerate(self._field_names))
 
 
@@ -155,8 +155,10 @@ class DataDirectory(Structure):
     def sizeof(cls):
         return DataDirectoryEntry.sizeof() * cls._number_of_directory_entries
 
-    _field_names = ('export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright',
-                    'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor')
+    _field_names = (
+        'export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright',
+        'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor'
+    )
 
     _formatters = ['%s'] * _number_of_directory_entries
 
@@ -168,7 +170,7 @@ class DataDirectory(Structure):
             offset = file.tell()
 
         raw = file.read(cls.sizeof())
-        obj = cls(*DataDirectoryEntry.iter_unpack(raw))
+        obj = cls(*list(DataDirectoryEntry.iter_unpack(raw))[:-1])
         obj._raw = raw
         obj._file = file
         obj._offset = offset
