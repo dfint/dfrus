@@ -95,11 +95,13 @@ class Structure:
 
     def __repr__(self):
         if self._wrap:
-            return self.__class__.__name__ + '(\n\t%s\n)' % ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self._items[name])
-                                                                for i, name in enumerate(self._field_names))
+            return (self.__class__.__name__ + '(\n\t%s\n)' %
+                    ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self._items[name])
+                                 for i, name in enumerate(self._field_names)))
         else:
-            return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
-                                                                for i, name in enumerate(self._field_names))
+            return (self.__class__.__name__ + '(%s)' %
+                    ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
+                              for i, name in enumerate(self._field_names)))
 
 
 class ImageDosHeader(Structure):
