@@ -62,6 +62,11 @@ class Structure:
 
         file.write(bytes(self))
 
+    def diff(self, another):
+        for field_name in self._field_names:
+            if self.items[field_name] != another.items[field_name]:
+                yield field_name, (self.items[field_name], another.items[field_name])
+
     def __repr__(self):
         return 'Section(%s)' % ', '.join('%s=%s' % (name, self._formatters[i] % self.items[name])
                                          for i, name in enumerate(self._field_names))
