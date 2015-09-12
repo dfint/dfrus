@@ -17,37 +17,18 @@ def main():
         with open(args.changed, 'rb') as changed:
             pe2 = PortableExecutable(changed)
 
-            print('IMAGE_DOS_HEADER:')
-            changes = list(pe1.dos_header.diff(pe2.dos_header))
-            if not changes:
-                print('No changes')
-            else:
-                for field, formatter, change in changes:
-                    print('%s: changed from %s to %s' % (field, formatter, formatter) % change)
-
-            print('IMAGE_FILE_HEADER:')
-            changes = list(pe1.file_header.diff(pe2.file_header))
-            if not changes:
-                print('No changes')
-            else:
-                for field, formatter, change in changes:
-                    print('%s: changed from %s to %s' % (field, formatter, formatter) % change)
-
-            print('IMAGE_OPTIONAL_HEADER:')
-            changes = list(pe1.optional_header.diff(pe2.optional_header))
-            if not changes:
-                print('No changes')
-            else:
-                for field, formatter, change in changes:
-                    print('%s: changed from %s to %s' % (field, formatter, formatter) % change)
-
-            print("IMAGE_DATA_DIRECTORY'es:")
-            changes = list(pe1.data_directory.diff(pe2.data_directory))
-            if not changes:
-                print('No changes')
-            else:
-                for field, formatter, change in changes:
-                    print('%s: changed from %s to %s' % (field, formatter, formatter) % change)
+            structures = ['dos_header', 'file_header', 'optional_header', 'data_directory']
+            for structure in structures:
+                print(structure)
+                original = getattr(pe1, structure)
+                changed = getattr(pe2, structure)
+                changes = list(original.diff(changed))
+                if not changes:
+                    print(' No changes')
+                else:
+                    for field, formatter, change in changes:
+                        print(' - %s=%s' % (field, formatter) % change[0])
+                        print(' + %s=%s' % (field, formatter) % change[1])
 
 if __name__ == "__main__":
     main()
