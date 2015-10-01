@@ -244,18 +244,24 @@ def fix_len(fn, offset, oldlen, newlen):
                 fpoke(fn, next_off+3, newlen)
                 return 1
         elif reg == Reg.esi:
+            # Sample code:
+            # mov ecx, dword_count
             # mov esi, offset str
+            # mov edi, offset dest
+            # rep movsd
+            
+            r = (oldlen+1) % 4
+            dword_count = (newlen-r)//4 + 1
             if pre[-6] == mov_reg_imm | 8 | Reg.ecx and int.from_bytes(pre[-5:-1], byteorder='little') == (oldlen+1)//4:
-                # mov ecx, (len+1)//4
-                r = (oldlen+1) % 4
-                fpoke4(fn, offset-5, (newlen+1-r+3)//4)
+                # mov ecx, dword_count
+                fpoke4(fn, offset-5, dword_count)
                 return 1
             elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.ecx, 0) and pre[-2] == (oldlen+1)//4:
-                # lea ecx, [reg+(len+1)//4]
-                r = (newlen+1) % 4
-                fpoke(fn, offset-2, (newlen+1-r+3)//4)
+                # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
+                fpoke(fn, offset-2, dword_count)
                 return 1
             elif newlen > oldlen:
+                # ecx modification code was not found. TODO: handle this case properly.
                 return -2
         return -1
     elif pre[-1] == mov_acc_mem | 1 or pre[-2] == mov_reg_rm | 1:
