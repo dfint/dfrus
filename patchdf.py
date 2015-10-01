@@ -245,11 +245,14 @@ def fix_len(fn, offset, oldlen, newlen):
                 return 1
         elif reg == Reg.esi:
             # Sample code:
-            # mov ecx, dword_count
-            # mov esi, offset str
-            # mov edi, offset dest
-            # rep movsd
-            
+            # ; oldlen = 22
+            # ; r = (oldlen+1) % 4 = 3 (3 bytes moved with 1 movsw and 1 movsb)
+            # mov ecx, 5 ; 5 = (oldlen + 1) // 4
+            # mov esi, strz_Store_Item_in_Hospital_dc4f40
+            # lea edi, [dest]
+            # repz movsd
+            # movsw
+            # movsb
             r = (oldlen+1) % 4
             dword_count = (newlen-r)//4 + 1
             if pre[-6] == mov_reg_imm | 8 | Reg.ecx and int.from_bytes(pre[-5:-1], byteorder='little') == (oldlen+1)//4:
