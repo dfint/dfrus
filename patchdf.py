@@ -2,6 +2,7 @@
 from disasm import *
 from binio import fpeek, fpoke4, fpoke, pad_tail
 from opcodes import *
+from collections import defaultdict
 
 
 def ord_utf16(c):
@@ -30,7 +31,6 @@ def load_trans_file(fn):
         if len(parts) > 3 and len(parts[1]) > 0:
             yield parts[1], parts[2]
 
-from collections import defaultdict
 
 code = 0
 rdata = 1
