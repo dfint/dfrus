@@ -323,6 +323,7 @@ def fix_len(fn, offset, oldlen, newlen):
 
 
 def get_length(s, oldlen):
+    # TODO: Rewrite to use disasm
     i = 0
     curlen = 0
     regs = [None, None, None]
@@ -383,7 +384,7 @@ def get_length(s, oldlen):
             _lea = dict(dest=modrm.reg, src=Operand(base_reg=x[0], disp=x[1]))
             i = j
         else:
-            raise AssertionError
+            raise ValueError, 'Unallowed operation (nor mov, nor lea)'
     return dict(length=i, dest=dest, deleted=deleted, lea=_lea)
 
 
