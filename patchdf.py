@@ -384,7 +384,7 @@ def get_length(s, oldlen):
             _lea = dict(dest=modrm.reg, src=Operand(base_reg=x[0], disp=x[1]))
             i = j
         else:
-            raise ValueError, 'Unallowed operation (nor mov, nor lea)'
+            raise ValueError('Unallowed operation (not mov, nor lea)')
     return dict(length=i, dest=dest, deleted=deleted, lea=_lea)
 
 
