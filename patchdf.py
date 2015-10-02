@@ -32,9 +32,7 @@ def load_trans_file(fn):
             yield parts[1], parts[2]
 
 
-code = 0
-rdata = 1
-data = 2
+code, rdata, data = range(3)
 
 
 def get_cross_references(fn, relocs, sections, image_base):
