@@ -4,24 +4,22 @@ from binio import fpeek, fpoke4, fpoke, pad_tail
 from opcodes import *
 
 
+def ord_utf16(c):
+    return int.from_bytes(c.encode('utf-16')[2:], 'little')
+
+
 def patch_unicode_table(fn, off):
-    upper_a_ya = [c for c in range(0x0410, 0x0430)]
-    assert(len(upper_a_ya) == 0x20)
-    ord_upper_a = int.from_bytes('А'.encode('cp1251'), 'little')
-    fpoke4(fn, off+ord_upper_a*4, upper_a_ya)
+    ord_upper_a = ord('А'.encode('cp1251'))
+    fpoke4(fn, off+ord_upper_a*4, range(ord_utf16('А'), ord_utf16('Я') + 1))
     
-    lower_a_ya = [c for c in range(0x0430, 0x0450)]
-    assert(len(lower_a_ya) == 0x20)
-    ord_lower_a = int.from_bytes('а'.encode('cp1251'), 'little')
-    fpoke4(fn, off+ord_lower_a*4, lower_a_ya)
+    ord_lower_a = ord('а'.encode('cp1251'))
+    fpoke4(fn, off+ord_lower_a*4, range(ord_utf16('а'), ord_utf16('я') + 1))
     
-    upper_yo = 0x0401
-    ord_upper_yo = int.from_bytes('Ё'.encode('cp1251'), 'little')
-    fpoke4(fn, off+ord_upper_yo*4, upper_yo)
+    ord_upper_yo = ord('Ё'.encode('cp1251'))
+    fpoke4(fn, off+ord_upper_yo*4, ord_utf16('Ё'))
     
-    lower_yo = 0x0451
-    ord_lower_yo = int.from_bytes('ё'.encode('cp1251'), 'little')
-    fpoke4(fn, off+ord_lower_yo*4, lower_yo)
+    ord_lower_yo = ord('ё'.encode('cp1251'))
+    fpoke4(fn, off+ord_lower_yo*4, ord_utf16('ё'))
 
 
 def load_trans_file(fn):
