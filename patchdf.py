@@ -360,6 +360,41 @@ def fix_len(fn, offset, oldlen, newlen):
     return -1  # Assume that there's no need to fix
 
 
+def rewrite_code(fn, offset, oldlen, newlen, new_str_rva):
+    pre = fpeek(fn, offset - 3, 3)
+    start = offset - get_start(pre)
+    aft = fpeek(fn, start, 100)
+    x = get_length(aft, oldlen + 1)
+    mach, new_ref_off = mach_memcpy(new_str_rva, x['dest'], newlen + 1)
+    if x['lea'] is not None:
+        mach += mach_lea(**x['lea'])
+
+    proc = None
+    if len(mach) > x['length']:
+        # if memcpy code is to long, try to write it into the new section and make call to it
+        mach.append(ret_near)
+        proc = mach
+        
+        mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
+        if len(mach) > x['length']:
+            # Too here there, even for just a procedure call
+            return -2
+    
+    # Write replacement code
+    mach = pad_tail(mach, x['length'], nop)
+    fpoke(fn, start, mach)
+    
+    # Make deleted relocs offsets relative to the given offset
+    deleted_relocs = [start + item - offset for item in x['deleted']]
+    
+    if not proc:
+        # Make new_ref relative to the given offset
+        new_ref = start + new_ref_off - offset
+        return dict(deleted_relocs=deleted_relocs, new_ref=new_ref)
+    else:
+        return dict(src_off=start + 1, new_code=proc, deleted_relocs=deleted_relocs, new_ref=new_ref_off)
+
+
 def get_length(s, oldlen):
     # TODO: Rewrite to use disasm
     i = 0
