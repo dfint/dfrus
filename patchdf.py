@@ -1,6 +1,6 @@
 
 from disasm import *
-from binio import fpeek, fpoke4, fpoke, pad_tail
+from binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from opcodes import *
 from collections import defaultdict
 
@@ -95,6 +95,11 @@ def find_instruction(s, instruction):
         if line.data[0] == instruction:
             return line.address
     return None
+
+
+def match_mov_reg_imm32(b, reg, imm):
+    assert len(b) == 5, b
+    return b[0] == mov_reg_imm | 8 | reg and from_dword(b[1:]) == imm
 
 
 count_before = 0x20
@@ -248,19 +253,58 @@ def fix_len(fn, offset, oldlen, newlen):
             # repz movsd
             # movsw
             # movsb
+            
             r = (oldlen+1) % 4
-            dword_count = (newlen-r)//4 + 1
-            if pre[-6] == mov_reg_imm | 8 | Reg.ecx and int.from_bytes(pre[-5:-1], byteorder='little') == (oldlen+1)//4:
+            dword_count = (oldlen+1)//4
+            new_dword_count = (newlen-r)//4 + 1
+            mod_1_ecx_0 = join_byte(1, Reg.ecx, 0)
+            if match_mov_reg_imm32(pre[-6:-1], Reg.ecx, dword_count):
                 # mov ecx, dword_count
-                fpoke4(fn, offset-5, dword_count)
+                fpoke4(fn, offset-5, new_dword_count)
                 return 1
-            elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.ecx, 0) and pre[-2] == (oldlen+1)//4:
+            elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
-                fpoke(fn, offset-2, dword_count)
+                fpoke(fn, offset-2, new_dword_count)
                 return 1
             elif newlen > oldlen:
                 # ecx modification code was not found. TODO: handle this case properly.
-                return -2
+                if jmp:
+                    return -2
+                else:
+                    for line in disasm(aft, start_address=next_off):
+                        print(hex(line.address), line)
+                        assert(line.mnemonic != 'db')
+                        offset = line.address
+                        data = line.data
+                        if data[0] == Prefix.rep:
+                            return -2
+                        elif data[0] == jmp_near:
+                            next_off_2 = line.address
+                            jmp = data[0]
+                            next_off_2 = line.operands[0].value
+                            aft = fpeek(fn, next_off_2, count_after)
+                            
+                            skip = None
+                            if match_mov_reg_imm32(aft[:5], Reg.ecx, dword_count):
+                                skip = 5
+                            elif aft[0] == lea and aft[1] & 0xf8 == mod_1_ecx_0 and aft[2] == dword_count:
+                                skip = 3
+                            print('skip:', skip)
+                            if skip is not None:
+                                return (
+                                    line.address,
+                                    bytes((mov_reg_imm | 8 | Reg.ecx,)) + to_dword(dword_count),
+                                    next_off_2 + skip,
+                                    jmp
+                                )
+                            
+                            return -2
+                        elif len(data) == 5 and match_mov_reg_imm32(data, Reg.ecx, dword_count):
+                            fpoke4(fn, line.address + 1, new_dword_count)
+                            return 1
+                        elif data[0] == lea and data[1] & 0xf8 == mod_1_ecx_0 and data[2] == dword_count:
+                            fpoke(fn, line.address + 2, new_dword_count)
+                    return -2
         return -1
     elif pre[-1] == mov_acc_mem | 1 or pre[-2] == mov_reg_rm | 1:
         # mov eax, [addr] or mov reg, [addr]
@@ -415,6 +459,8 @@ def add_to_new_section(fn, dest, s, alignment=4):
 
 
 if __name__ == '__main__':
-    from binio import TestFileObject
-    patch_unicode_table(TestFileObject(), 0)
-    print(load_trans_file(['|12\\t3|as\\rd|', '|dfg|345y|', ' ', '|||']))
+    # from binio import TestFileObject
+    # patch_unicode_table(TestFileObject(), 0)
+    # print(load_trans_file(['|12\\t3|as\\rd|', '|dfg|345y|', ' ', '|||']))
+    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx, 0x0a)
+    
