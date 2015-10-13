@@ -249,7 +249,6 @@ for off, string in strings:
             ref_rva = sections[code].offset_to_rva(ref)
             fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
             if isinstance(fix, dict):
-                
                 if 'new_code' in fix:
                     assert type(fix['new_code']) is bytes
                     new_code = fix['new_code']
