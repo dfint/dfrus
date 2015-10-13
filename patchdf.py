@@ -73,16 +73,17 @@ MAX_LEN = 0x80
 
 
 def mach_strlen(code_chunk):
-    return (bytes((push_reg | Reg.ecx,  # push ecx
-                   xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor eax, eax
-                   # @@:
-                   cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
-                   jcc_short | Cond.z, 0x0b,  # jz success
-                   cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), MAX_LEN, 0x00, 0x00, 0x00,  # cmp ecx, MAX_LEN
-                   jcc_short | Cond.g, 3+len(code_chunk),  # jg skip
-                   inc_reg | Reg.ecx,  # inc ecx
-                   jmp_short, 0xef  # jmp @b
-                   )) +
+    return (bytes((
+                push_reg | Reg.ecx,  # push ecx
+                xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor eax, eax
+                # @@:
+                cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
+                jcc_short | Cond.z, 0x0b,  # jz success
+                cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), MAX_LEN, 0x00, 0x00, 0x00,  # cmp ecx, MAX_LEN
+                jcc_short | Cond.g, 3+len(code_chunk),  # jg skip
+                inc_reg | Reg.ecx,  # inc ecx
+                jmp_short, 0xef  # jmp @b
+            )) +
             # success:
             bytes(code_chunk) +
             # skip:
