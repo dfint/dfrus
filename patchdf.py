@@ -98,6 +98,41 @@ def find_instruction(s, instruction):
     return None
 
 
+class Trace:
+    not_follow = 0
+    follow = 1
+    stop = 2
+
+
+def trace_code(fn, offset, func, trace_jmp = Trace.follow, trace_jcc = Trace.follow, trace_call = Trace.stop):
+    s = fpeek(fn, offset, count_after)
+    for line in disasm(s, offset):
+        assert line.mnemonic != 'db'
+        if func(line):
+            return offset, line
+        if line.mnemonic.startswith('jmp'):
+            if trace_jmp == Trace.not_follow:
+                pass
+            elif trace_jmp == Trace.follow:
+                return trace_code(fn, int(line.operands[0]), trace_jmp, trace_jcc, trace_call)
+            elif trace_jmp == Trace.stop:
+                return offset, line
+        elif line.mnemonic.startswith('j'):
+            if trace_jcc == Trace.not_follow:
+                pass
+            elif trace_jcc == Trace.follow:
+                return trace_code(fn, int(line.operands[0]), trace_jmp, trace_jcc, trace_call)
+            elif trace_jcc == Trace.stop:
+                return offset, line
+        elif line.mnemonic.startswith('call'):
+            if trace_call == Trace.not_follow:
+                pass
+            elif trace_call == Trace.follow:
+                return trace_code(fn, int(line.operands[0]), trace_jmp, trace_jcc, trace_call)
+            elif trace_call == Trace.stop:
+                return offset, line
+
+
 def match_mov_reg_imm32(b, reg, imm):
     assert len(b) == 5, b
     return b[0] == mov_reg_imm | 8 | reg and from_dword(b[1:]) == imm
