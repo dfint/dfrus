@@ -275,6 +275,7 @@ for off, string in strings:
                 if is_long:
                     fpoke4(fn, ref, new_section.offset_to_rva(str_off) + image_base)
             elif is_long:
+                # TODO: Move this piece of code to the patchdf.py somehow
                 pre = fpeek(fn, ref - 3, 3)
                 start = ref - get_start(pre)
                 x = get_length(fpeek(fn, start, 100), len(string) + 1)
