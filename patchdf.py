@@ -305,90 +305,84 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         # mov eax, [addr] or mov reg, [addr]
         if newlen <= oldlen:
             return -1
-        elif newlen+1 <= align(oldlen+1):
-            r = (oldlen+1) % 4
+        else:
             next_off = offset - get_start(pre)
             aft = fpeek(fn, next_off, count_after)
-            flag = 0
-            reg = None
-            move_to_reg = None
-            for x, i in analyse_mach(aft):
-                if r == 1:
-                    if flag == 0:
-                        if x['data'][0] == mov_reg_rm and 'modrm' in x:
-                            # Copying 1 byte from memory to a register
-                            modrm = x['modrm']
-                            if modrm.mode == 0 and modrm.regmem == 5:
-                                reg = modrm.reg
+            if newlen+1 <= align(oldlen+1):
+                r = (oldlen+1) % 4
+                flag = 0
+                reg = None
+                move_to_reg = None
+                for x, i in analyse_mach(aft):
+                    if r == 1:
+                        if flag == 0:
+                            if x['data'][0] == mov_reg_rm and 'modrm' in x:
+                                # Copying 1 byte from memory to a register
+                                modrm = x['modrm']
+                                if modrm.mode == 0 and modrm.regmem == 5:
+                                    reg = modrm.reg
+                                    move_to_reg = i
+                                    flag += 1
+                            elif x['data'][0] == mov_acc_mem:
+                                # Copying 1 byte from memory to accumulator (al)
+                                reg = Reg.eax
                                 move_to_reg = i
                                 flag += 1
-                        elif x['data'][0] == mov_acc_mem:
-                            # Copying 1 byte from memory to accumulator (al)
-                            reg = Reg.eax
-                            move_to_reg = i
-                            flag += 1
-                    else:
-                        if x['data'][0] == mov_rm_reg and 'modrm' in x:
-                            # Copying from register to memory
-                            modrm = x['modrm']
-                            if modrm.mode != 3 and modrm.reg == reg:
-                                move_to_mem = i
-                                # Make code move 4 bytes instead of 1:
-                                opcode = aft[move_to_reg]
-                                fpoke(fn, next_off+move_to_reg, opcode | 1)  # set size flag of the opcode
-                                opcode = aft[move_to_mem]
-                                fpoke(fn, next_off+move_to_mem, opcode | 1)  # set size flag of the opcode
-                                return 1
-                else:
-                    if x['data'][0] == Prefix.operand_size:
-                        if flag == 0:
-                            move_to_reg = i
-                            flag += 1
                         else:
-                            move_to_mem = i
-                            fpoke(fn, next_off+move_to_reg, nop)  # clear operand size prefix
-                            fpoke(fn, next_off+move_to_mem, nop)  # clear operand size prefix
-                            return 1
-                assert(flag < 2)
-        else:
-            return rewrite_code(fn, offset, oldlen, newlen, new_str_rva)
+                            if x['data'][0] == mov_rm_reg and 'modrm' in x:
+                                # Copying from register to memory
+                                modrm = x['modrm']
+                                if modrm.mode != 3 and modrm.reg == reg:
+                                    move_to_mem = i
+                                    # Make code move 4 bytes instead of 1:
+                                    opcode = aft[move_to_reg]
+                                    fpoke(fn, next_off+move_to_reg, opcode | 1)  # set size flag of the opcode
+                                    opcode = aft[move_to_mem]
+                                    fpoke(fn, next_off+move_to_mem, opcode | 1)  # set size flag of the opcode
+                                    return 1
+                    else:
+                        if x['data'][0] == Prefix.operand_size:
+                            if flag == 0:
+                                move_to_reg = i
+                                flag += 1
+                            else:
+                                move_to_mem = i
+                                fpoke(fn, next_off+move_to_reg, nop)  # clear operand size prefix
+                                fpoke(fn, next_off+move_to_mem, nop)  # clear operand size prefix
+                                return 1
+                    assert(flag < 2)
+            else:
+                x = get_length(aft, oldlen + 1)
+                mach, new_ref_off = mach_memcpy(new_str_rva, x['dest'], newlen + 1)
+                if x['lea'] is not None:
+                    mach += mach_lea(**x['lea'])
+
+                proc = None
+                if len(mach) > x['length']:
+                    # if memcpy code is to long, try to write it into the new section and make call to it
+                    mach.append(ret_near)
+                    proc = mach
+                    
+                    mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
+                    if len(mach) > x['length']:
+                        # Too here there, even for just a procedure call
+                        return -2
+                
+                # Write replacement code
+                mach = pad_tail(mach, x['length'], nop)
+                fpoke(fn, next_off, mach)
+                
+                # Make deleted relocs offsets relative to the given offset
+                deleted_relocs = [next_off + item - offset for item in x['deleted']]
+                
+                if not proc:
+                    # Make new_ref relative to the given offset
+                    new_ref = next_off + new_ref_off - offset
+                    return dict(deleted_relocs=deleted_relocs, new_ref=new_ref)
+                else:
+                    return dict(src_off=next_off + 1, new_code=proc, deleted_relocs=deleted_relocs, new_ref=new_ref_off)
 
     return -1  # Assume that there's no need to fix
-
-
-def rewrite_code(fn, offset, oldlen, newlen, new_str_rva):
-    pre = fpeek(fn, offset - 3, 3)
-    start = offset - get_start(pre)
-    aft = fpeek(fn, start, 100)
-    x = get_length(aft, oldlen + 1)
-    mach, new_ref_off = mach_memcpy(new_str_rva, x['dest'], newlen + 1)
-    if x['lea'] is not None:
-        mach += mach_lea(**x['lea'])
-
-    proc = None
-    if len(mach) > x['length']:
-        # if memcpy code is to long, try to write it into the new section and make call to it
-        mach.append(ret_near)
-        proc = mach
-        
-        mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
-        if len(mach) > x['length']:
-            # Too here there, even for just a procedure call
-            return -2
-    
-    # Write replacement code
-    mach = pad_tail(mach, x['length'], nop)
-    fpoke(fn, start, mach)
-    
-    # Make deleted relocs offsets relative to the given offset
-    deleted_relocs = [start + item - offset for item in x['deleted']]
-    
-    if not proc:
-        # Make new_ref relative to the given offset
-        new_ref = start + new_ref_off - offset
-        return dict(deleted_relocs=deleted_relocs, new_ref=new_ref)
-    else:
-        return dict(src_off=start + 1, new_code=proc, deleted_relocs=deleted_relocs, new_ref=new_ref_off)
 
 
 def get_length(s, oldlen):
