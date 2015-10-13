@@ -236,6 +236,7 @@ for off, string in strings:
                          off=off, encoding=encoding,
                          new_len=aligned_len)
             str_off = None
+            new_str_rva = None
         else:
             # Add the translation to the separate section
             str_off = new_section_offset
@@ -246,19 +247,23 @@ for off, string in strings:
         # Fix string length for each reference
         for ref in refs:
             ref_rva = sections[code].offset_to_rva(ref)
-            fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation))
-            if isinstance(fix, Sequence):
-                src_off, new_code, dest_off, op = fix
-                new_code = bytes(new_code)
-                if op == call_near and make_call_hooks:
-                    funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
-                else:
-                    if src_off in fixes:
-                        old_fix = fixes[src_off]
-                        old_code = old_fix['new_code']
-                        if new_code not in old_code:
-                            new_code = old_code + new_code
-                    fixes[src_off] = dict(src_off=src_off, new_code=new_code, dest_off=dest_off, op=op)
+            fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
+            if isinstance(fix, dict):
+                if 'new_code' in fix:
+                    assert type(fix['new_code']) is bytes
+                    new_code = fix['new_code']
+                    src_off = fix['src_off']
+                    if make_call_hooks and 'op' in fix and fix['op'] == call_near and 'dest_off' in fix:
+                        dest_off = fix['dest_off']
+                        funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
+                    else:
+                        if src_off in fixes:
+                            old_fix = fixes[src_off]
+                            old_code = old_fix['new_code']
+                            if new_code not in old_code:
+                                new_code = old_code + new_code
+                            fix['new_code'] = new_code
+                        fixes[src_off] = fix
                 fix = -1
             if fix != 0:
                 if fix == -2 and debug:
@@ -275,7 +280,8 @@ for off, string in strings:
                         print('Failed to fix length.')
                         print('|%s|%s| <- %x (%x)' %
                               (string, translation, ref, ref_rva + image_base))
-                    pass
+                    if is_long:
+                        fpoke4(fn, ref, new_str_rva)
                 else:
                     # Fix relocations
                     # Remove relocations of the overwritten references
@@ -317,6 +323,8 @@ for fix in fixes.values():
         dest_rva = sections[code].offset_to_rva(fix['dest_off'])
         disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement
         # Add jump from the hook
+        dword = to_dword(disp, signed=True)
+        assert type(dword) is bytes
         mach += bytearray((jmp_near,)) + to_dword(disp, signed=True)
     
     # Write the hook to the new section

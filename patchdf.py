@@ -106,7 +106,7 @@ count_before = 0x20
 count_after = 0x80
 
 
-def fix_len(fn, offset, oldlen, newlen):
+def fix_len(fn, offset, oldlen, newlen, new_str_rva):
     next_off = offset+4
     pre = fpeek(fn, offset-count_before, count_before)
     aft = fpeek(fn, next_off, count_after)
@@ -157,11 +157,11 @@ def fix_len(fn, offset, oldlen, newlen):
                             elif line.data[0] == call_near:
                                 if mov_esp_edi:
                                     disp = from_dword(line.data[1:5], signed=True)
-                                    return (
-                                        next_off+line.address+1,
-                                        ((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, 0x0f, 0, 0, 0),  # mov [esi+14h], 0fh
-                                        next_off+line.address+5+disp,  # call_near - 1 byte, displacement - 4 bytes
-                                        aft[line.address]
+                                    return dict(
+                                        src_off=next_off+line.address+1,
+                                        new_code=bytes(((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14)) + to_dword(0xf),  # mov [esi+14h], 0fh
+                                        dest_off=next_off+line.address+5+disp,  # call_near - 1 byte, displacement - 4 bytes
+                                        op=call_near
                                     )
                                 else:
                                     break
@@ -176,22 +176,20 @@ def fix_len(fn, offset, oldlen, newlen):
                     fpoke(fn, next_off+1, newlen)
                     return 1
                 elif jmp == jmp_near:
-                    return (
-                        oldnext+1,
-                        (push_imm8, newlen),
-                        next_off+2,
-                        jmp
+                    return dict(
+                        src_off=oldnext+1,
+                        new_code=bytes((push_imm8, newlen)),
+                        dest_off=next_off+2
                     )
                 else:
                     # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         disp = from_dword(aft[i+1:i+5], signed=True)
-                        return (
-                            next_off+i+1,
-                            mach_strlen((mov_rm_reg+1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
-                            next_off+i+5+disp,
-                            aft[i]
+                        return dict(
+                            src_off=next_off+i+1,
+                            new_code=mach_strlen((mov_rm_reg+1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
+                            dest_off=next_off+i+5+disp
                         )
             elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
@@ -199,11 +197,11 @@ def fix_len(fn, offset, oldlen, newlen):
                 i = find_instruction(aft, call_near)
                 if i is not None:
                     disp = from_dword(aft[i+1:i+5], signed=True)
-                    return (
-                        next_off+i+1,
-                        mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
-                        next_off+i+5+disp,
-                        aft[i]
+                    return dict(
+                        src_off=next_off+i+1,
+                        new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
+                        dest_off=next_off+i+5+disp,
+                        op=call_near
                     )
             elif aft and match_mov_reg_imm32(aft[:5], Reg.edi, oldlen):
                 # mov edi, len ; after
@@ -211,21 +209,20 @@ def fix_len(fn, offset, oldlen, newlen):
                     fpoke4(fn, next_off+1, newlen)
                     return 1
                 elif jmp == jmp_near:
-                    return (
-                        oldnext+1,
-                        bytes((mov_reg_imm | 8 | Reg.edi,)) + to_dword(newlen),
-                        next_off+5,
-                        jmp
+                    return dict(
+                        src_off=oldnext+1,
+                        new_code=bytes((mov_reg_imm | 8 | Reg.edi,)) + to_dword(newlen),
+                        dest_off=next_off+5
                     )
                 else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         disp = from_dword(aft[i+1:i+5], signed=True)
-                        return (
-                            next_off+i+1,
-                            mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
-                            next_off+i+5+disp,
-                            aft[i]
+                        return dict(
+                            src_off=next_off+i+1,
+                            new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
+                            dest_off=next_off+i+5+disp,
+                            op=call_near
                         )
             elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0):
                 # lea edi, [reg+N] ; assume that reg+N == oldlen
@@ -290,11 +287,10 @@ def fix_len(fn, offset, oldlen, newlen):
                                 skip = 3
                             
                             if skip is not None:
-                                return (
-                                    line.address+1,
-                                    bytes((mov_reg_imm | 8 | Reg.ecx,)) + to_dword(dword_count),
-                                    next_off_2 + skip,
-                                    jmp
+                                return dict(
+                                    src_off=line.address+1,
+                                    new_code=bytes((mov_reg_imm | 8 | Reg.ecx,)) + to_dword(dword_count),
+                                    dest_off=next_off_2 + skip
                                 )
                             
                             return -2
