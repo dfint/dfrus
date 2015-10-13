@@ -46,7 +46,7 @@ def get_cross_references(fn, relocs, sections, image_base):
         if not (0 <= reloc < sections[code].virtual_size):
             # Relocation doesn't belong to the code section
             continue
-        obj_rva = int.from_bytes(code_section[reloc:reloc+4], 'little') - image_base
+        obj_rva = from_dword(code_section[reloc:reloc+4]) - image_base
         reloc += sections[code].physical_offset
         if data_lower_bound <= obj_rva <= data_upper_bound:
             obj_off = sections.rva_to_offset(obj_rva)
@@ -118,7 +118,7 @@ def fix_len(fn, offset, oldlen, newlen):
             disp = to_signed(aft[1], width=8)
             next_off += 2 + disp
         else:
-            disp = int.from_bytes(aft[1:5], byteorder='little', signed=True)
+            disp = from_dword(aft[1:5], signed=True)
             next_off += 5 + disp
         jmp = aft[0]
         aft = fpeek(fn, next_off, count_after)
@@ -133,7 +133,7 @@ def fix_len(fn, offset, oldlen, newlen):
         reg = pre[-1] & 7
         if reg == Reg.eax:
             # mov eax, offset str
-            if int.from_bytes(pre[-5:-1], byteorder='little') == oldlen:
+            if from_dword(pre[-5:-1]) == oldlen:
                 fpoke4(fn, offset-5, newlen)
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi:
                     # mov edi, len before
@@ -156,7 +156,7 @@ def fix_len(fn, offset, oldlen, newlen):
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
                                 if mov_esp_edi:
-                                    disp = int.from_bytes(line.data[1:5], byteorder='little', signed=True)
+                                    disp = from_dword(line.data[1:5], signed=True)
                                     return (
                                         next_off+line.address,
                                         ((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, 0x0f, 0, 0, 0),  # mov [esi+14h], 0fh
@@ -186,7 +186,7 @@ def fix_len(fn, offset, oldlen, newlen):
                     # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
-                        disp = int.from_bytes(aft[i+1:i+5], byteorder='little', signed=True)
+                        disp = from_dword(aft[i+1:i+5], signed=True)
                         return (
                             next_off+i,
                             mach_strlen((mov_rm_reg+1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
@@ -198,14 +198,14 @@ def fix_len(fn, offset, oldlen, newlen):
                 # There's no code in DF that passes this condition. Leaved just in case.
                 i = find_instruction(aft, call_near)
                 if i is not None:
-                    disp = int.from_bytes(aft[i+1:i+5], byteorder='little', signed=True)
+                    disp = from_dword(aft[i+1:i+5], signed=True)
                     return (
                         next_off+i,
                         mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
                         next_off+i+5+disp,
                         aft[i]
                     )
-            elif aft and aft[0] == mov_reg_imm | 8 | Reg.edi and int.from_bytes(aft[1:5], byteorder='little') == oldlen:
+            elif aft and match_mov_reg_imm32(aft[:5], Reg.edi, oldlen):
                 # mov edi, len ; after
                 if not jmp:
                     fpoke4(fn, next_off+1, newlen)
@@ -213,14 +213,14 @@ def fix_len(fn, offset, oldlen, newlen):
                 elif jmp == jmp_near:
                     return (
                         oldnext,
-                        bytes((mov_reg_imm | 8 | Reg.edi,)) + newlen.to_bytes(length=4, byteorder='little'),
+                        bytes((mov_reg_imm | 8 | Reg.edi,)) + to_dword(newlen),
                         next_off+5,
                         jmp
                     )
                 else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
-                        disp = int.from_bytes(aft[i+1:i+5], byteorder='little', signed=True)
+                        disp = from_dword(aft[i+1:i+5], signed=True)
                         return (
                             next_off+i,
                             mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
@@ -272,7 +272,6 @@ def fix_len(fn, offset, oldlen, newlen):
                     return -2
                 else:
                     for line in disasm(aft, start_address=next_off):
-                        print(hex(line.address), line)
                         assert(line.mnemonic != 'db')
                         offset = line.address
                         data = line.data
@@ -289,7 +288,7 @@ def fix_len(fn, offset, oldlen, newlen):
                                 skip = 5
                             elif aft[0] == lea and aft[1] & 0xf8 == mod_1_ecx_0 and aft[2] == dword_count:
                                 skip = 3
-                            print('skip:', skip)
+                            
                             if skip is not None:
                                 return (
                                     line.address,
@@ -444,7 +443,7 @@ def mach_memcpy(src, dest, count):
 
     mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
     new_reference = len(mach)
-    mach += src.to_bytes(4, byteorder='little')  # imm32
+    mach += to_dword(src)  # imm32
     mach += bytearray((Prefix.rep, movsd))  # rep movsd
     mach.append(popad)  # popad
 
