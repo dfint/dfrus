@@ -167,6 +167,11 @@ class Operand:
 
             return result
 
+    def __int__(self):
+        if self.reg is not None or self.base_reg is not None or self.index_reg is not None:
+            raise ValueError('Failed to represent Operand as integer: %r' % self)
+        return self.value
+
 
 def mach_lea(dest, src):
     mach = bytearray()
