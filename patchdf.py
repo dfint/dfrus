@@ -351,7 +351,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                             return 1
                 assert(flag < 2)
         else:
-            return 0
+            return rewrite_code(fn, offset, oldlen, newlen, new_str_rva)
 
     return -1  # Assume that there's no need to fix
 
