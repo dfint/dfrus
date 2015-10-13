@@ -148,17 +148,17 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
     aft = fpeek(fn, next_off, count_after)
     jmp = None
     oldnext = None
-    if aft[0] in {jmp_short, jmp_near}:
+    if aft[0] in {jmp_short, jmp_near} or aft[0] & 0xf0 == jcc_short:
         oldnext = next_off
-        if aft[0] == jmp_short:
+        if aft[0] == jmp_short or aft[0] & 0xf0 == jcc_short:
             disp = to_signed(aft[1], width=8)
             next_off += 2 + disp
-        else:
+        elif aft[0] == jmp_near:
             disp = from_dword(aft[1:5], signed=True)
             next_off += 5 + disp
         jmp = aft[0]
         aft = fpeek(fn, next_off, count_after)
-    elif aft[0] == call_near or aft[0] & 0xf0 == jcc_short or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
+    elif aft[0] == call_near or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
         aft = None
 
     if pre[-1] == push_imm32:
@@ -217,8 +217,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         new_code=bytes((push_imm8, newlen)),
                         dest_off=next_off+2
                     )
-                else:
-                    # jmp == jmp_short
+                else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         disp = from_dword(aft[i+1:i+5], signed=True)
