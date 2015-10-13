@@ -292,7 +292,7 @@ def fix_len(fn, offset, oldlen, newlen):
                             if skip is not None:
                                 return (
                                     line.address,
-                                    bytes((mov_reg_imm | 8 | Reg.ecx,)) + to_dword(dword_count),
+                                    bytes((mov_reg_imm | 8 | Reg.ecx,)) + to_dword(new_dword_count),
                                     next_off_2 + skip,
                                     jmp
                                 )
