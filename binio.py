@@ -170,8 +170,8 @@ def from_dword(b, signed=False, byteorder='little'):
     return int.from_bytes(b, byteorder=byteorder, signed=signed)
 
 
-def to_dword(x, byteorder='little'):
-    return x.to_bytes(length=4, byteorder=byteorder)
+def to_dword(x, signed=False, byteorder='little'):
+    return x.to_bytes(length=4, byteorder=byteorder, signed=signed)
 
 
 if __name__ == "__main__":

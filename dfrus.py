@@ -260,10 +260,10 @@ for off, string in strings:
                     else:
                         if src_off in fixes:
                             old_fix = fixes[src_off]
-                            old_code = old_fix[1]
+                            old_code = old_fix['new_code']
                             if new_code not in old_code:
                                 new_code = old_code + new_code
-                        fixes[src_off] = src_off, new_code, dest_off, op
+                        fixes[src_off] = dict(src_off=src_off, new_code=new_code, dest_off=dest_off, op=op)
                 fix = -1
 
             if fix != 0:
@@ -322,20 +322,30 @@ for off, string in strings:
 
 
 # Delayed fix
-for fix in fixes:
-    src_off, mach, dest, _ = fixes[fix]
+for fix in fixes.values():
+    src_off = fix['src_off']
+    mach = fix['new_code']
+    
     hook_off = new_section_offset
     hook_rva = new_section.offset_to_rva(hook_off)
-    dest_rva = sections[code].offset_to_rva(dest)
-    disp = dest_rva - (hook_rva + len(mach) + 5)  # displacement for jump from the hook
-    # Add jump from the hook
-    mach += bytearray((jmp_near,)) + disp.to_bytes(4, byteorder='little', signed=True)
+    
+    if 'dest_off' in fix:
+        dest_rva = sections[code].offset_to_rva(fix['dest_off'])
+        disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement
+        # Add jump from the hook
+        mach += bytearray((jmp_near,)) + to_dword(disp, signed=True)
+    
     # Write the hook to the new section
     new_section_offset = add_to_new_section(fn, hook_off, mach)
-
+    
+    # If there's a new absolute reference in the code, add it to reloc table
+    if 'new_ref' in fix:  
+        relocs.add(hook_rva + fix['new_ref'])
+        relocs_modified = True
+    
     src_rva = sections[code].offset_to_rva(src_off)
-    disp = hook_rva - (src_rva + 5)  # displacement for jump to the hook
-    fpoke(fn, src_off + 1, disp.to_bytes(4, byteorder='little', signed=True))
+    disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
+    fpoke(fn, src_off, to_dword(disp, signed=True))
 
 
 def add_call_hook(dest, val):
