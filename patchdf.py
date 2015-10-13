@@ -511,9 +511,9 @@ def mach_memcpy(src, dest, count):
     return mach, new_reference
 
 
-def add_to_new_section(fn, dest, s, alignment=4):
+def add_to_new_section(fn, dest, s, alignment=4, padding_byte=b'\0'):
     aligned = align(len(s), alignment)
-    s = pad_tail(s, aligned, b'\0')
+    s = pad_tail(s, aligned, padding_byte)
     fpoke(fn, dest, s)
     return dest + aligned
 
