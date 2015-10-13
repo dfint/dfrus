@@ -300,10 +300,10 @@ for fix in fixes.values():
         # Add jump from the hook
         dword = to_dword(disp, signed=True)
         assert type(dword) is bytes
-        mach += bytearray((jmp_near,)) + to_dword(disp, signed=True)
+        mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
     
     # Write the hook to the new section
-    new_section_offset = add_to_new_section(fn, hook_off, mach)
+    new_section_offset = add_to_new_section(fn, hook_off, mach, padding_byte=int3)
     
     # If there's a new absolute reference in the code, add it to reloc table
     if 'new_ref' in fix:  
