@@ -253,8 +253,10 @@ def analyse_mach(s):
         yield result, j
 
 
-op_1byte_nomask_noargs = {nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
-                          popad: "popad", leave: "leave", int3: "int3"}
+op_1byte_nomask_noargs = {
+    nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
+    popad: "popad", leave: "leave", int3: "int3", Prefix.rep: "repz", Prefix.repne: "repnz"
+}
 op_nomask = {call_near: "call near", jmp_near: "jmp near", jmp_short: "jmp short"}
 op_FE_width_REG_RM = {test_rm_reg: "test", xchg_rm_reg: "xchg"}
 op_FC_dir_width_REG_RM = {mov_rm_reg: "mov", add_rm_reg: "add", sub_rm_reg: "sub", or_rm_reg: "or", and_rm_reg: "and",
@@ -337,7 +339,7 @@ def disasm(s, start_address=0):
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
             i += 1
-            immediate = start_address+i+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
+            immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
             i += 4
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
                               operands=[Operand(value=immediate)])

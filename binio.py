@@ -165,6 +165,15 @@ def to_unsigned(x, width):
     return x
 
 
+def from_dword(b, signed=False, byteorder='little'):
+    assert len(b) == 4
+    return int.from_bytes(b, byteorder=byteorder, signed=signed)
+
+
+def to_dword(x, byteorder='little'):
+    return x.to_bytes(length=4, byteorder=byteorder)
+
+
 if __name__ == "__main__":
     fn = TestFileObject()
     # fn = open("test.bin","r+b")
