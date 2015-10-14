@@ -102,35 +102,52 @@ class Trace:
     not_follow = 0
     follow = 1
     stop = 2
+    forward_only = 3
 
 
-def trace_code(fn, offset, func, trace_jmp = Trace.follow, trace_jcc = Trace.follow, trace_call = Trace.stop):
+def trace_code(fn, offset, func, trace_jmp = Trace.follow, trace_jcc = Trace.forward_only, trace_call = Trace.stop):
     s = fpeek(fn, offset, count_after)
     for line in disasm(s, offset):
-        assert line.mnemonic != 'db'
-        if func(line):
-            return offset, line
-        if line.mnemonic.startswith('jmp'):
+        # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
+        if line.mnemonic == 'db':
+            raise ValueError('Disassembler returned db at offset %xh' % offset)
+        elif not func(line):  # Stop when the func returns False
+            return line
+        elif line.mnemonic.startswith('jmp'):
             if trace_jmp == Trace.not_follow:
                 pass
             elif trace_jmp == Trace.follow:
-                return trace_code(fn, int(line.operands[0]), trace_jmp, trace_jcc, trace_call)
+                return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
             elif trace_jmp == Trace.stop:
-                return offset, line
+                return line
+            elif trace_jmp == Trace.forward_only:
+                if int(line.operands[0]) > line.address:
+                    return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
         elif line.mnemonic.startswith('j'):
             if trace_jcc == Trace.not_follow:
                 pass
             elif trace_jcc == Trace.follow:
-                return trace_code(fn, int(line.operands[0]), trace_jmp, trace_jcc, trace_call)
+                return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
             elif trace_jcc == Trace.stop:
-                return offset, line
+                return line
+            elif trace_jcc == Trace.forward_only:
+                if int(line.operands[0]) > line.address:
+                    return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
         elif line.mnemonic.startswith('call'):
             if trace_call == Trace.not_follow:
                 pass
             elif trace_call == Trace.follow:
-                return trace_code(fn, int(line.operands[0]), trace_jmp, trace_jcc, trace_call)
+                returned = trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+                if returned is None or not returned.mnemonic.startswith('ret'):
+                    return returned
             elif trace_call == Trace.stop:
-                return offset, line
+                return line
+            elif trace_call == Trace.forward_only:
+                if int(line.operands[0]) > line.address:
+                    return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+        elif line.mnemonic.startswith('ret'):
+            return line
+    return None
 
 
 def match_mov_reg_imm32(b, reg, imm):
@@ -143,7 +160,24 @@ count_after = 0x80
 
 
 def fix_len(fn, offset, oldlen, newlen, new_str_rva):
+    def which_func(offset):
+        line = trace_code(fn, next_off, func=lambda line: not line.mnemonic.startswith('rep'))
+        if line is None:
+            func = ('not reached',)
+        elif line.mnemonic.startswith('rep'):
+            func = (line.mnemonic,)
+        elif line.mnemonic.startswith('call'):
+            try:
+                func = (line.mnemonic, line.address, int(line.operands[0]))
+            except ValueError:
+                func = (line.mnemonic + ' indirect', line.address, str(line.operands))
+        else:
+            func = str(line)
+        return func
+    
     next_off = offset+4
+    func = which_func(next_off)
+    
     pre = fpeek(fn, offset-count_before, count_before)
     aft = fpeek(fn, next_off, count_after)
     jmp = None
@@ -163,7 +197,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
 
     if pre[-1] == push_imm32:
         # push offset str
-        return -1  # No need fixing
+        return dict(fixed='not needed', str='push', len='no', func=func)  # No need fixing
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
         reg = pre[-1] & 7
@@ -171,7 +205,9 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
             # mov eax, offset str
             if from_dword(pre[-5:-1]) == oldlen:
                 fpoke4(fn, offset-5, newlen)
+                meta = dict(str='eax', len='unknown', fixed='yes', func=func)
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi:
+                    meta['len'] = 'edi'
                     # mov edi, len before
                     if oldlen == 15 and aft:
                         # Trying to fix the case when the edi value is used as a stl-string cap size
@@ -193,12 +229,14 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                             elif line.data[0] == call_near:
                                 if mov_esp_edi:
                                     disp = from_dword(line.data[1:5], signed=True)
-                                    return dict(
+                                    retvalue = dict(
                                         src_off=next_off+line.address+1,
                                         new_code=bytes(((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14)) + to_dword(0xf),  # mov [esi+14h], 0fh
                                         dest_off=next_off+line.address+5+disp,  # call_near - 1 byte, displacement - 4 bytes
                                         op=call_near
                                     )
+                                    retvalue.update(meta)
+                                    return retvalue
                                 else:
                                     break
                 return 1  # Length fixed successfully

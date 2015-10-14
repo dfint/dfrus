@@ -1,7 +1,7 @@
 
 from opcodes import *
 from binio import to_signed
-from collections import namedtuple
+from collections import namedtuple, Sequence
 
 
 def align(n, edge=4):
@@ -168,8 +168,9 @@ class Operand:
             return result
 
     def __int__(self):
-        if self.reg is not None or self.base_reg is not None or self.index_reg is not None:
-            raise ValueError('Failed to represent Operand as integer: %r' % self)
+        if (self.value is None or self.reg is not None or
+                self.base_reg is not None or self.index_reg is not None):
+            raise ValueError('Failed to represent Operand as integer: %s' % self)
         return self.value
 
 
@@ -292,6 +293,7 @@ class DisasmLine:
         self.address = address
         self.data = data
         self.mnemonic = mnemonic
+        assert operands is None or isinstance(operands, Sequence)
         self.operands = operands
         self.__str = None
 
@@ -446,7 +448,7 @@ def disasm(s, start_address=0):
             size_flag = s[i] & 1
             size = size_flag*2 - size_prefix
             i += 1
-            imm_size = 1 << size
+            imm_size = 4  # 4 bytes in 32-bit mode
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
             op1 = Operand(reg=Reg.eax, data_size=size)
@@ -552,7 +554,7 @@ def disasm(s, start_address=0):
                 i += 1
                 immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 i += 4
-                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=Operand(value=immediate))
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[Operand(value=immediate)])
             elif s[i] & 0xFE in {x0f_movzx, x0f_movsx}:
                 op = s[i] & 0xFE
                 mnemonic = 'movzx' if op == x0f_movzx else 'movsx'
