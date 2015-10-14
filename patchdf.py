@@ -170,7 +170,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
             try:
                 func = (line.mnemonic, line.address, int(line.operands[0]))
             except ValueError:
-                func = (line.mnemonic + ' indirect', line.address, str(line.operands))
+                func = (line.mnemonic + ' indirect', line.address, str(line.operands[0]))
         else:
             func = str(line)
         return func
@@ -194,11 +194,11 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         aft = None
 
     func = which_func(oldnext)
-    meta = dict(func=func, len='unknown')
+    meta = dict(func=func)
     if pre[-1] == push_imm32:
         # push offset str
+        meta['str'] = 'push'
         meta['fixed'] = 'not needed'
-        meta['len'] = 'no'
         return meta  # No need fixing
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
@@ -246,7 +246,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
             elif pre[-3] == push_imm8 and pre[-2] == oldlen:
                 # push len ; before
                 fpoke(fn, offset-2, newlen)
-                meta.update(dict(len='push imm8', fixed='yes'))
+                meta.update(dict(len='push', fixed='yes'))
                 return meta
             elif aft and aft[0] == push_imm8 and aft[1] == oldlen:
                 # push len ; after
@@ -269,7 +269,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         disp = from_dword(aft[i+1:i+5], signed=True)
                         retvalue = dict(
                             src_off=next_off+i+1,
-                            new_code=mach_strlen((mov_rm_reg+1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
+                            new_code=mach_strlen((mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
                             dest_off=next_off+i+5+disp
                         )
                         retvalue.update(meta)

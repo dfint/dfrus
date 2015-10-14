@@ -208,6 +208,7 @@ if debug:
 
 funcs = defaultdict(lambda: defaultdict(list))
 fixes = dict()
+metadata = dict()
 
 for off, string in strings:
     if string in trans_table:
@@ -262,8 +263,12 @@ for off, string in strings:
                         old_code = old_fix['new_code']
                         if new_code not in old_code:
                             new_code = old_code + new_code
-                        fix['new_code'] = new_code
-                    fixes[src_off] = fix
+                            fix['new_code'] = new_code
+                            fixes[src_off] = fix
+                        else:
+                            pass  # Fix is already added, do nothing
+                    else:
+                        fixes[src_off] = fix
             
             # Remove relocations of the overwritten references
             if 'deleted_relocs' in fix and fix['deleted_relocs']:
@@ -278,10 +283,52 @@ for off, string in strings:
             elif is_long:
                 fpoke4(fn, ref, new_str_rva)
             
-            if 'fixed' in fix and fix['fixed'] == 'no' and debug:
-                print('Failed to fix length.')
-                print('|%s|%s| <- %x (%x)' %
-                      (string, translation, ref, ref_rva + image_base))
+            metadata[(string, ref)] = fix
+
+
+# Extract information of functions parameters
+functions = defaultdict(dict)
+for item in metadata.values():
+    if 'func' in item and item['func'][0] == 'call near':
+        offset = item['func'][2]
+        address = sections[code].offset_to_rva(offset) + image_base
+        if 'str' in item:
+            str_param = item['str']
+            if 'str' not in functions[offset]:
+                functions[offset]['str'] = str_param
+            elif functions[offset]['str'] != str_param:
+                raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' % (address, functions['str'], str_param))
+        
+        if 'len' in item:
+            len_param = item['len']
+            if 'len' not in functions[offset]:
+                functions[offset]['len'] = len_param
+            elif functions[offset]['len'] != len_param:
+                raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' % (address, functions['str'], str_param))
+
+
+# Add strlen before call of functions for strings which length was not fixed
+for string, info in metadata.items():
+    if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
+        func = info['func']
+        if func[0] == 'call near' and 'len' in functions[func[2]] :
+            _, src_off, dest_off = func
+            src_off += 1
+            code_chunk = None
+            if functions[dest_off]['len'] == 'push':
+                code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)  # mov [esp+8], ecx
+            elif functions[dest_off]['len'] == 'edi':
+                code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
+            assert code_chunk is not None
+            new_code = mach_strlen(code_chunk)
+            if src_off in fixes:
+                old_fix = fixes[src_off]
+                old_code = old_fix['new_code']
+                if new_code in old_code:
+                    continue
+                else:
+                    new_code = old_code + new_code
+            fixes[src_off] = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
 
 
 # Delayed fix
