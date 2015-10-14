@@ -248,42 +248,40 @@ for off, string in strings:
         for ref in refs:
             ref_rva = sections[code].offset_to_rva(ref)
             fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
-            if isinstance(fix, dict):
-                if 'new_code' in fix:
-                    assert type(fix['new_code']) is bytes
-                    new_code = fix['new_code']
-                    src_off = fix['src_off']
-                    if make_call_hooks and 'op' in fix and fix['op'] == call_near and 'dest_off' in fix:
-                        dest_off = fix['dest_off']
-                        funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
-                    else:
-                        if src_off in fixes:
-                            old_fix = fixes[src_off]
-                            old_code = old_fix['new_code']
-                            if new_code not in old_code:
-                                new_code = old_code + new_code
-                            fix['new_code'] = new_code
-                        fixes[src_off] = fix
-                
-                # Remove relocations of the overwritten references
-                if 'deleted_relocs' in fix and fix['deleted_relocs']:
-                    for item in fix['deleted_relocs']:
-                        relocs.remove(ref_rva + item)
-                    relocs_modified = True
-                
-                # Add relocation for the new reference
-                if 'new_ref' in fix:
-                    relocs.add(ref_rva + fix['new_ref'])
-                    relocs_modified = True
-                elif is_long:
-                    fpoke4(fn, ref, new_str_rva)
-            else:
-                if fix == -2 and debug:
-                    print('Failed to fix length.')
-                    print('|%s|%s| <- %x (%x)' %
-                          (string, translation, ref, ref_rva + image_base))
-                if is_long:
-                    fpoke4(fn, ref, new_str_rva)
+            assert isinstance(fix, dict)
+            if 'new_code' in fix:
+                assert type(fix['new_code']) is bytes
+                new_code = fix['new_code']
+                src_off = fix['src_off']
+                if make_call_hooks and 'op' in fix and fix['op'] == call_near and 'dest_off' in fix:
+                    dest_off = fix['dest_off']
+                    funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
+                else:
+                    if src_off in fixes:
+                        old_fix = fixes[src_off]
+                        old_code = old_fix['new_code']
+                        if new_code not in old_code:
+                            new_code = old_code + new_code
+                        fix['new_code'] = new_code
+                    fixes[src_off] = fix
+            
+            # Remove relocations of the overwritten references
+            if 'deleted_relocs' in fix and fix['deleted_relocs']:
+                for item in fix['deleted_relocs']:
+                    relocs.remove(ref_rva + item)
+                relocs_modified = True
+            
+            # Add relocation for the new reference
+            if 'new_ref' in fix:
+                relocs.add(ref_rva + fix['new_ref'])
+                relocs_modified = True
+            elif is_long:
+                fpoke4(fn, ref, new_str_rva)
+            
+            if 'fixed' in fix and fix['fixed'] == 'no' and debug:
+                print('Failed to fix length.')
+                print('|%s|%s| <- %x (%x)' %
+                      (string, translation, ref, ref_rva + image_base))
 
 
 # Delayed fix
