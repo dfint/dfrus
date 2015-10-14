@@ -527,14 +527,14 @@ def get_length(s, oldlen):
 def mach_memcpy(src, dest, count):
     mach = bytearray()
     mach.append(pushad)  # pushad
-    mach += bytearray((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
-    mach += bytearray((mov_reg_imm | Reg.cl, (count+3)//4))  # mov cl, (count+3)//4
+    mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
+    mach += bytes((mov_reg_imm | Reg.cl, (count+3)//4))  # mov cl, (count+3)//4
 
     # If the destination address is not in edi yet, put it there
     if dest != (Reg.edi, 0):
         if dest[1] == 0:
             # mov edi, reg
-            mach += bytearray((mov_rm_reg | 1, join_byte(3, dest[0], Reg.edi)))
+            mach += bytes((mov_rm_reg | 1, join_byte(3, dest[0], Reg.edi)))
         else:
             # lea edi, [reg+imm]
             mach += mach_lea(Reg.edi, Operand(base_reg=dest[0], disp=dest[1]))
@@ -542,7 +542,7 @@ def mach_memcpy(src, dest, count):
     mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
     new_reference = len(mach)
     mach += to_dword(src)  # imm32
-    mach += bytearray((Prefix.rep, movsd))  # rep movsd
+    mach += bytes((Prefix.rep, movsd))  # rep movsd
     mach.append(popad)  # popad
 
     return mach, new_reference
