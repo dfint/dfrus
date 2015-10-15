@@ -509,7 +509,12 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                     retvalue.update(meta)
                     return retvalue
                 else:
-                    retvalue = dict(src_off=next_off + 1, new_code=proc, deleted_relocs=deleted_relocs, new_ref=new_ref_off)
+                    retvalue = dict(
+                        src_off=next_off + 1,
+                        new_code=proc,
+                        deleted_relocs=deleted_relocs,
+                        new_ref=new_ref_off
+                    )
                     retvalue.update(meta)
                     return retvalue
 
