@@ -423,7 +423,6 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         # mov eax, [addr] or mov reg, [addr]
         meta['func'] = ('mov',)
         meta['str'] = 'mov'
-        meta['len'] = 'no'
         if newlen <= oldlen:
             meta['fixed'] = 'not needed'
             return meta

@@ -206,6 +206,24 @@ if debug:
         for item in strings:
             print("0x%x : %r" % item)
 
+
+def add_fix(fixes, offset, fix):
+    new_code = fix['new_code']
+    if offset in fixes:
+        old_fix = fixes[offset]
+        old_code = old_fix['new_code']
+        if new_code not in old_code:
+            new_code = old_code + new_code
+            fix['new_code'] = new_code
+            fixes[offset] = fix
+        else:
+            pass  # Fix is already added, do nothing
+    else:
+        fixes[offset] = fix
+    
+    return fixes
+
+
 funcs = defaultdict(lambda: defaultdict(list))
 fixes = dict()
 metadata = dict()
@@ -258,17 +276,7 @@ for off, string in strings:
                     dest_off = fix['dest_off']
                     funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
                 else:
-                    if src_off in fixes:
-                        old_fix = fixes[src_off]
-                        old_code = old_fix['new_code']
-                        if new_code not in old_code:
-                            new_code = old_code + new_code
-                            fix['new_code'] = new_code
-                            fixes[src_off] = fix
-                        else:
-                            pass  # Fix is already added, do nothing
-                    else:
-                        fixes[src_off] = fix
+                    add_fix(fixes, src_off, fix)
             
             # Remove relocations of the overwritten references
             if 'deleted_relocs' in fix and fix['deleted_relocs']:
@@ -311,24 +319,21 @@ for item in metadata.values():
 for string, info in metadata.items():
     if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
         func = info['func']
-        if func[0] == 'call near' and 'len' in functions[func[2]] :
-            _, src_off, dest_off = func
-            src_off += 1
-            code_chunk = None
-            if functions[dest_off]['len'] == 'push':
-                code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)  # mov [esp+8], ecx
-            elif functions[dest_off]['len'] == 'edi':
-                code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
-            assert code_chunk is not None
-            new_code = mach_strlen(code_chunk)
-            if src_off in fixes:
-                old_fix = fixes[src_off]
-                old_code = old_fix['new_code']
-                if new_code in old_code:
-                    continue
-                else:
-                    new_code = old_code + new_code
-            fixes[src_off] = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
+        if func[0] == 'call near':
+            if 'len' in functions[func[2]]:
+                _, src_off, dest_off = func
+                src_off += 1
+                code_chunk = None
+                if functions[dest_off]['len'] == 'push':
+                    code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)  # mov [esp+8], ecx
+                elif functions[dest_off]['len'] == 'edi':
+                    code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
+                assert code_chunk is not None
+                new_code = mach_strlen(code_chunk)
+                fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
+                add_fix(fixes, src_off, fix)
+        elif debug:
+            print('Status unknown: %r (reference from 0x%x)' % string, info)
 
 
 # Delayed fix
