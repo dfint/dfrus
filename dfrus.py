@@ -321,8 +321,8 @@ for item in metadata.values():
 # Add strlen before call of functions for strings which length was not fixed
 for string, info in metadata.items():
     if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
-        func = info['func']
-        if func[0] == 'call near':
+        func = info.get('func', None)
+        if func is not None and func[0] == 'call near':
             if 'len' in functions[func[2]]:
                 _, src_off, dest_off = func
                 src_off += 1
@@ -336,7 +336,10 @@ for string, info in metadata.items():
                 fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
                 add_fix(fixes, src_off, fix)
         elif debug:
-            print('Status unknown: %r (reference from 0x%x)' % string, info)
+            if 'fixed' in info and info['fixed'] == 'no':
+                print('Not fixed: %r (reference from 0x%x)' % string, info)
+            else:
+                print('Status unknown: %r (reference from 0x%x)' % string, info)
 
 
 # Delayed fix
