@@ -193,15 +193,16 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
     elif aft[0] == call_near or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
         aft = None
 
-    func = which_func(oldnext)
-    meta = dict(func=func)
+    meta = dict()
     if pre[-1] == push_imm32:
         # push offset str
+        meta['func'] = which_func(oldnext)
         meta['str'] = 'push'
         meta['fixed'] = 'not needed'
         return meta  # No need fixing
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
+        meta['func'] = which_func(oldnext)
         reg = pre[-1] & 7
         if reg == Reg.eax:
             # mov eax, offset str
@@ -526,7 +527,7 @@ def get_length(s, oldlen):
     regs = [None, None, None]
     deleted = set()
     dest = None
-    saved_mach = None
+    saved_mach = bytes()
     length = None
     for line in disasm(s):
         offset = line.address
@@ -539,37 +540,40 @@ def get_length(s, oldlen):
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
                 # mov reg, [...]
-                assert left_operand.reg <= Reg.edx, 'Unallowed register: %s' % left_operand
-                assert regs[left_operand.reg] is None, 'Register is already marked as occupied: %s' % left_operand
-                if right_operand.type == 'ref abs':
-                    # mov reg, [mem]
-                    regs[left_operand.reg] = left_operand.data_size
-                    deleted.add(offset + line.data.index(to_dword(right_operand.disp)))
+                if left_operand.reg <= Reg.edx:
+                    assert regs[left_operand.reg] is None, 'Register is already marked as occupied: %s' % left_operand
+                    if right_operand.type == 'ref abs':
+                        # mov reg, [mem]
+                        regs[left_operand.reg] = left_operand.data_size
+                        deleted.add(offset + line.data.index(to_dword(right_operand.disp)))
+                    else:
+                        # mov reg1, [reg2+disp]
+                        regs[left_operand.reg] = -1
+                        saved_mach += line.data
                 else:
-                    # mov reg1, [reg2+disp]
-                    assert saved_mach is None
-                    regs[left_operand.reg] = -1
-                    saved_mach = line.data
+                    saved_mach += line.data
             elif left_operand.type == 'ref rel':
                 # mov [reg1+disp], reg2
-                assert left_operand.index_reg is None
-                assert regs[right_operand.reg] == right_operand.data_size, (regs[right_operand.reg], right_operand.data_size)
-                regs[right_operand.reg] = None  # Mark register as free
-                if (dest is None or dest.base_reg == left_operand.base_reg and
-                                    dest.disp > left_operand.disp):
-                    dest = left_operand
-                curlen += 1 << right_operand.data_size
+                if right_operand.reg <= Reg.edx:
+                    assert left_operand.index_reg is None
+                    assert regs[right_operand.reg] == right_operand.data_size, (regs[right_operand.reg], right_operand.data_size)
+                    regs[right_operand.reg] = None  # Mark register as free
+                    if (dest is None or dest.base_reg == left_operand.base_reg and
+                                        dest.disp > left_operand.disp):
+                        dest = left_operand
+                    curlen += 1 << right_operand.data_size
+                else:
+                    saved_mach += line.data
             else:
                 raise ValueError('Unallowed left operand type: %s, type is %r' % (left_operand, left_operand.type()))
         elif line.mnemonic == 'lea':
-            assert saved_mach is None
             left_operand, right_operand = line.operands
             if left_operand.reg <= Reg.edx:
                 regs[left_operand.reg] = -1
             if (dest is None or dest.base_reg == right_operand.base_reg and
                                 dest.disp >= right_operand.disp):
                 dest = Operand(base_reg=left_operand.reg, disp=0)
-            saved_mach = line.data
+            saved_mach += line.data
         else:
             raise ValueError('Unallowed operation (not mov, nor lea): %s, %r' % line)
     assert dest is not None, 'Destination not recognized'

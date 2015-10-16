@@ -268,16 +268,12 @@ for off, string in strings:
             ref_rva = sections[code].offset_to_rva(ref)
             try:
                 fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
-            except AssertionError:
-                print('Catched AssertionError on string %r at reference 0x%x' % (string, ref))
-                raise
-            except ValueError:
-                print('Catched ValueError on string %r at reference 0x%x' % (string, ref))
+            except Exception:
+                print('Catched %s on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref))
                 raise
             
             assert isinstance(fix, dict)
             if 'new_code' in fix:
-                assert type(fix['new_code']) is bytes
                 new_code = fix['new_code']
                 src_off = fix['src_off']
                 if make_call_hooks and 'op' in fix and fix['op'] == call_near and 'dest_off' in fix:
