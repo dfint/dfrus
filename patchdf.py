@@ -478,8 +478,9 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
             else:
                 x = get_length(aft, oldlen + 1)
                 mach, new_ref_off = mach_memcpy(new_str_rva, x['dest'], newlen + 1)
-                if x['lea'] is not None:
-                    mach += mach_lea(**x['lea'])
+                if x['saved_mach']:
+                    mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
+                    new_ref_off += len(x['saved_mach'])
 
                 proc = None
                 if len(mach) > x['length']:
@@ -521,90 +522,83 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
 
 
 def get_length(s, oldlen):
-    # TODO: Rewrite to use disasm
-    i = 0
     curlen = 0
     regs = [None, None, None]
     deleted = set()
     dest = None
-    _lea = None
-    while curlen < oldlen:
-        size = 4
-        if s[i] == Prefix.operand_size:
-            size = 2
-            i += 1
-
-        op = s[i]
-        i += 1
-        if op & 0xfe == mov_acc_mem:
-            # mov eax/ax/al, [mem]
-            assert(regs[Reg.ax] is None)
-            if op & 1 == 0:
-                size = 1
-            regs[Reg.ax] = size
-            deleted.add(i)
-            i += 4
-        elif op & 0xfc == mov_rm_reg:
-            if op & 1 == 0:
-                size = 1
-            x, j = analyse_modrm(s, i)
-            modrm = x['modrm']
-            reg = modrm.reg
-            assert(reg <= Reg.dx)  # reg in {Reg.ax, Reg.cx, Reg.dx})
-            i += 1  # assume there's no sib byte
-            if op & 2:
-                # mov reg, [mem]
-                assert(modrm.mode == 0 and modrm.regmem == 5)  # move from explicit address to register
-                assert(regs[reg] is None)  # register value was not saved
-                regs[reg] = size
-                deleted.add(i)
+    saved_mach = None
+    length = None
+    for line in disasm(s):
+        offset = line.address
+        assert curlen <= oldlen
+        if curlen >= oldlen:
+            length = offset
+            break
+        assert line.mnemonic != 'db'
+        if line.mnemonic == 'mov':
+            left_operand, right_operand = line.operands
+            if left_operand.type == 'reg gen':
+                # mov reg, [...]
+                assert left_operand.reg <= Reg.edx, 'Unallowed register: %s' % left_operand
+                assert regs[left_operand.reg] is None, 'Register is already marked as occupied: %s' % left_operand
+                if right_operand.type == 'ref abs':
+                    # mov reg, [mem]
+                    regs[left_operand.reg] = left_operand.data_size
+                    deleted.add(offset + line.data.index(to_dword(right_operand.disp)))
+                else:
+                    # mov reg1, [reg2+disp]
+                    assert saved_mach is None
+                    regs[left_operand.reg] = -1
+                    saved_mach = line.data
+            elif left_operand.type == 'ref rel':
+                # mov [reg1+disp], reg2
+                assert left_operand.index_reg is None
+                assert regs[right_operand.reg] == right_operand.data_size, (regs[right_operand.reg], right_operand.data_size)
+                regs[right_operand.reg] = None  # Mark register as free
+                if (dest is None or dest.base_reg == left_operand.base_reg and
+                                    dest.disp > left_operand.disp):
+                    dest = left_operand
+                curlen += 1 << right_operand.data_size
             else:
-                # mov [reg+N], reg
-                assert(modrm.mode != 3)  # move to register disallowed
-                assert(not (modrm.mode == 0 and modrm.regmem == 5))  # move to explicit address disallowed
-                assert(regs[reg] == size)  # get a value with the same size as stored
-                regs[reg] = None
-                x = process_operands(x)
-                if dest is None or dest[0] == x[0] and dest[1] > x[1]:
-                    dest = x
-                curlen += size
-            i = j
-        elif op == lea:
-            x, j = analyse_modrm(s, i)
-            modrm = x['modrm']
-            assert(modrm.mode != 3)
-            reg = modrm.reg
-            if reg <= Reg.dx:
-                regs[reg] = -1  # mark register as occupied
-            x = process_operands(x)
-            if dest is None or dest[0] == x[0] and dest[1] > x[1]:
-                dest = x
-            _lea = dict(dest=modrm.reg, src=Operand(base_reg=x[0], disp=x[1]))
-            i = j
+                raise ValueError('Unallowed left operand type: %s, type is %r' % (left_operand, left_operand.type()))
+        elif line.mnemonic == 'lea':
+            assert saved_mach is None
+            left_operand, right_operand = line.operands
+            if left_operand.reg <= Reg.edx:
+                regs[left_operand.reg] = -1
+            if (dest is None or dest.base_reg == right_operand.base_reg and
+                                dest.disp >= right_operand.disp):
+                dest = Operand(base_reg=left_operand.reg, disp=0)
+            saved_mach = line.data
         else:
-            raise ValueError('Unallowed operation (not mov, nor lea)')
-    return dict(length=i, dest=dest, deleted=deleted, lea=_lea)
+            raise ValueError('Unallowed operation (not mov, nor lea): %s, %r' % line)
+    assert dest is not None, 'Destination not recognized'
+    return dict(length=length, dest=dest, deleted=deleted, saved_mach=saved_mach)
 
 
-def mach_memcpy(src, dest, count):
+def mach_memcpy(src, dest: Operand, count):
     mach = bytearray()
     mach.append(pushad)  # pushad
-    mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
-    mach += bytes((mov_reg_imm | Reg.cl, (count+3)//4))  # mov cl, (count+3)//4
-
+    
+    assert dest.index_reg is None
     # If the destination address is not in edi yet, put it there
-    if dest != (Reg.edi, 0):
-        if dest[1] == 0:
+    if dest.base_reg != Reg.edi or dest.disp != 0:
+        if dest.disp == 0:
             # mov edi, reg
-            mach += bytes((mov_rm_reg | 1, join_byte(3, dest[0], Reg.edi)))
+            mach += bytes((mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)))
         else:
             # lea edi, [reg+imm]
-            mach += mach_lea(Reg.edi, Operand(base_reg=dest[0], disp=dest[1]))
+            mach += mach_lea(Reg.edi, dest)
 
     mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
     new_reference = len(mach)
     mach += to_dword(src)  # imm32
+    
+    mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
+    mach += bytes((mov_reg_imm | Reg.cl, (count+3)//4))  # mov cl, (count+3)//4
+    
     mach += bytes((Prefix.rep, movsd))  # rep movsd
+    
     mach.append(popad)  # popad
 
     return mach, new_reference

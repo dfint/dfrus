@@ -113,6 +113,7 @@ class Operand:
         if self.data_size is None and self.reg is not None:
             self.data_size = 2
     
+    @property
     def type(self):
         if self.value is not None:
             return 'imm'  # immediate value
@@ -186,10 +187,11 @@ class Operand:
         return self.value
 
 
-def mach_lea(dest, src):
+def mach_lea(dest, src: Operand):
     mach = bytearray()
     mach.append(lea)
-
+    assert src.index_reg is None, 'mach_lea(): right operand with index register not implemented'
+    
     if src.disp == 0 and src.base_reg != Reg.ebp:
         mode = 0
     elif -0x80 <= src.disp < 0x80:
