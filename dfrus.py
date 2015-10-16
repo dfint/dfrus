@@ -266,7 +266,12 @@ for off, string in strings:
         # Fix string length for each reference
         for ref in refs:
             ref_rva = sections[code].offset_to_rva(ref)
-            fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
+            try:
+                fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
+            except AssertionError:
+                print('Catched assertion error on string %r at reference 0x%x' % (string, ref))
+                raise
+            
             assert isinstance(fix, dict)
             if 'new_code' in fix:
                 assert type(fix['new_code']) is bytes
