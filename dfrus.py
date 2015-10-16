@@ -269,7 +269,10 @@ for off, string in strings:
             try:
                 fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
             except AssertionError:
-                print('Catched assertion error on string %r at reference 0x%x' % (string, ref))
+                print('Catched AssertionError on string %r at reference 0x%x' % (string, ref))
+                raise
+            except ValueError:
+                print('Catched ValueError on string %r at reference 0x%x' % (string, ref))
                 raise
             
             assert isinstance(fix, dict)
