@@ -419,10 +419,10 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                             return meta
                     meta['fixed'] = 'no'
                     return meta
+        meta['fixed'] = 'no'
         return meta
     elif pre[-1] == mov_acc_mem | 1 or pre[-2] == mov_reg_rm | 1:
         # mov eax, [addr] or mov reg, [addr]
-        meta['func'] = ('mov',)
         meta['str'] = 'mov'
         if newlen <= oldlen:
             meta['fixed'] = 'not needed'
@@ -475,6 +475,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                                 meta['fixed'] = 'yes'
                                 return meta
                     assert(flag < 2)
+                meta['fixed'] = 'no'
                 return meta
             else:
                 x = get_length(aft, oldlen + 1)
