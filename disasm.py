@@ -112,7 +112,19 @@ class Operand:
         self.seg_reg = seg_reg
         if self.data_size is None and self.reg is not None:
             self.data_size = 2
-
+    
+    def type(self):
+        if self.value is not None:
+            return 'imm'  # immediate value
+        elif self.reg is not None:
+            return 'reg gen'  # general purpose register
+        elif self.seg_reg is not None:
+            return 'reg seg'  # segment register
+        elif self.base_reg is None and self.index_reg is None:
+            return 'ref abs'  # absolute memory reference
+        else:
+            return 'ref rel'  # relative memory reference
+    
     @property
     def data_size(self):
         return self._data_size
