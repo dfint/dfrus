@@ -285,16 +285,15 @@ for off, string in strings:
                     funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
                 else:
                     add_fix(fixes, src_off, fix)
+            elif 'new_ref' in fix:
+                # Add relocation for the new reference
+                relocs.add(ref_rva + fix['new_ref'])
+                relocs_modified = True
             
             # Remove relocations of the overwritten references
             if 'deleted_relocs' in fix and fix['deleted_relocs']:
                 for item in fix['deleted_relocs']:
                     relocs.remove(ref_rva + item)
-                relocs_modified = True
-            
-            # Add relocation for the new reference
-            if 'new_ref' in fix:
-                relocs.add(ref_rva + fix['new_ref'])
                 relocs_modified = True
             elif is_long:
                 fpoke4(fn, ref, new_str_rva)
