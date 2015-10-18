@@ -280,8 +280,14 @@ for off, string in strings:
                     dest_off = fix['dest_off']
                     funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
                 else:
+                    if 'new_ref' in fix:
+                        if fix['new_code'].index(to_dword(new_str_rva)) != fix['new_ref']:
+                            raise ValueError('new_ref in fix code is broken for string %r, reference from offset 0x%x' % 
+                                             (string, ref))
                     add_fix(fixes, src_off, fix)
             elif 'new_ref' in fix:
+                if to_dword(new_str_rva) != fpeek(fn, ref + fix['new_ref'], 4):
+                    raise ValueError('new_ref broken for string %r, reference from offset 0x%x' % (string, ref))
                 # Add relocation for the new reference
                 relocs.add(ref_rva + fix['new_ref'])
                 relocs_modified = True
