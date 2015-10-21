@@ -318,7 +318,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         )
                         retvalue.update(meta)
                         return retvalue
-            elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0):
+            elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
                 # lea edi, [reg+N] ; assume that reg+N == oldlen
                 meta['len'] = 'edi'
                 disp = to_signed(pre[-2], 8)
