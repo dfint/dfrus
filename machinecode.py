@@ -36,23 +36,22 @@ class Reference:
         return cls(name, size, is_relative=False)
 
 
-class Label:
-    # Not using in MachineCode for now
-    def __init__(self, name: str, offset=None):
-        self.name = name
-        self.offset = offset
-
-
 class MachineCode:
-    def __init__(self, *args, origin_address=None, **kwargs):
+    def __init__(self, *args, origin_address=0, **kwargs):
         self.origin_address = origin_address
         self._raw_list = args
         self._fields = dict()
+        self._labels = dict()
         self._absolute_ref_indexes = []
         i = 0
         for item in args:
             if isinstance(item, int):
+                assert 0 <= item < 256
                 i += 1
+            elif isinstance(item, str):  # label name encountered
+                item = item.rstrip(':')
+                self._labels[item] = i
+                i += 0  # Labels don't have size
             elif isinstance(item, Sequence):
                 i += len(item)
             elif isinstance(item, Reference):
@@ -68,10 +67,11 @@ class MachineCode:
                 self._fields[item] = value
 
     def __iter__(self):
-        if self.origin_address is None:
-            raise ValueError('Origin address is not set.')
-
         for ref_name, value in self._fields.items():
+            if ref_name in self._labels:
+                self._fields[ref_name] = self._labels[ref_name] + self.origin_address
+                value = self._fields[ref_name]
+            
             if value is None:
                 raise ValueError('A value of the %r field is not set.' % ref_name)
         
@@ -80,6 +80,8 @@ class MachineCode:
             if isinstance(item, int):
                 yield item
                 i += 1
+            elif isinstance(item, str):
+                pass  # label name encountered, do nothing
             elif isinstance(item, Sequence):
                 for b in item:
                     yield b
@@ -87,7 +89,7 @@ class MachineCode:
             elif isinstance(item, Reference):
                 i += item.size
                 if item.is_relative:
-                    d = (self._fields[item.name] - self.origin_address - i).to_bytes(item.size, 'little')
+                    d = (self._fields[item.name] - self.origin_address - i).to_bytes(item.size, byteorder='little', signed=True)
                     for b in d:
                         yield b
                 else:
@@ -115,6 +117,42 @@ class MachineCode:
     
     def __contains__(self, item):
         return item in self._fields
+
+
+MAX_LEN = 0x100
+
+
+def mach_strlen(code_chunk):
+    """
+        push ecx
+        xor ecx, ecx
+    @@:
+        cmp byte [eax+ecx], 0  ; assume that eax contains a string address
+        jz success
+        cmp ecx, 100h
+        jg skip
+        inc ecx
+        jmp @b
+    success:
+        <code_chunk>
+    skip:
+        pop ecx
+    """
+    return MachineCode(
+        push_reg | Reg.ecx,  # push ecx
+        xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
+        '@@:',
+        cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
+        jcc_short | Cond.z, Reference.relative('success', size=1),  # jz success
+        cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), to_dword(MAX_LEN),  # cmp ecx, MAX_LEN
+        jcc_short | Cond.g, Reference.relative('skip', size=1),  # jg skip
+        inc_reg | Reg.ecx,  # inc ecx
+        jmp_short, Reference.relative('@@', size=1),  # jmp @b
+        'success:',
+        code_chunk,
+        'skip:',
+        pop_reg | Reg.ecx,  # pop ecx
+    )
 
 
 def test_machinecode():
@@ -164,6 +202,12 @@ def test_machinecode():
     b = bytes(code)
     found_refs = sorted(b.index(to_dword(code[ref_name])) for ref_name in 'ab')
     assert found_refs == list(code.absolute_references)
+    
+    # Test the new mach_strlen:
+    code = mach_strlen(nop)
+    sample = '51 31 C9 80 3C 08 00 74 0B 81 F9 00 01 00 00 7F 04 41 EB EF 90 59'
+    assert bytes(code) == bytes(int(item, base=16) for item in sample.split())
+
 
 if __name__ == '__main__':
     test_machinecode()
