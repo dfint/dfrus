@@ -147,6 +147,23 @@ def test_machinecode():
     assert bytes(code) == bytes(
         int(item, base=16) for item in 'C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00'.split()
     )
+    
+    # Test getting addresses of absolute references
+    code = MachineCode(
+        bytes(123),
+        Reference.absolute(name='b', size=4),
+        bytes(12345),
+        Reference.absolute(name='a', size=4),
+        bytes(10)
+    )
+    
+    code.origin_address = 0
+    code['a'] = 0xDEAD
+    code['b'] = 0xBEEF
+    
+    b = bytes(code)
+    found_refs = sorted(b.index(to_dword(code[ref_name])) for ref_name in 'ab')
+    assert found_refs == list(code.absolute_references)
 
 if __name__ == '__main__':
     test_machinecode()
