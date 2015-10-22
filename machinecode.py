@@ -13,7 +13,8 @@ new_code = MachineCode(
 
 class Reference:
     def __init__(self, name: str, size=4, is_relative: bool=None):
-        self.value = value
+        self.name = name
+        self.size = size
         self.is_relative = is_relative
     
     @classmethod
@@ -59,11 +60,10 @@ class MachineCode:
     def __iter__(self):
         if self.origin_address is None:
             raise ValueError('Origin address is not set.')
-        
-        for item in self.refernces:
-            for ref_name, value in self.refs.items():
-                if value is None:
-                    raise ValueError('A value of the %r field is not set.' % ref_name)
+
+        for ref_name, value in self._fields.items():
+            if value is None:
+                raise ValueError('A value of the %r field is not set.' % ref_name)
         
         i = 0
         for item in self._raw_list:
@@ -77,7 +77,12 @@ class MachineCode:
             elif isinstance(item, Reference):
                 i += item.size
                 if item.is_relative:
-                    d = (item.value - self.origin_address - i).to_bytes()
+                    d = (self._fields[item.name] - self.origin_address - i).to_bytes(item.size, 'little')
+                    for b in d:
+                        yield b
+                else:
+                    for b in self._fields[item.name].to_bytes(item.size, 'little'):
+                        yield b
     
     def __setitem__(self, key, value):
         if key not in self._fields:
@@ -90,7 +95,7 @@ class MachineCode:
         if self.origin_address is None:
             return iter(self._absolute_ref_indexes)
         else:
-            return (origin_address + i for i in self._absolute_ref_indexes)
+            return (self.origin_address + i for i in self._absolute_ref_indexes)
     
     def __contains__(self, item):
         return item in self._fields
