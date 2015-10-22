@@ -8,6 +8,13 @@ new_code = MachineCode(
     mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
     jmp_near, Reference.relative(name='return_addr', size=4)  # jmp near return_addr
 )
+
+# Then:
+new_code.origin_address = 0x123456  # Must be set before setting addresses of relative references
+new_code['func'] = 0x756733
+new_code['return_addr'] = 0x475675
+fn.seek(new_code.origin_address)
+fn.write(bytes(new_code))
 '''
 
 
