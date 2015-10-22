@@ -75,7 +75,7 @@ MAX_LEN = 0x80
 def mach_strlen(code_chunk):
     return (bytes((
                 push_reg | Reg.ecx,  # push ecx
-                xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor eax, eax
+                xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
                 # @@:
                 cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
                 jcc_short | Cond.z, 0x0b,  # jz success
