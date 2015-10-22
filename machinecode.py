@@ -1,9 +1,12 @@
 from collections import Sequence
+from opcodes import *
+from disasm import join_byte
+from binio import to_dword
 
 '''
 # Concept:
 new_code = MachineCode(
-    (mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov [esi+14h], 0fh
+    (mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov dword [esi+14h], 0fh
     call_near, Reference.relative(name='func', size=4),  # call near func
     mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
     jmp_near, Reference.relative(name='return_addr', size=4)  # jmp near return_addr
@@ -112,3 +115,38 @@ class MachineCode:
     
     def __contains__(self, item):
         return item in self._fields
+
+
+def test_machinecode():
+    """
+    # Sample code:
+    use32
+
+    func = 222222h
+    return_addr = 777777h
+
+    org 123456h
+
+    mov dword [esi+14h], 0fh
+    call near func
+    mov edi, 0fh
+    jmp near return_addr
+    """
+
+    code = MachineCode(
+        (mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov dword [esi+14h], 0fh
+        call_near, Reference.relative(name='func', size=4),  # call near func
+        mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
+        jmp_near, Reference.relative(name='return_addr', size=4)  # jmp near return_addr
+    )
+
+    code.origin_address = 0x123456
+    code['func'] = 0x222222
+    code['return_addr'] = 0x777777
+
+    assert bytes(code) == bytes(
+        int(item, base=16) for item in 'C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00'.split()
+    )
+
+if __name__ == '__main__':
+    test_machinecode()
