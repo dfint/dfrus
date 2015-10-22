@@ -63,7 +63,7 @@ class MachineCode:
                 raise IndexError('Name %r is not used in the code.' % item)
             else:
                 self._fields[item] = value
-    
+
     def __iter__(self):
         if self.origin_address is None:
             raise ValueError('Origin address is not set.')
@@ -93,10 +93,16 @@ class MachineCode:
     
     def __setitem__(self, key, value):
         if key not in self._fields:
-            raise IndexError('Name %r is not used in the code.' % key)
+            raise KeyError('Name %r is not used in the code.' % key)
         else:
             self._fields[key] = value
-    
+
+    def __getitem__(self, key):
+        if key not in self._fields:
+            raise KeyError('Name %r is not used in the code.' % key)
+        else:
+            return self._fields[key]
+
     @property
     def absolute_references(self):
         if self.origin_address is None:
