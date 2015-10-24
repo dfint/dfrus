@@ -14,8 +14,8 @@ new_code = MachineCode(
 
 # Then:
 new_code.origin_address = 0x123456  # Must be set before setting addresses of relative references
-new_code['func'] = 0x756733
-new_code['return_addr'] = 0x475675
+new_code.fields['func'] = 0x756733
+new_code.fields['return_addr'] = 0x475675
 fn.seek(new_code.origin_address)
 fn.write(bytes(new_code))
 '''
@@ -40,7 +40,7 @@ class MachineCode:
     def __init__(self, *args, origin_address=0, **kwargs):
         self.origin_address = origin_address
         self._raw_list = args
-        self._fields = dict()
+        self.fields = dict()
         self._labels = dict()
         self._absolute_ref_indexes = []
         i = 0
@@ -55,22 +55,22 @@ class MachineCode:
             elif isinstance(item, Sequence):
                 i += len(item)
             elif isinstance(item, Reference):
-                self._fields[item.name] = None
+                self.fields[item.name] = None
                 if not item.is_relative:
                     self._absolute_ref_indexes.append(i)
                 i += item.size
         
         for item, value in kwargs.items():
-            if item not in self._fields:
+            if item not in self.fields:
                 raise IndexError('Name %r is not used in the code.' % item)
             else:
-                self._fields[item] = value
+                self.fields[item] = value
 
     def __iter__(self):
-        for ref_name, value in self._fields.items():
+        for ref_name, value in self.fields.items():
             if ref_name in self._labels:
-                self._fields[ref_name] = self._labels[ref_name] + self.origin_address
-                value = self._fields[ref_name]
+                self.fields[ref_name] = self._labels[ref_name] + self.origin_address
+                value = self.fields[ref_name]
             
             if value is None:
                 raise ValueError('A value of the %r field is not set.' % ref_name)
@@ -89,24 +89,12 @@ class MachineCode:
             elif isinstance(item, Reference):
                 i += item.size
                 if item.is_relative:
-                    d = (self._fields[item.name] - self.origin_address - i).to_bytes(item.size, byteorder='little', signed=True)
-                    for b in d:
+                    disp = self.fields[item.name] - self.origin_address - i
+                    for b in disp.to_bytes(item.size, byteorder='little', signed=True):
                         yield b
                 else:
-                    for b in self._fields[item.name].to_bytes(item.size, 'little'):
+                    for b in self.fields[item.name].to_bytes(item.size, 'little'):
                         yield b
-    
-    def __setitem__(self, key, value):
-        if key not in self._fields:
-            raise KeyError('Name %r is not used in the code.' % key)
-        else:
-            self._fields[key] = value
-
-    def __getitem__(self, key):
-        if key not in self._fields:
-            raise KeyError('Name %r is not used in the code.' % key)
-        else:
-            return self._fields[key]
 
     @property
     def absolute_references(self):
@@ -114,9 +102,6 @@ class MachineCode:
             return iter(self._absolute_ref_indexes)
         else:
             return (self.origin_address + i for i in self._absolute_ref_indexes)
-    
-    def __contains__(self, item):
-        return item in self._fields
 
 
 MAX_LEN = 0x100
@@ -179,8 +164,8 @@ def test_machinecode():
     )
 
     code.origin_address = 0x123456
-    code['func'] = 0x222222
-    code['return_addr'] = 0x777777
+    code.fields['func'] = 0x222222
+    code.fields['return_addr'] = 0x777777
 
     assert bytes(code) == bytes(
         int(item, base=16) for item in 'C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00'.split()
@@ -196,11 +181,11 @@ def test_machinecode():
     )
     
     code.origin_address = 0
-    code['a'] = 0xDEAD
-    code['b'] = 0xBEEF
+    code.fields['a'] = 0xDEAD
+    code.fields['b'] = 0xBEEF
     
     b = bytes(code)
-    found_refs = sorted(b.index(to_dword(code[ref_name])) for ref_name in 'ab')
+    found_refs = sorted(b.index(to_dword(code.fields[ref_name])) for ref_name in 'ab')
     assert found_refs == list(code.absolute_references)
     
     # Test the new mach_strlen:
