@@ -22,7 +22,7 @@ parser.add_argument('-n', '--destname', dest='dest',
 parser.add_argument('-d', '--dict', default='dict.txt', dest='dictionary',
                     help='path to the dictionary file, default=dict.txt')
 parser.add_argument('--debug', action='store_true', help='enable debugging mode')
-parser.add_argument('--cyr', action='store_true', help='enable cyrillic cp1251 codepage')
+parser.add_argument('--codepage', type=int, help='enable given codepage by number')
 parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
                     type=lambda s: tuple(int(x) for x in s.split(':')))
 
@@ -67,7 +67,7 @@ except OSError:
 # --------------------------------------------------------
 print("Loading translation file...")
 
-encoding = 'cp1251' if args.cyr else 'cp437'
+encoding = 'cp%s' % args.codepage if args.codepage else 'cp437'
 try:
     with open(args.dictionary, encoding=encoding) as trans:
         trans_table = load_trans_file(trans)
@@ -103,6 +103,12 @@ try:
 except FileNotFoundError:
     print('Error: "%s" file not found.' % args.dictionary)
     sys.exit()
+except LookupError as err:
+    if str(err).startswith('unknown encoding'):
+        print('Error: unknown codepage %r' % encoding)
+        sys.exit()
+    else:
+        raise
 
 # --------------------------------------------------------
 print("Copying '%s'\nTo '%s'..." % (df1, df2))
@@ -143,8 +149,8 @@ relocs_modified = False
 xref_table = get_cross_references(fn, relocs, sections, image_base)
 
 # --------------------------------------------------------
-if args.cyr:
-    print("Enabling the cyrillic alphabet...")
+if args.codepage:
+    print("Enabling codepage cp%d..." % args.codepage)
 
     unicode_table_start = [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
 
@@ -159,8 +165,11 @@ if args.cyr:
         fn.close()
         print("Unicode table not found.")
         sys.exit()
-
-    patch_unicode_table(fn, needle)
+    
+    try:
+        patch_unicode_table(fn, needle, args.codepage)
+    except KeyError:
+        print("Codepage %d not implemented. Skipping." % args.codepage)
 
 # --------------------------------------------------------
 if debug:

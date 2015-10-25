@@ -9,18 +9,38 @@ def ord_utf16(c):
     return int.from_bytes(c.encode('utf-16')[2:], 'little')
 
 
-def patch_unicode_table(fn, off):
-    ord_upper_a = ord('А'.encode('cp1251'))
-    fpoke4(fn, off+ord_upper_a*4, range(ord_utf16('А'), ord_utf16('Я') + 1))
-    
-    ord_lower_a = ord('а'.encode('cp1251'))
-    fpoke4(fn, off+ord_lower_a*4, range(ord_utf16('а'), ord_utf16('я') + 1))
-    
-    ord_upper_yo = ord('Ё'.encode('cp1251'))
-    fpoke4(fn, off+ord_upper_yo*4, ord_utf16('Ё'))
-    
-    ord_lower_yo = ord('ё'.encode('cp1251'))
-    fpoke4(fn, off+ord_lower_yo*4, ord_utf16('ё'))
+codepages = {
+    860: {
+        0x84: 0x00E3,
+        0x86: 0x00C1,
+        0x89: 0x00CA,
+        0x8B: 0x00CD,
+        0x8C: 0x00D4,
+        0x8E: 0x00C3,
+        0x8F: 0x00C2,
+        0x91: 0x00C0,
+        0x92: 0x00C8,
+        0x94: 0x00F4,
+        0x96: 0x00DA,
+        0x98: 0x00CC,
+        0x99: 0x00D5,
+        0x9D: 0x00D9,
+        0x9F: 0x00D3,
+        0xA9: 0x00D2,
+    },
+    1251: {
+        0xC0: range(ord_utf16('А'), ord_utf16('Я') + 1),
+        0xE0: range(ord_utf16('а'), ord_utf16('я') + 1),
+        0xA8: ord_utf16('Ё'),
+        0xB8: ord_utf16('ё')
+    }
+}
+
+
+def patch_unicode_table(fn, off, codepage):
+    cp = codepages[codepage]
+    for item in cp:
+        fpoke4(fn, off + item*4, cp[item])
 
 
 def load_trans_file(fn):
