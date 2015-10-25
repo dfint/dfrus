@@ -352,7 +352,7 @@ for string, info in metadata.items():
                 add_fix(fixes, src_off, fix)
         elif debug:
             if 'fixed' in info and info['fixed'] == 'no':
-                print('Not fixed: %r (reference from 0x%x)' % string, info)
+                print('Length not fixed: %r (reference from 0x%x)' % string, info)
             else:
                 print('Status unknown: %r (reference from 0x%x)' % string, info)
 
