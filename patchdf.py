@@ -498,7 +498,12 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 meta['fixed'] = 'no'
                 return meta
             else:
-                x = get_length(aft, oldlen + 1)
+                try:
+                    x = get_length(aft, oldlen + 1)
+                except ValueError:
+                    meta['fixed'] = 'no'
+                    return meta
+                
                 mach, new_ref_off = mach_memcpy(new_str_rva, x['dest'], newlen + 1)
                 if x['saved_mach']:
                     mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
