@@ -596,7 +596,7 @@ def get_length(s, oldlen):
                 dest = Operand(base_reg=left_operand.reg, disp=0)
             saved_mach += line.data
         else:
-            raise ValueError('Unallowed operation (not mov, nor lea): %s, %r' % line)
+            raise ValueError('Unallowed operation (not mov, nor lea): %s' % line)
     assert dest is not None, 'Destination not recognized'
     return dict(length=length, dest=dest, deleted=deleted, saved_mach=saved_mach)
 
