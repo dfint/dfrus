@@ -10,6 +10,16 @@ def ord_utf16(c):
 
 
 codepages = {
+    'cp737': {
+        0x80: range(ord_utf16('Α'), ord_utf16('Ρ') + 1),
+        0x91: range(ord_utf16('Σ'), ord_utf16('Ω') + 1),
+        0x98: range(ord_utf16('α'), ord_utf16('ρ') + 1),
+        0xA9: range(ord_utf16('σ'), ord_utf16('ψ') + 1),
+        0xE0: ord_utf16('ω'),
+        0xE1: [ord_utf16(letter) for letter in 'άέήϊίόύϋώ'],
+        0xEA: [ord_utf16(letter) for letter in 'ΆΈΉΊΌΎΏ'],
+        0xF4: [ord_utf16('Ϊ'), ord_utf16('Ϋ')],
+    },
     'cp850': {
         0x9B: 0x00F8,
         0x9D: 0x00D8,
