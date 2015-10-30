@@ -22,7 +22,7 @@ parser.add_argument('-n', '--destname', dest='dest',
 parser.add_argument('-d', '--dict', default='dict.txt', dest='dictionary',
                     help='path to the dictionary file, default=dict.txt')
 parser.add_argument('--debug', action='store_true', help='enable debugging mode')
-parser.add_argument('--codepage', type=int, help='enable given codepage by number')
+parser.add_argument('--codepage', help='enable given codepage by name')
 parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
                     type=lambda s: tuple(int(x) for x in s.split(':')))
 
@@ -67,7 +67,7 @@ except OSError:
 # --------------------------------------------------------
 print("Loading translation file...")
 
-encoding = 'cp%s' % args.codepage if args.codepage else 'cp437'
+encoding = args.codepage if args.codepage else 'cp437'
 try:
     with open(args.dictionary, encoding=encoding) as trans:
         trans_table = load_trans_file(trans)
@@ -170,10 +170,10 @@ if args.codepage:
         sys.exit()
     
     try:
-        print("Patching charmap table to cp%d..." % args.codepage)
+        print("Patching charmap table to %s..." % args.codepage)
         patch_unicode_table(fn, needle, args.codepage)
     except KeyError:
-        print("Codepage %d not implemented. Skipping." % args.codepage)
+        print("Codepage %s not implemented. Skipping." % args.codepage)
     else:
         print("Done.")
 
