@@ -10,7 +10,7 @@ def ord_utf16(c):
 
 
 codepages = {
-    850: {
+    'cp850': {
         0x9B: 0x00F8,
         0x9D: 0x00D8,
         0xB5: [0x00C1, 0x00C2, 0x00C0],
@@ -21,7 +21,7 @@ codepages = {
         0xE2: [0x00D4, 0x00D2, 0x00F5, 0x00D5],
         0xE7: [0x00FE, 0x00DE, 0x00DA, 0x00DB, 0x00D9, 0x00FD, 0x00DD],
     },
-    860: {
+    'cp860': {
         0x84: 0x00E3,
         0x86: 0x00C1,
         0x89: 0x00CA,
@@ -35,7 +35,7 @@ codepages = {
         0x9F: 0x00D3,
         0xA9: 0x00D2,
     },
-    1251: {
+    'cp1251': {
         0xC0: range(ord_utf16('А'), ord_utf16('Я') + 1),
         0xE0: range(ord_utf16('а'), ord_utf16('я') + 1),
         0xA8: ord_utf16('Ё'),
