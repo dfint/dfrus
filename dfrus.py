@@ -150,26 +150,32 @@ xref_table = get_cross_references(fn, relocs, sections, image_base)
 
 # --------------------------------------------------------
 if args.codepage:
-    print("Enabling codepage cp%d..." % args.codepage)
-
-    unicode_table_start = [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
-
+    print("Searching for charmap table...")
+    unicode_table_start = b''.join(
+        to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
+    )
+    
+    data_section = fpeek(fn, sections[data].physical_offset, sections[data].physical_size)
     needle = None
     for obj_off in xref_table:
-        buf = fpeek4u(fn, obj_off, len(unicode_table_start))
+        off = obj_off - sections[data].physical_offset
+        buf = data_section[off:off+len(unicode_table_start)]
         if buf == unicode_table_start:
             needle = obj_off
             break
 
     if needle is None:
         fn.close()
-        print("Unicode table not found.")
+        print("Charmap table not found.")
         sys.exit()
     
     try:
+        print("Patching charmap table to cp%d..." % args.codepage)
         patch_unicode_table(fn, needle, args.codepage)
     except KeyError:
         print("Codepage %d not implemented. Skipping." % args.codepage)
+    else:
+        print("Done.")
 
 # --------------------------------------------------------
 if debug:
