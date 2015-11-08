@@ -240,14 +240,6 @@ class ImageNTHeaders:
         self.data_directory = DataDirectory.read(file)
 
 
-class Alias(dict):
-    def __getitem__(self, item):
-        if item not in self:
-            return item
-        else:
-            return super().__getitem__(item)
-
-
 class Section(Structure):
     IMAGE_SCN_CNT_CODE = 0x00000020
     IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
@@ -277,14 +269,14 @@ class Section(Structure):
         return type(self) == type(other) and all(x == y for x, y in zip(self, other))
 
     def __str__(self):
-        alias = Alias({
+        shortened = {
             'virtual_size': 'vsize',
             'physical_size': 'psize',
             'physical_offset': 'poffset',
-        })
+        }
 
         return (self.__class__.__name__ + '(%s)' %
-                ', '.join('%s=%s' % (alias[name], self._formatters[i] % self._items[name])
+                ', '.join('%s=%s' % (shortened.get(name, default=name), self._formatters[i] % self._items[name])
                           for i, name in enumerate(self._field_names)))
 
 
