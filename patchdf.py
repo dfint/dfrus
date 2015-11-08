@@ -132,7 +132,7 @@ class Trace:
     forward_only = 3
 
 
-def trace_code(fn, offset, func, trace_jmp = Trace.follow, trace_jcc = Trace.forward_only, trace_call = Trace.stop):
+def trace_code(fn, offset, func, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
     s = fpeek(fn, offset, count_after)
     for line in disasm(s, offset):
         # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
@@ -188,7 +188,7 @@ count_after = 0x80
 
 def fix_len(fn, offset, oldlen, newlen, new_str_rva):
     def which_func(offset):
-        line = trace_code(fn, next_off, func=lambda line: not line.mnemonic.startswith('rep'))
+        line = trace_code(fn, next_off, func=lambda cur_line: not cur_line.mnemonic.startswith('rep'))
         if line is None:
             func = ('not reached',)
         elif line.mnemonic.startswith('rep'):
@@ -653,4 +653,3 @@ if __name__ == '__main__':
     # patch_unicode_table(TestFileObject(), 0)
     # print(load_trans_file(['|12\\t3|as\\rd|', '|dfg|345y|', ' ', '|||']))
     assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx, 0x0a)
-    
