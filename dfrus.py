@@ -1,13 +1,10 @@
-import sys
 import os.path
 import argparse
 
 from shutil import copy
-from collections import defaultdict, Sequence
 
-from disasm import align
 from extract_strings import extract_strings
-from binio import fpeek4u, write_string
+from binio import write_string
 from peclasses import PortableExecutable, Section, RelocationTable
 from patchdf import *
 from opcodes import *
