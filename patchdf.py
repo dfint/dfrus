@@ -524,8 +524,8 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                     
                     mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
                     if len(mach) > x['length']:
-                        # Too here there, even for just a procedure call
-                        meta[fixed] = 'no'
+                        # Too tight here, even for a procedure call
+                        meta['fixed'] = 'no'
                         return meta
                 
                 # Write replacement code
