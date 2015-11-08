@@ -336,7 +336,7 @@ for item in metadata.values():
             if 'len' not in functions[offset]:
                 functions[offset]['len'] = len_param
             elif functions[offset]['len'] != len_param:
-                raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' % (address, functions['str'], str_param))
+                raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' % (address, functions['len'], len_param))
 
 
 # Add strlen before call of functions for strings which length was not fixed
