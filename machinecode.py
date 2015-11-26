@@ -110,6 +110,47 @@ class MachineCode:
         else:
             return (self.origin_address + i for i in self._absolute_ref_indexes)
 
+    def __iadd__(self, other):
+        if isinstance(other, type(self)):
+            self._raw_list.extend(other._raw_list)
+            new_labels = dict(other._labels)  # Avoid changing other's labels directly, copy them
+            for item in new_labels:
+                if item in self._labels:
+                    raise ValueError('Duplicate label name: %r' % item)
+                new_labels[item] += self.code_length
+            self._labels.update(new_labels)
+
+            self.fields.update(dict(other.fields))
+
+            self._absolute_ref_indexes.extend(item + self.code_length for item in other._absolute_ref_indexes)
+
+            self.code_length += other.code_length
+        elif isinstance(other, Iterable):
+            other = list(other)
+            self._raw_list.extend(other)
+            self.code_length += len(other)
+        else:
+            self._raw_list.append(int(other))
+
+    def __add__(self, other):
+        internals = list(self._raw_list)
+        new_fields = dict(self.fields)
+
+        if isinstance(other, type(self)):
+            internals.extend(other._raw_list)
+            new_fields.update(other.fields)
+        elif isinstance(other, Iterable):
+            internals.extend(other)
+        else:
+            internals.append(int(other))
+
+        return MachineCode(*internals, origin_address=self.origin_address, **new_fields)
+
+    def __radd__(self, other):
+        other = list(other) if isinstance(other, Iterable) else [other]
+        internals = other + list(self._raw_list)
+        return MachineCode(*internals, origin_address=self.origin_address, **self.fields)
+
 
 MAX_LEN = 0x100
 
