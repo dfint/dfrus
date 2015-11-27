@@ -585,7 +585,8 @@ def disasm(s, start_address=0):
 
         yield line
 
-def main(argv):
+
+def _main(argv):
     if len(argv) < 2:
         pass
     else:
@@ -611,4 +612,4 @@ def main(argv):
 
 if __name__ == "__main__":
     import sys
-    main(sys.argv)
+    _main(sys.argv)
