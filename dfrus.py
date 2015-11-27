@@ -55,7 +55,6 @@ def _main():
     debug = args.debug
 
     path = args.path
-    df1 = None
 
     if len(path) == 0 or not os.path.exists(path):
         if debug:
@@ -79,7 +78,7 @@ def _main():
 
     # --------------------------------------------------------
     try:
-        with open(df1, "rb") as fn:
+        with open(df1, "rb"):
             pass
             # TODO: Add necessary check (timedate etc.)
     except OSError:
