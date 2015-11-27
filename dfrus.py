@@ -1,5 +1,6 @@
 import os.path
 import argparse
+import sys
 
 from shutil import copy
 
@@ -8,6 +9,7 @@ from binio import write_string
 from peclasses import PortableExecutable, Section, RelocationTable
 from patchdf import *
 from opcodes import *
+from machinecode import MachineCode
 
 parser = argparse.ArgumentParser(add_help=True, description='A patcher for the hardcoded strings of the Dwarf Fortress')
 parser.add_argument('-p', '--dfpath', dest='path',
@@ -26,8 +28,6 @@ parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:
 args = parser.parse_args(sys.argv[1:])
 
 debug = args.debug
-
-make_call_hooks = False
 
 path = args.path
 df1 = None
@@ -287,18 +287,24 @@ for off, string in strings:
             assert isinstance(fix, dict)
             if 'new_code' in fix:
                 new_code = fix['new_code']
+                assert isinstance(new_code, (bytes, bytearray, MachineCode))
                 src_off = fix['src_off']
-                if make_call_hooks and 'op' in fix and fix['op'] == call_near and 'dest_off' in fix:
-                    dest_off = fix['dest_off']
-                    funcs[dest_off][new_code].append(sections[code].offset_to_rva(src_off))
+
+                if 'new_ref' in fix:
+                    new_ref = fix['new_ref']
+                elif isinstance(new_code, MachineCode) and list(new_code.absolute_references):
+                    new_ref = next(new_code.absolute_references)
                 else:
-                    if 'new_ref' in fix:
-                        if fix['new_code'].index(to_dword(new_str_rva)) != fix['new_ref']:
-                            raise ValueError('new_ref in fix code is broken for string %r, reference from offset 0x%x' % 
-                                             (string, ref))
-                    add_fix(fixes, src_off, fix)
+                    new_ref = None
+
+                if new_ref is not None:
+                    if bytes(new_code)[new_ref:new_ref+4] != to_dword(new_str_rva):
+                        raise ValueError('new_ref in fix code is broken for string %r, reference from offset 0x%x' %
+                                         (string, ref))
+
+                add_fix(fixes, src_off, fix)
             elif 'new_ref' in fix:
-                if to_dword(new_str_rva) != fpeek(fn, ref + fix['new_ref'], 4):
+                if fpeek(fn, ref + fix['new_ref'], 4) != to_dword(new_str_rva):
                     raise ValueError('new_ref broken for string %r, reference from offset 0x%x' % (string, ref))
                 # Add relocation for the new reference
                 relocs.add(ref_rva + fix['new_ref'])
@@ -367,21 +373,32 @@ for fix in fixes.values():
     
     hook_off = new_section_offset
     hook_rva = new_section.offset_to_rva(hook_off)
-    
-    if 'dest_off' in fix:
-        dest_rva = sections[code].offset_to_rva(fix['dest_off'])
-        disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement
-        # Add jump from the hook
-        dword = to_dword(disp, signed=True)
-        assert type(dword) is bytes
-        mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
+
+    dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.get('dest_off', None)
+
+    if dest_off is not None:
+        dest_rva = sections[code].offset_to_rva(dest_off)
+        if isinstance(mach, MachineCode):
+            mach.origin_address = hook_rva
+            mach.fields['dest'] = dest_rva
+        else:
+            disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement
+            # Add jump from the hook
+            dword = to_dword(disp, signed=True)
+
+            mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
     
     # Write the hook to the new section
-    new_section_offset = add_to_new_section(fn, hook_off, mach, padding_byte=int3)
+    new_section_offset = add_to_new_section(fn, hook_off, bytes(mach), padding_byte=int3)
     
-    # If there's a new absolute reference in the code, add it to reloc table
-    if 'new_ref' in fix:  
-        relocs.add(hook_rva + fix['new_ref'])
+    # If there are absolute references in the code, add them to relocation table
+    if 'new_ref' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
+        new_refs = list(mach.absolute_references) if isinstance(mach, MachineCode) else []
+
+        if 'new_ref' in fix:
+            new_refs.append(fix['new_ref'])
+
+        relocs.update({hook_rva+item for item in new_refs})
         relocs_modified = True
     
     src_rva = sections[code].offset_to_rva(src_off)
@@ -420,12 +437,6 @@ def add_call_hook(dest, val):
     disp = hook_rva - (src_rva + 5)
     fpoke(fn, src_off, jmp_near)
     fpoke(fn, src_off + 1, disp.to_bytes(4, byteorder='little', signed=True))
-
-
-# Adding call hooks
-if make_call_hooks:
-    for func in funcs:
-        add_call_hook(func, funcs[func])
 
 
 # Write relocation table to the executable
