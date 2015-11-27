@@ -13,10 +13,13 @@ from machinecode import MachineCode
 
 
 def init_argparser():
-    parser = argparse.ArgumentParser(add_help=True, description='A patcher for the hardcoded strings of the Dwarf Fortress')
+    parser = argparse.ArgumentParser(
+            add_help=True,
+            description='A patcher for the hardcoded strings of the Dwarf Fortress')
     parser.add_argument('-p', '--dfpath', dest='path',
                         default='Dwarf Fortress.exe',
-                        help='path to the DF directory or to the Dwarf Fortress.exe itself, default="Dwarf Fortress.exe"')
+                        help='path to the DF directory or to the Dwarf Fortress.exe itself, '
+                             'default="Dwarf Fortress.exe"')
     parser.add_argument('-n', '--destname', dest='dest',
                         default='Dwarf Fortress Patched.exe',
                         help='name of the patched DF executable, default="Dwarf Fortress Patched.exe"')
@@ -335,14 +338,16 @@ def _main():
                 if 'str' not in functions[offset]:
                     functions[offset]['str'] = str_param
                 elif functions[offset]['str'] != str_param:
-                    raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' % (address, functions['str'], str_param))
+                    raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' %
+                                     (address, functions['str'], str_param))
 
             if 'len' in item:
                 len_param = item['len']
                 if 'len' not in functions[offset]:
                     functions[offset]['len'] = len_param
                 elif functions[offset]['len'] != len_param:
-                    raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' % (address, functions['len'], len_param))
+                    raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' %
+                                     (address, functions['len'], len_param))
 
     # Add strlen before call of functions for strings which length was not fixed
     for string, info in metadata.items():
@@ -354,7 +359,8 @@ def _main():
                     src_off += 1
                     code_chunk = None
                     if functions[dest_off]['len'] == 'push':
-                        code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)  # mov [esp+8], ecx
+                        # mov [esp+8], ecx
+                        code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
                     elif functions[dest_off]['len'] == 'edi':
                         code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
                     assert code_chunk is not None
