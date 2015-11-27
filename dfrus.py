@@ -3,13 +3,16 @@ import argparse
 import sys
 
 from shutil import copy
+from collections import defaultdict
 
 from extract_strings import extract_strings
-from binio import write_string
+from binio import write_string, to_dword, fpeek, fpoke4, fpoke
 from peclasses import PortableExecutable, Section, RelocationTable
-from patchdf import *
+import patchdf as pd
+from patchdf import code, data
 from opcodes import *
 from machinecode import MachineCode
+from disasm import align, join_byte
 
 
 def init_argparser():
@@ -94,7 +97,7 @@ def _main():
     encoding = 'cp%s' % args.codepage if args.codepage else 'cp437'
     try:
         with open(args.dictionary, encoding=encoding) as trans:
-            trans_table = load_trans_file(trans)
+            trans_table = pd.load_trans_file(trans)
 
             if not debug:
                 trans_table = dict(trans_table)
@@ -170,7 +173,7 @@ def _main():
     relocs_modified = False
 
     # Getting cross-references:
-    xref_table = get_cross_references(fn, relocs, sections, image_base)
+    xref_table = pd.get_cross_references(fn, relocs, sections, image_base)
 
     # --------------------------------------------------------
     if args.codepage:
@@ -195,7 +198,7 @@ def _main():
 
         try:
             print("Patching charmap table to cp%d..." % args.codepage)
-            patch_unicode_table(fn, needle, args.codepage)
+            pd.patch_unicode_table(fn, needle, args.codepage)
         except KeyError:
             print("Codepage %d not implemented. Skipping." % args.codepage)
         else:
@@ -279,14 +282,15 @@ def _main():
                 # Add the translation to the separate section
                 str_off = new_section_offset
                 new_str_rva = new_section.offset_to_rva(str_off) + image_base
-                new_section_offset = add_to_new_section(fn, new_section_offset,
-                                                        bytes(translation + '\0', encoding=encoding))
+                new_section_offset = pd.add_to_new_section(fn, new_section_offset,
+                                                           bytes(translation + '\0', encoding=encoding))
 
             # Fix string length for each reference
             for ref in refs:
                 ref_rva = sections[code].offset_to_rva(ref)
                 try:
-                    fix = fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation), new_str_rva=new_str_rva)
+                    fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
+                                     new_str_rva=new_str_rva)
                 except Exception:
                     print('Catched %s on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref))
                     raise
@@ -364,7 +368,7 @@ def _main():
                     elif functions[dest_off]['len'] == 'edi':
                         code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
                     assert code_chunk is not None
-                    new_code = mach_strlen(code_chunk)
+                    new_code = pd.mach_strlen(code_chunk)
                     fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
                     add_fix(fixes, src_off, fix)
             elif debug:
@@ -394,7 +398,7 @@ def _main():
                 mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
 
         # Write the hook to the new section
-        new_section_offset = add_to_new_section(fn, hook_off, bytes(mach), padding_byte=int3)
+        new_section_offset = pd.add_to_new_section(fn, hook_off, bytes(mach), padding_byte=int3)
 
         # If there are absolute references in the code, add them to relocation table
         if 'new_ref' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
