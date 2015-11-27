@@ -224,7 +224,7 @@ def add_fix(fixes, offset, fix):
     if offset in fixes:
         old_fix = fixes[offset]
         old_code = old_fix['new_code']
-        if new_code not in old_code:
+        if bytes(new_code) not in bytes(old_code):
             new_code = old_code + new_code
             fix['new_code'] = new_code
             fixes[offset] = fix
