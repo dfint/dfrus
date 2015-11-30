@@ -386,11 +386,16 @@ def _main():
         hook_rva = new_section.offset_to_rva(hook_off)
 
         dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.get('dest_off', None)
-
+        
+        if isinstance(mach, MachineCode):
+            for field, value in mach.fields.items():
+                if value is not None:
+                    mach.fields[field] = sections[code].offset_to_rva(value)
+            mach.origin_address = hook_rva
+        
         if dest_off is not None:
             dest_rva = sections[code].offset_to_rva(dest_off)
             if isinstance(mach, MachineCode):
-                mach.origin_address = hook_rva
                 mach.fields['dest'] = dest_rva
             else:
                 disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement

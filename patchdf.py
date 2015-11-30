@@ -3,6 +3,7 @@ from disasm import *
 from binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from opcodes import *
 from collections import defaultdict
+from machinecode import MachineCode, Reference
 
 
 def ord_utf16(c):
@@ -253,18 +254,36 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         
                         mov_esp_edi = False
                         
-                        for line in disasm(aft):
+                        for line in disasm(aft, next_off):
                             assert(line.mnemonic != 'db')
                             if str(line).startswith('mov [esp') and str(line).endswith('], edi'):
+                                # Check if the value of edi is used in 'mov [esp+N], edi'
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
                                 if mov_esp_edi:
-                                    disp = from_dword(line.data[1:5], signed=True)
+                                    # jmp near m1 ; replace call of sub_40f650 with jmp
+                                    # return_addr:
+                                    # ; ...
+                                    # ; ----------------------------------------------
+                                    # m1:
+                                    # mov dword [esi+14h], 0fh
+                                    # call sub_40f650 ; or whatever the function was
+                                    # mov edi, 0fh
+                                    # jmp near return_addr
+                                    fpoke(fn, line.address, jmp_near)  # Replace call with jump
+                                    new_code = MachineCode(
+                                        # Restore the cap length value of stl-string:
+                                        mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov dword [esi+14h], 0fh
+                                        call_near, Reference.relative(name='func'),  # call near func
+                                        # Restore original edi value for the case if it is used further in the code:
+                                        mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
+                                        jmp_near, Reference.relative(name='return_addr'),  # jmp near return_addr
+                                        func=line.operands[0].value,
+                                        return_addr=line.address + 5
+                                    )
                                     retvalue = dict(
-                                        src_off=next_off+line.address+1,
-                                        new_code=bytes(((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14)) + to_dword(0xf),  # mov [esi+14h], 0fh
-                                        dest_off=next_off+line.address+5+disp,  # call_near opcode - 1 byte, displacement - 4 bytes
-                                        op=call_near
+                                        src_off=line.address + 1,
+                                        new_code=new_code,
                                     )
                                     retvalue.update(meta)
                                     return retvalue
