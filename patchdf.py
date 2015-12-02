@@ -366,16 +366,10 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         return retvalue
             elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
                 # lea edi, [reg+N] ; assume that reg+N == oldlen
-                meta['len'] = 'edi'
                 disp = to_signed(pre[-2], 8)
                 if disp == oldlen:
                     # lea edi, [reg+oldlen]
                     fpoke(fn, offset-2, newlen)
-                    meta['fixed'] = 'yes'
-                    return meta
-                elif pre[-3] & 7 != Reg.esp:
-                    # lea edi, [reg+oldlen+N]
-                    fpoke(fn, offset-2, newlen-oldlen+disp)
                     meta['fixed'] = 'yes'
                     return meta
             elif (aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
