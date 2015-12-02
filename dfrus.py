@@ -352,7 +352,14 @@ def _main():
                 elif functions[offset]['len'] != len_param:
                     raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' %
                                      (address, functions['len'], len_param))
-
+    
+    if debug:
+        print('\nGuessed function parameters:')
+        for func in sorted(functions):
+            value = functions[func]
+            print('sub_%x: %r' % (sections[code].offset_to_rva(func)+image_base, value))
+        print()
+    
     # Add strlen before call of functions for strings which length was not fixed
     for string, info in metadata.items():
         if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
