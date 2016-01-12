@@ -1,6 +1,6 @@
 #! python3
 
-forbidden = set("$;@^`{|}")
+forbidden = set("$;@^{|}")
 
 allowed = set("\r\t")
 
