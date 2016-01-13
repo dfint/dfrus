@@ -4,6 +4,7 @@ from binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from opcodes import *
 from collections import defaultdict
 from machinecode import MachineCode, Reference
+import csv
 
 
 def ord_utf16(c):
@@ -52,12 +53,15 @@ def patch_unicode_table(fn, off, codepage):
 
 
 def load_trans_file(fn):
-    for line in fn:
-        line = line.replace('\\r', '\r')
-        line = line.replace('\\t', '\t')
-        parts = line.split('|')
-        if len(parts) > 3 and len(parts[1]) > 0:
-            yield parts[1], parts[2]
+    unescape = lambda x: x.replace('\\r', '\r').replace('\\t', '\t')
+    dialect = csv.Sniffer().sniff(fn.read(1024))  # Guess file format (delimiter, quotes, etc.)
+    fn.seek(0)
+    reader = csv.reader(fn, dialect)
+    for parts in reader:
+        if not parts[0]:
+            parts = parts[1:]
+        
+        yield unescape(parts[0]), unescape(parts[1])
 
 
 code, rdata, data = range(3)
