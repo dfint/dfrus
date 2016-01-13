@@ -57,4 +57,4 @@ if __name__ == "__main__":
         for _, s in strings:
             s = s.replace('\r', '\\r')
             s = s.replace('\t', '\\t')
-            print('|%s|' % s)
+            print(s)
