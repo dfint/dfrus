@@ -1,6 +1,6 @@
 #! python3
 
-forbidden = set("$;@^`{|}")
+forbidden = set("$;@^{}")
 
 allowed = set("\r\t")
 
@@ -45,16 +45,18 @@ if __name__ == "__main__":
             print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
             input("Press Enter...")
             sys.exit()
-        from binio import fpeek4u
         from peclasses import PortableExecutable
         from patchdf import get_cross_references
+        from collections import Counter
         pe = PortableExecutable(fn)
         image_base = pe.optional_header.image_base
         sections = pe.section_table
         relocs = pe.relocation_table
         xrefs = get_cross_references(fn, relocs, sections, image_base)
-        strings = extract_strings(fn, xrefs)
+        strings = list(extract_strings(fn, xrefs))
+        count = Counter(x[1] for x in strings)
         for _, s in strings:
-            s = s.replace('\r', '\\r')
-            s = s.replace('\t', '\\t')
-            print('|%s|' % s)
+            if count[s] == 1:
+                s = s.replace('\r', '\\r')
+                s = s.replace('\t', '\\t')
+                print(s)

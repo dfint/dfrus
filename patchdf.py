@@ -3,6 +3,8 @@ from disasm import *
 from binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from opcodes import *
 from collections import defaultdict
+from machinecode import MachineCode, Reference
+import csv
 
 
 def ord_utf16(c):
@@ -71,12 +73,15 @@ def patch_unicode_table(fn, off, codepage):
 
 
 def load_trans_file(fn):
-    for line in fn:
-        line = line.replace('\\r', '\r')
-        line = line.replace('\\t', '\t')
-        parts = line.split('|')
-        if len(parts) > 3 and len(parts[1]) > 0:
-            yield parts[1], parts[2]
+    unescape = lambda x: x.replace('\\r', '\r').replace('\\t', '\t')
+    dialect = csv.Sniffer().sniff(fn.read(100))  # Guess file format (delimiter, quotes, etc.)
+    fn.seek(0)
+    reader = csv.reader(fn, dialect)
+    for parts in reader:
+        if not parts[0]:
+            parts = parts[1:]
+        assert len(parts) >= 2, parts
+        yield unescape(parts[0]), unescape(parts[1])
 
 
 code, rdata, data = range(3)
@@ -152,7 +157,7 @@ class Trace:
     forward_only = 3
 
 
-def trace_code(fn, offset, func, trace_jmp = Trace.follow, trace_jcc = Trace.forward_only, trace_call = Trace.stop):
+def trace_code(fn, offset, func, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
     s = fpeek(fn, offset, count_after)
     for line in disasm(s, offset):
         # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
@@ -208,7 +213,7 @@ count_after = 0x80
 
 def fix_len(fn, offset, oldlen, newlen, new_str_rva):
     def which_func(offset):
-        line = trace_code(fn, next_off, func=lambda line: not line.mnemonic.startswith('rep'))
+        line = trace_code(fn, next_off, func=lambda cur_line: not cur_line.mnemonic.startswith('rep'))
         if line is None:
             func = ('not reached',)
         elif line.mnemonic.startswith('rep'):
@@ -273,18 +278,36 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         
                         mov_esp_edi = False
                         
-                        for line in disasm(aft):
+                        for line in disasm(aft, next_off):
                             assert(line.mnemonic != 'db')
                             if str(line).startswith('mov [esp') and str(line).endswith('], edi'):
+                                # Check if the value of edi is used in 'mov [esp+N], edi'
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
                                 if mov_esp_edi:
-                                    disp = from_dword(line.data[1:5], signed=True)
+                                    # jmp near m1 ; replace call of sub_40f650 with jmp
+                                    # return_addr:
+                                    # ; ...
+                                    # ; ----------------------------------------------
+                                    # m1:
+                                    # mov dword [esi+14h], 0fh
+                                    # call sub_40f650 ; or whatever the function was
+                                    # mov edi, 0fh
+                                    # jmp near return_addr
+                                    fpoke(fn, line.address, jmp_near)  # Replace call with jump
+                                    new_code = MachineCode(
+                                        # Restore the cap length value of stl-string:
+                                        mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov dword [esi+14h], 0fh
+                                        call_near, Reference.relative(name='func'),  # call near func
+                                        # Restore original edi value for the case if it is used further in the code:
+                                        mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
+                                        jmp_near, Reference.relative(name='return_addr'),  # jmp near return_addr
+                                        func=line.operands[0].value,
+                                        return_addr=line.address + 5
+                                    )
                                     retvalue = dict(
-                                        src_off=next_off+line.address+1,
-                                        new_code=bytes(((mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14)) + to_dword(0xf),  # mov [esi+14h], 0fh
-                                        dest_off=next_off+line.address+5+disp,  # call_near opcode - 1 byte, displacement - 4 bytes
-                                        op=call_near
+                                        src_off=line.address + 1,
+                                        new_code=new_code,
                                     )
                                     retvalue.update(meta)
                                     return retvalue
@@ -366,17 +389,12 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         retvalue.update(meta)
                         return retvalue
             elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
-                # lea edi, [reg+N] ; assume that reg+N == oldlen
-                meta['len'] = 'edi'
+                # Possible to be `lea edi, [reg+N]`
                 disp = to_signed(pre[-2], 8)
                 if disp == oldlen:
                     # lea edi, [reg+oldlen]
+                    meta['len'] = 'edi'
                     fpoke(fn, offset-2, newlen)
-                    meta['fixed'] = 'yes'
-                    return meta
-                elif pre[-3] & 7 != Reg.esp:
-                    # lea edi, [reg+oldlen+N]
-                    fpoke(fn, offset-2, newlen-oldlen+disp)
                     meta['fixed'] = 'yes'
                     return meta
             elif (aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
@@ -544,8 +562,8 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                     
                     mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
                     if len(mach) > x['length']:
-                        # Too here there, even for just a procedure call
-                        meta[fixed] = 'no'
+                        # Too tight here, even for a procedure call
+                        meta['fixed'] = 'no'
                         return meta
                 
                 # Write replacement code
@@ -673,4 +691,3 @@ if __name__ == '__main__':
     # patch_unicode_table(TestFileObject(), 0)
     # print(load_trans_file(['|12\\t3|as\\rd|', '|dfg|345y|', ' ', '|||']))
     assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx, 0x0a)
-    
