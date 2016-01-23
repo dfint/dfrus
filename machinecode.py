@@ -1,6 +1,6 @@
-from collections import Sequence
+from collections import Iterable, Sequence
 from opcodes import *
-from disasm import join_byte
+from disasm import join_byte, Operand, mach_lea
 from binio import to_dword
 
 '''
@@ -39,27 +39,34 @@ class Reference:
 class MachineCode:
     def __init__(self, *args, origin_address=0, **kwargs):
         self.origin_address = origin_address
-        self._raw_list = args
+        self._raw_list = list(args)
         self.fields = dict()
         self._labels = dict()
         self._absolute_ref_indexes = []
         i = 0
         for item in args:
-            if isinstance(item, int):
+            if item is None:
+                pass
+            elif isinstance(item, int):
                 assert 0 <= item < 256
                 i += 1
             elif isinstance(item, str):  # label name encountered
                 item = item.rstrip(':')
+                if item in self._labels:
+                    raise ValueError('Duplicate label name: %r' % item)
                 self._labels[item] = i
                 i += 0  # Labels don't have size
-            elif isinstance(item, Sequence):
+            elif isinstance(item, Iterable):
+                if not isinstance(item, Sequence):
+                    item = list(item)
                 i += len(item)
             elif isinstance(item, Reference):
                 self.fields[item.name] = None
                 if not item.is_relative:
                     self._absolute_ref_indexes.append(i)
                 i += item.size
-        
+        self.code_length = i
+
         for item, value in kwargs.items():
             if item not in self.fields:
                 raise IndexError('Name %r is not used in the code.' % item)
@@ -103,6 +110,47 @@ class MachineCode:
         else:
             return (self.origin_address + i for i in self._absolute_ref_indexes)
 
+    def __iadd__(self, other):
+        if isinstance(other, type(self)):
+            self._raw_list.extend(other._raw_list)
+            new_labels = dict(other._labels)  # Avoid changing other's labels directly, copy them
+            for item in new_labels:
+                if item in self._labels:
+                    raise ValueError('Duplicate label name: %r' % item)
+                new_labels[item] += self.code_length
+            self._labels.update(new_labels)
+
+            self.fields.update(dict(other.fields))
+
+            self._absolute_ref_indexes.extend(item + self.code_length for item in other._absolute_ref_indexes)
+
+            self.code_length += other.code_length
+        elif isinstance(other, Iterable):
+            other = list(other)
+            self._raw_list.extend(other)
+            self.code_length += len(other)
+        else:
+            self._raw_list.append(int(other))
+
+    def __add__(self, other):
+        internals = list(self._raw_list)
+        new_fields = dict(self.fields)
+
+        if isinstance(other, type(self)):
+            internals.extend(other._raw_list)
+            new_fields.update(other.fields)
+        elif isinstance(other, Iterable):
+            internals.extend(other)
+        else:
+            internals.append(int(other))
+
+        return MachineCode(*internals, origin_address=self.origin_address, **new_fields)
+
+    def __radd__(self, other):
+        other = list(other) if isinstance(other, Iterable) else [other]
+        internals = other + list(self._raw_list)
+        return MachineCode(*internals, origin_address=self.origin_address, **self.fields)
+
 
 MAX_LEN = 0x100
 
@@ -137,6 +185,34 @@ def mach_strlen(code_chunk):
         code_chunk,
         'skip:',
         pop_reg | Reg.ecx,  # pop ecx
+    )
+
+
+def mach_memcpy(src, dest: Operand, length: int):
+    """
+    pushad
+    <nothing> or <mov edi, dest> or <lea edi, [dest]>
+    mov esi, src
+    xor ecx, ecx
+    mov cl, (length+3)//4
+    rep movsd
+    popad
+    """
+    assert dest.index_reg is None
+    return MachineCode(
+        pushad,
+        (
+            # If the destination address is not in edi yet, put it there
+            None if dest.base_reg == Reg.edi and dest.disp == 0 else
+            [mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)] if dest.disp == 0 else
+            mach_lea(Reg.edi, dest)
+        ),
+        mov_reg_imm | 8 | Reg.esi, Reference.absolute('src'),  # mov esi, src
+        xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
+        mov_reg_imm | Reg.cl, (length+3)//4,  # mov cl, (length+3)//4
+        Prefix.rep, movsd,  # rep movsd
+        popad,
+        src=src
     )
 
 
