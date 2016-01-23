@@ -118,7 +118,7 @@ class ImageDosHeader(Structure):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.e_magic != b'MZ':
-            raise ValueError('IMAGE_DOS_HEADER wrong signature: %r' % self.signature)
+            raise ValueError('IMAGE_DOS_HEADER wrong signature: %r' % self.e_magic)
 
 
 class ImageFileHeader(Structure):
@@ -422,6 +422,7 @@ class RelocationTable:
 class PortableExecutable:
     def __init__(self, file):
         self.file = file
+        self.file.seek(0)
         self.dos_header = ImageDosHeader.read(file)
         assert self.dos_header.sizeof() == 0x40
         self.nt_headers = ImageNTHeaders(file, self.dos_header.e_lfanew)

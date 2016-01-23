@@ -85,8 +85,7 @@ else:
 
         # Update data directory table
         dd.basereloc.size = new_size
-        fn.seek(dd.offset)
-        fn.write(bytes(dd))
+        dd.rewrite()
 
         peobj.reread()
         assert set(peobj.relocation_table) == relocs
