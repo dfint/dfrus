@@ -298,7 +298,6 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                                 # mov dword [esi+14h], oldlen
                                 fix_cap = (MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14, to_dword(oldlen))
                                             if mov_esp_edi else None)
-                                # fix_cap = None
                                 
                                 new_code = MachineCode(
                                     fix_cap,
