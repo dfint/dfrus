@@ -47,6 +47,9 @@ def add_fix(fixes, offset, fix):
             fixes[offset] = fix
         else:
             pass  # Fix is already added, do nothing
+        
+        if 'poke' in fix:
+            assert 'poke' in old_fix and fix['poke'] == old_fix['poke']
     else:
         fixes[offset] = fix
 
@@ -297,7 +300,7 @@ def _main():
                     fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
                                      new_str_rva=new_str_rva)
                 except Exception:
-                    print('Catched %s on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref))
+                    print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
                     raise
 
                 assert isinstance(fix, dict)
@@ -426,7 +429,10 @@ def _main():
 
             relocs.update({hook_rva+item for item in new_refs})
             relocs_modified = True
-
+        
+        if 'poke' in fix:
+            fpoke(fn, fix['poke'][0], fix['poke'][1])
+        
         src_rva = sections[code].offset_to_rva(src_off)
         disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
         fpoke(fn, src_off, to_dword(disp, signed=True))
