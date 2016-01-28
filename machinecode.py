@@ -58,7 +58,7 @@ class MachineCode:
                 i += 0  # Labels don't have size
             elif isinstance(item, Iterable):
                 if not isinstance(item, Sequence):
-                    item = list(item)
+                    item = list(item)  # Convert into list to measure item's length
                 i += len(item)
             elif isinstance(item, Reference):
                 self.fields[item.name] = None
@@ -89,10 +89,10 @@ class MachineCode:
                 i += 1
             elif isinstance(item, str):
                 pass  # label name encountered, do nothing
-            elif isinstance(item, Sequence):
-                for b in item:
+            elif isinstance(item, Iterable):
+                for j, b in enumerate(item, 1):
                     yield b
-                i += len(item)
+                i += j
             elif isinstance(item, Reference):
                 i += item.size
                 if item.is_relative:
