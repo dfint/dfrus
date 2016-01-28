@@ -265,7 +265,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi:
                     meta['len'] = 'edi'
                     # mov edi, len before
-                    if oldlen == 15 and aft:
+                    if (oldlen == 15 or oldlen == 16) and aft:
                         # Trying to fix the case when the edi value is used as a stl-string cap size
                         # Sample code for this case:
                         # mov edi, 0fh
@@ -284,35 +284,38 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                                 # Check if the value of edi is used in 'mov [esp+N], edi'
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
-                                if mov_esp_edi:
-                                    # jmp near m1 ; replace call of sub_40f650 with jmp
-                                    # return_addr:
-                                    # ; ...
-                                    # ; ----------------------------------------------
-                                    # m1:
-                                    # mov dword [esi+14h], 0fh
-                                    # call sub_40f650 ; or whatever the function was
-                                    # mov edi, 0fh
-                                    # jmp near return_addr
-                                    fpoke(fn, line.address, jmp_near)  # Replace call with jump
-                                    new_code = MachineCode(
-                                        # Restore the cap length value of stl-string:
-                                        mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov dword [esi+14h], 0fh
-                                        call_near, Reference.relative(name='func'),  # call near func
-                                        # Restore original edi value for the case if it is used further in the code:
-                                        mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
-                                        jmp_near, Reference.relative(name='return_addr'),  # jmp near return_addr
-                                        func=line.operands[0].value,
-                                        return_addr=line.address + 5
-                                    )
-                                    retvalue = dict(
-                                        src_off=line.address + 1,
-                                        new_code=new_code,
-                                    )
-                                    retvalue.update(meta)
-                                    return retvalue
-                                else:
-                                    break
+                                # jmp near m1 ; replace call of sub_40f650 with jmp
+                                # return_addr:
+                                # ; ...
+                                # ; ----------------------------------------------
+                                # m1:
+                                # mov dword [esi+14h], oldlen
+                                # call sub_40f650 ; or whatever the function was
+                                # mov edi, oldlen
+                                # jmp near return_addr
+                                
+                                # Restore the cap length value of stl-string if needed
+                                # mov dword [esi+14h], oldlen
+                                fix_cap = (MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14, to_dword(oldlen))
+                                            if mov_esp_edi else None)
+                                # fix_cap = None
+                                
+                                new_code = MachineCode(
+                                    fix_cap,
+                                    call_near, Reference.relative(name='func'),  # call near func
+                                    # Restore original edi value for the case if it is used further in the code:
+                                    mov_reg_imm | 8 | Reg.edi, to_dword(oldlen),  # mov edi, oldlen ; restore edi value
+                                    jmp_near, Reference.relative(name='return_addr'),  # jmp near return_addr
+                                    func=line.operands[0].value,
+                                    return_addr=line.address + 5
+                                )
+                                retvalue = dict(
+                                    src_off=line.address + 1,
+                                    new_code=new_code,
+                                    poke = (line.address, jmp_near) # Replace call with jump
+                                )
+                                retvalue.update(meta)
+                                return retvalue
                 return meta  # Length fixed successfully
             elif pre[-3] == push_imm8 and pre[-2] == oldlen:
                 # push len ; before
