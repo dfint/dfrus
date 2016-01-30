@@ -47,22 +47,26 @@ codepages = {
         0x9F: 0x00D3,
         0xA9: 0x00D2,
     },
+    'cp866': {
+        0x80: range(ord_utf16('А'), ord_utf16('Я') + 1),
+        0xA0: range(ord_utf16('а'), ord_utf16('п') + 1),
+        0xE0: range(ord_utf16('р'), ord_utf16('я') + 1),
+        0xF0: [ord_utf16(letter) for letter in 'ЁёЄєЇїЎў']
+    }
     'cp1251': {
         0xC0: range(ord_utf16('А'), ord_utf16('Я') + 1),
         0xE0: range(ord_utf16('а'), ord_utf16('я') + 1),
         0xA8: ord_utf16('Ё'),
         0xB8: ord_utf16('ё'),
-        0xB2: ord_utf16('І'),
-        0xB3: ord_utf16('і'),
-        0xAF: ord_utf16('Ї'),
+        0xB2: [ord_utf16('І'), ord_utf16('і')],
+        # 0xAF: ord_utf16('Ї'),
         0xBF: ord_utf16('ї'),
         0xAA: ord_utf16('Є'),
         0xBA: ord_utf16('є'),
         0xA5: ord_utf16('Ґ'),
         0xB4: ord_utf16('ґ'),
-        0xA1: ord_utf16('Ў'),
-        0xA2: ord_utf16('ў'),
-    }
+        0xA1: [ord_utf16('Ў'), ord_utf16('ў')],
+    },
 }
 
 
