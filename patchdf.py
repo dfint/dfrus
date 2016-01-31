@@ -52,7 +52,7 @@ codepages = {
         0xA0: range(ord_utf16('а'), ord_utf16('п') + 1),
         0xE0: range(ord_utf16('р'), ord_utf16('я') + 1),
         0xF0: [ord_utf16(letter) for letter in 'ЁёЄєЇїЎў']
-    }
+    },
     'cp1251': {
         0xC0: range(ord_utf16('А'), ord_utf16('Я') + 1),
         0xE0: range(ord_utf16('а'), ord_utf16('я') + 1),
