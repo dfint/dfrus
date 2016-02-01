@@ -42,14 +42,17 @@ def add_fix(fixes, offset, fix):
         old_fix = fixes[offset]
         old_code = old_fix['new_code']
         if bytes(new_code) not in bytes(old_code):
-            new_code = old_code + new_code
+            if isinstance(old_code, MachineCode):
+                assert not isinstance(new_code, MachineCode)
+                new_code = new_code + old_code
+                if 'poke' in old_fix and 'poke' not in fix:
+                    fix['poke'] = old_fix['poke']
+            else:
+                new_code = old_code + new_code
             fix['new_code'] = new_code
             fixes[offset] = fix
         else:
             pass  # Fix is already added, do nothing
-        
-        if 'poke' in fix:
-            assert 'poke' in old_fix and fix['poke'] == old_fix['poke']
     else:
         fixes[offset] = fix
 
