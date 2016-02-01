@@ -274,7 +274,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi:
                     meta['len'] = 'edi'
                     # mov edi, len before
-                    if (oldlen == 15 or oldlen == 16) and aft:
+                    if (oldlen == 15 or oldlen == 16) and aft and not jmp:
                         # Trying to fix the case when the edi value is used as a stl-string cap size
                         # Sample code for this case:
                         # mov edi, 0fh
