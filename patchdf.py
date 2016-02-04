@@ -65,7 +65,8 @@ codepages = {
         0xBA: ord_utf16('є'),
         0xA5: ord_utf16('Ґ'),
         0xB4: ord_utf16('ґ'),
-        0xA1: [ord_utf16('Ў'), ord_utf16('ў')],
+        # 0xA1: ord_utf16('Ў'),
+        0xA2: ord_utf16('ў'),
     },
 }
 
