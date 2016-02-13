@@ -80,10 +80,7 @@ def patch_unicode_table(fn, off, codepage):
 def load_trans_file(fn):
     unescape = lambda x: x.replace('\\r', '\r').replace('\\t', '\t')
     
-    try:
-        dialect = csv.Sniffer().sniff(fn.read(100))  # Guess file format (delimiter, quotes, etc.)
-    except csv.Error:
-        dialect = 'unix'
+    dialect = 'unix'
     
     fn.seek(0)
     reader = csv.reader(fn, dialect)
