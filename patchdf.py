@@ -169,7 +169,7 @@ def trace_code(fn, offset, func, trace_jmp=Trace.follow, trace_jcc=Trace.forward
     for line in disasm(s, offset):
         # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
         if line.mnemonic == 'db':
-            raise ValueError('Disassembler returned db at offset %xh' % offset)
+            return None
         elif not func(line):  # Stop when the func returns False
             return line
         elif line.mnemonic.startswith('jmp'):
@@ -215,7 +215,7 @@ def match_mov_reg_imm32(b, reg, imm):
 
 
 count_before = 0x20
-count_after = 0x80
+count_after = 0x100
 
 
 def fix_len(fn, offset, oldlen, newlen, new_str_rva):
@@ -421,6 +421,8 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 else:
                     meta['fixed'] = 'no'
                     return meta
+            else:
+                meta['test'] = offset
         elif reg == Reg.esi:
             # Sample code:
             # ; oldlen = 22
@@ -452,7 +454,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 if jmp:
                     meta['fixed'] = 'no'
                     return meta
-                else:
+                elif aft:
                     for line in disasm(aft, start_address=next_off):
                         assert(line.mnemonic != 'db')
                         offset = line.address
