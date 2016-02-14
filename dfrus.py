@@ -353,16 +353,16 @@ def _main():
                 if 'str' not in functions[offset]:
                     functions[offset]['str'] = str_param
                 elif functions[offset]['str'] != str_param:
-                    raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' %
-                                     (address, functions['str'], str_param))
+                    raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
+                                     (address, functions[offset]['str'], str_param))
 
             if 'len' in item:
                 len_param = item['len']
                 if 'len' not in functions[offset]:
                     functions[offset]['len'] = len_param
                 elif functions[offset]['len'] != len_param:
-                    raise ValueError('Function parameter recognition collision for sub_%x: %s != %s' %
-                                     (address, functions['len'], len_param))
+                    raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
+                                     (address, functions[offset]['len'], len_param))
     
     if debug:
         print('\nGuessed function parameters:')
