@@ -1,15 +1,20 @@
 #! python3
 
+import sys
+from peclasses import PortableExecutable
+from patchdf import get_cross_references
+from collections import Counter
+
 forbidden = set("$;@^{}")
 
 allowed = set("\r\t")
 
 
 def is_allowed(x):
-    return x in allowed or (' ' <= x < chr(127) and x not in forbidden)
+    return x in allowed or (' ' <= x < chr(127) or x.isalpha() and x not in forbidden)
 
 
-def extract_strings(fn, xrefs, blocksize=1024):
+def extract_strings(fn, xrefs, blocksize=1024, encoding='cp437'):
     prev_string = None
     for obj_off in sorted(xrefs):
         if prev_string is not None and obj_off <= prev_string[0]+len(prev_string[1]):
@@ -30,33 +35,43 @@ def extract_strings(fn, xrefs, blocksize=1024):
                 letters += 1
         
         if s_len and letters > 0:
-            current_string = (obj_off, buf[:s_len].decode())
+            current_string = (obj_off, buf[:s_len].decode(encoding=encoding))
             yield current_string
             prev_string = current_string
 
+
+def myrepr(s):
+    text = repr(s)
+    if sys.stdout:
+        b = text.encode(sys.stdout.encoding, 'backslashreplace')
+        text = b.decode(sys.stdout.encoding, 'strict')
+    return text
+
+
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) < 2:
-        print('Usage:\nextract_strings.py "Dwarf Fortress.exe" > stringdump.txt', file=sys.stderr)
+    if len(sys.argv) < 3:
+        print('Usage:\nextract_strings.py "Dwarf Fortress.exe" output.txt [encoding]', file=sys.stderr)
     else:
         try:
-            fn = open(sys.argv[1], "r+b")
+            with open(sys.argv[1], "r+b") as fn:
+                pe = PortableExecutable(fn)
+                image_base = pe.optional_header.image_base
+                sections = pe.section_table
+                relocs = pe.relocation_table
+                xrefs = get_cross_references(fn, relocs, sections, image_base)
+                encoding = 'cp437' if len(sys.argv)<=3 else sys.argv[3]
+                print(encoding)
+                strings = list(extract_strings(fn, xrefs, encoding=encoding))
+                count = Counter(x[1] for x in strings)
+                with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
+                    for _, s in strings:
+                        if count[s] == 1:
+                            s = s.replace('\r', '\\r')
+                            s = s.replace('\t', '\\t')
+                            print(myrepr(s))
+                            print(s, file=dump)
         except OSError:
             print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
-            input("Press Enter...")
+            input("Press Enter...", file=sys.stderr)
             sys.exit()
-        from peclasses import PortableExecutable
-        from patchdf import get_cross_references
-        from collections import Counter
-        pe = PortableExecutable(fn)
-        image_base = pe.optional_header.image_base
-        sections = pe.section_table
-        relocs = pe.relocation_table
-        xrefs = get_cross_references(fn, relocs, sections, image_base)
-        strings = list(extract_strings(fn, xrefs))
-        count = Counter(x[1] for x in strings)
-        for _, s in strings:
-            if count[s] == 1:
-                s = s.replace('\r', '\\r')
-                s = s.replace('\t', '\\t')
-                print(s)
