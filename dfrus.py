@@ -387,10 +387,11 @@ def _main():
                         code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
                     elif functions[dest_off]['len'] == 'edi':
                         code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
-                    assert code_chunk is not None
-                    new_code = pd.mach_strlen(code_chunk)
-                    fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
-                    add_fix(fixes, src_off, fix)
+                    
+                    if code_chunk:
+                        new_code = pd.mach_strlen(code_chunk)
+                        fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
+                        add_fix(fixes, src_off, fix)
             elif debug:
                 if 'fixed' in info and info['fixed'] == 'no':
                     print('Length not fixed: %r (reference from 0x%x)' % string, info)
