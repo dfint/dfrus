@@ -164,46 +164,46 @@ class Trace:
     forward_only = 3
 
 
-def trace_code(fn, offset, func, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
+def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
     s = fpeek(fn, offset, count_after)
     for line in disasm(s, offset):
         # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
         if line.mnemonic == 'db':
             return None
-        elif not func(line):  # Stop when the func returns False
+        elif stop_cond(line):  # Stop when the stop_cond returns True
             return line
         elif line.mnemonic.startswith('jmp'):
             if trace_jmp == Trace.not_follow:
                 pass
             elif trace_jmp == Trace.follow:
-                return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+                return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
             elif trace_jmp == Trace.stop:
                 return line
             elif trace_jmp == Trace.forward_only:
                 if int(line.operands[0]) > line.address:
-                    return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
         elif line.mnemonic.startswith('j'):
             if trace_jcc == Trace.not_follow:
                 pass
             elif trace_jcc == Trace.follow:
-                return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+                return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
             elif trace_jcc == Trace.stop:
                 return line
             elif trace_jcc == Trace.forward_only:
                 if int(line.operands[0]) > line.address:
-                    return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
         elif line.mnemonic.startswith('call'):
             if trace_call == Trace.not_follow:
                 pass
             elif trace_call == Trace.follow:
-                returned = trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+                returned = trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
                 if returned is None or not returned.mnemonic.startswith('ret'):
                     return returned
             elif trace_call == Trace.stop:
                 return line
             elif trace_call == Trace.forward_only:
                 if int(line.operands[0]) > line.address:
-                    return trace_code(fn, int(line.operands[0]), func, trace_jmp, trace_jcc, trace_call)
+                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
         elif line.mnemonic.startswith('ret'):
             return line
     return None
@@ -219,8 +219,8 @@ count_after = 0x100
 
 
 def fix_len(fn, offset, oldlen, newlen, new_str_rva):
-    def which_func(offset):
-        line = trace_code(fn, next_off, func=lambda cur_line: not cur_line.mnemonic.startswith('rep'))
+    def which_func(offset, stop_cond=lambda _: False):
+        line = trace_code(fn, next_off, stop_cond=lambda cur_line: cur_line.mnemonic.startswith('rep') or stop_cond(cur_line))
         if line is None:
             func = ('not reached',)
         elif line.mnemonic.startswith('rep'):
@@ -261,7 +261,8 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         return meta  # No need fixing
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
-        meta['func'] = which_func(oldnext)
+        meta['func'] = which_func(oldnext,
+            stop_cond=lambda line: line.operands and str(line.operands[0]) in {'eax', 'ax', 'ah', 'al'})
         reg = pre[-1] & 7
         if reg == Reg.eax:
             # mov eax, offset str
