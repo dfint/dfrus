@@ -422,8 +422,6 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 else:
                     meta['fixed'] = 'no'
                     return meta
-            else:
-                meta['temp'] = offset
         elif reg == Reg.esi:
             # Sample code:
             # ; oldlen = 22
