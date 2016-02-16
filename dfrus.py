@@ -246,7 +246,7 @@ def _main():
     # --------------------------------------------------------
     print("Translating...")
 
-    strings = list(extract_strings(fn, xref_table))
+    strings = list(extract_strings(fn, xref_table, encoding='cp1252'))
 
     if debug:
         print("%d strings extracted." % len(strings))
