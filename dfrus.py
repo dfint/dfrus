@@ -353,6 +353,8 @@ def _main():
                 if 'str' not in functions[offset]:
                     functions[offset]['str'] = str_param
                 elif functions[offset]['str'] != str_param:
+                    if 'temp' in item:
+                        print(hex(sections[code].offset_to_rva(item['temp'])+image_base))
                     raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
                                      (address, functions[offset]['str'], str_param))
 
