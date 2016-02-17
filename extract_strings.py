@@ -14,9 +14,10 @@ def is_allowed(x):
     return x in allowed or (' ' <= x < chr(127) or x.isalpha() and x not in forbidden)
 
 
-def extract_strings(fn, xrefs, blocksize=1024, encoding='cp437'):
+def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
     prev_string = None
-    for obj_off in sorted(xrefs):
+    s_xrefs = sorted(xrefs)
+    for j, obj_off in enumerate(s_xrefs):
         if prev_string is not None and obj_off <= prev_string[0]+len(prev_string[1]):
             continue  # it's not the beginning of the string
         
@@ -37,6 +38,26 @@ def extract_strings(fn, xrefs, blocksize=1024, encoding='cp437'):
         if s_len and letters > 0:
             current_string = (obj_off, buf[:s_len].decode(encoding=encoding))
             yield current_string
+            
+            upper_bound = (s_xrefs[j + 1] - obj_off) if j < len(s_xrefs) - 1 else -1
+            buf = (buf[:upper_bound])[s_len+1:]
+            if buf:
+                print(buf)
+            cur_off = obj_off + s_len + 1
+            line_len = s_len + 1
+            start = None
+            for i, c in enumerate(buf):
+                if c != 0:
+                    if not is_allowed(chr(c)):
+                        break
+                    if not start:
+                        start = i
+                elif start:
+                    prev_string = current_string
+                    current_string = (cur_off + start, buf[start:i].decode(encoding=encoding))
+                    yield current_string
+                    start = None
+            
             prev_string = current_string
 
 
@@ -69,7 +90,7 @@ if __name__ == "__main__":
                         if count[s] == 1:
                             s = s.replace('\r', '\\r')
                             s = s.replace('\t', '\\t')
-                            print(myrepr(s))
+                            # print(myrepr(s))
                             print(s, file=dump)
         except OSError:
             print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
