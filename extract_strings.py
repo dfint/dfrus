@@ -87,11 +87,12 @@ if __name__ == "__main__":
                 count = Counter(x[1] for x in strings)
                 with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
                     for _, s in strings:
-                        if count[s] == 1:
+                        if count[s] >= 1:
                             s = s.replace('\r', '\\r')
                             s = s.replace('\t', '\\t')
                             # print(myrepr(s))
                             print(s, file=dump)
+                            count[s] = 0
         except OSError:
             print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
             input("Press Enter...", file=sys.stderr)
