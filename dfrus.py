@@ -268,22 +268,23 @@ def _main():
 
             if string == translation:
                 continue
+            
+            if off in refs:
+                refs = xref_table[off]
 
-            refs = xref_table[off]
-
-            # Find the earliest reference to the string (even if it is a reference to the middle of the string)
-            k = 4
-            while off + k in xref_table and k < len(string) + 1:
-                for j, ref in enumerate(refs):
-                    mid_refs = xref_table[off + k]
-                    delta = ref - mid_refs[0]
-                    if len(mid_refs) == 1 and 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
-                        refs[j] = mid_refs[0]
-                k += 4
+                # Find the earliest reference to the string (even if it is a reference to the middle of the string)
+                k = 4
+                while off + k in xref_table and k < len(string) + 1:
+                    for j, ref in enumerate(refs):
+                        mid_refs = xref_table[off + k]
+                        delta = ref - mid_refs[0]
+                        if len(mid_refs) == 1 and 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
+                            refs[j] = mid_refs[0]
+                    k += 4
 
             aligned_len = align(len(string) + 1)
             is_long = aligned_len < len(translation) + 1
-            if not is_long:
+            if not is_long or off not in refs:
                 # Overwrite the string with the translation in-place
                 write_string(fn, translation,
                              off=off, encoding=encoding,
