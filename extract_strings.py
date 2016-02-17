@@ -41,8 +41,7 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
             
             upper_bound = (s_xrefs[j + 1] - obj_off) if j < len(s_xrefs) - 1 else -1
             buf = (buf[:upper_bound])[s_len+1:]
-            if buf:
-                print(buf)
+            
             cur_off = obj_off + s_len + 1
             line_len = s_len + 1
             start = None
@@ -90,7 +89,7 @@ if __name__ == "__main__":
                         if count[s] >= 1:
                             s = s.replace('\r', '\\r')
                             s = s.replace('\t', '\\t')
-                            # print(myrepr(s))
+                            print(myrepr(s))
                             print(s, file=dump)
                             count[s] = 0
         except OSError:
