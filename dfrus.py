@@ -271,7 +271,7 @@ def _main():
             if string == translation:
                 continue
             
-            if off in refs:
+            if off in xref_table:
                 refs = xref_table[off]
 
                 # Find the earliest reference to the string (even if it is a reference to the middle of the string)
@@ -286,7 +286,7 @@ def _main():
 
             aligned_len = align(len(string) + 1)
             is_long = aligned_len < len(translation) + 1
-            if not is_long or off not in refs:
+            if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
                 write_string(fn, translation,
                              off=off, encoding=encoding,

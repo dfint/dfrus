@@ -640,7 +640,7 @@ def get_length(s, oldlen):
                 else:
                     saved_mach += line.data
             else:
-                raise ValueError('Unallowed left operand type: %s, type is %r' % (left_operand, left_operand.type()))
+                raise ValueError('Unallowed left operand type: %s, type is %r' % (left_operand, type(left_operand)))
         elif line.mnemonic == 'lea':
             left_operand, right_operand = line.operands
             if left_operand.reg <= Reg.edx:
