@@ -304,7 +304,6 @@ def _main():
                 try:
                     fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
                                      new_str_rva=new_str_rva)
-                    print(fix)
                 except Exception:
                     print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
                     raise
@@ -334,7 +333,6 @@ def _main():
                         raise ValueError('new_ref broken for string %r, reference from offset 0x%x' % (string, ref))
                     # Add relocation for the new reference
                     relocs_to_add.add(ref_rva + new_ref)
-                    print(hex(ref_rva+new_ref+image_base))
 
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
@@ -447,9 +445,9 @@ def _main():
         relocs -= relocs_to_remove
         relocs |= relocs_to_add
         if debug:
-            print("Removed relocations: ")
+            print("\nRemoved relocations:")
             print("[%s]" % '\n'.join(textwrap.wrap(', '.join(sorted(hex(item) for item in relocs_to_remove)), 80)))
-            print("Added relocations: ")
+            print("\nAdded relocations:")
             print("[%s]" % '\n'.join(textwrap.wrap(', '.join(sorted(hex(item) for item in relocs_to_add)), 80)))
         
         reloc_table = RelocationTable.build(relocs)
