@@ -611,7 +611,8 @@ def get_length(s, oldlen):
         if curlen >= oldlen:
             length = offset
             break
-        assert line.mnemonic != 'db'
+        if line.mnemonic != 'db':
+            assert ValueError('Unknown instruction encountered.')
         if line.mnemonic == 'mov':
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
@@ -652,7 +653,8 @@ def get_length(s, oldlen):
             saved_mach += line.data
         else:
             raise ValueError('Unallowed operation (not mov, nor lea): %s' % line)
-    assert dest is not None, 'Destination not recognized'
+    if dest is None:
+        raise ValueError('Destination not recognized.')
     return dict(length=length, dest=dest, deleted=deleted, saved_mach=saved_mach)
 
 
