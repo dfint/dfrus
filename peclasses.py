@@ -260,10 +260,14 @@ class Section(Structure):
         self.name = self.name.strip(b'\0')
 
     def offset_to_rva(self, offset):
-        return offset - self.physical_offset + self.rva
+        local_offset = offset - self.physical_offset
+        assert 0 <= local_offset < self.physical_size
+        return local_offset + self.rva
 
     def rva_to_offset(self, rva):
-        return rva - self.rva + self.physical_offset
+        local_offset = rva - self.rva
+        assert 0 <= local_offset < self.virtual_size
+        return local_offset + self.physical_offset
 
     def __eq__(self, other):
         return type(self) == type(other) and all(x == y for x, y in zip(self, other))

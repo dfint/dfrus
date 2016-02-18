@@ -237,7 +237,7 @@ def _main():
         virtual_size=0,  # for now
         rva=align(last_section.rva + last_section.virtual_size,
                   section_alignment),
-        physical_size=0,  # for now
+        physical_size=0xFFFFFFFF,  # for now
         physical_offset=align(last_section.physical_offset +
                               last_section.physical_size, file_alignment),
         flags=Section.IMAGE_SCN_CNT_INITIALIZED_DATA | Section.IMAGE_SCN_MEM_READ | Section.IMAGE_SCN_MEM_EXECUTE
@@ -301,7 +301,7 @@ def _main():
 
             # Fix string length for each reference
             for ref in refs:
-                ref_rva = sections[code].offset_to_rva(ref)
+                ref_rva = sections.offset_to_rva(ref)
                 try:
                     fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
                                      new_str_rva=new_str_rva)
