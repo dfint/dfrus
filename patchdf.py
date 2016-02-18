@@ -449,7 +449,8 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                     return meta
                 elif aft:
                     for line in disasm(aft, start_address=next_off):
-                        assert(line.mnemonic != 'db')
+                        if line.mnemonic != 'db':
+                            break
                         offset = line.address
                         data = line.data
                         if data[0] == Prefix.rep:
