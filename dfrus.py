@@ -1,6 +1,7 @@
 import os.path
 import argparse
 import sys
+import textwrap
 
 from shutil import copy
 from collections import defaultdict
@@ -176,7 +177,8 @@ def _main():
 
     # Getting addresses of all relocatable entries
     relocs = set(pe.relocation_table)
-    relocs_modified = False
+    relocs_to_add = set()
+    relocs_to_remove = set()
 
     # Getting cross-references:
     xref_table = pd.get_cross_references(fn, relocs, sections, image_base)
@@ -302,6 +304,7 @@ def _main():
                 try:
                     fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
                                      new_str_rva=new_str_rva)
+                    print(fix)
                 except Exception:
                     print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
                     raise
@@ -326,17 +329,16 @@ def _main():
 
                     add_fix(fixes, src_off, fix)
                 elif 'new_ref' in fix:
-                    if fpeek(fn, ref + fix['new_ref'], 4) != to_dword(new_str_rva):
+                    new_ref = fix['new_ref']
+                    if fpeek(fn, ref + new_ref, 4) != to_dword(new_str_rva):
                         raise ValueError('new_ref broken for string %r, reference from offset 0x%x' % (string, ref))
                     # Add relocation for the new reference
-                    relocs.add(ref_rva + fix['new_ref'])
-                    relocs_modified = True
+                    relocs_to_add.add(ref_rva + new_ref)
+                    print(hex(ref_rva+new_ref+image_base))
 
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
-                    for item in fix['deleted_relocs']:
-                        relocs.remove(ref_rva + item)
-                    relocs_modified = True
+                    relocs_to_remove |= {item + ref_rva for item in fix['deleted_relocs']}
                 elif is_long:
                     fpoke4(fn, ref, new_str_rva)
 
@@ -430,8 +432,7 @@ def _main():
             if 'new_ref' in fix:
                 new_refs.append(fix['new_ref'])
 
-            relocs.update({hook_rva+item for item in new_refs})
-            relocs_modified = True
+            relocs_to_add.update({hook_rva + item for item in new_refs})
         
         if 'poke' in fix:
             fpoke(fn, fix['poke'][0], fix['poke'][1])
@@ -441,7 +442,16 @@ def _main():
         fpoke(fn, src_off, to_dword(disp, signed=True))
 
     # Write relocation table to the executable
-    if relocs_modified:
+    if relocs_to_add or relocs_to_remove:
+        assert relocs & relocs_to_remove == relocs_to_remove
+        relocs -= relocs_to_remove
+        relocs |= relocs_to_add
+        if debug:
+            print("Removed relocations: ")
+            print("[%s]" % '\n'.join(textwrap.wrap(', '.join(sorted(hex(item) for item in relocs_to_remove)), 80)))
+            print("Added relocations: ")
+            print("[%s]" % '\n'.join(textwrap.wrap(', '.join(sorted(hex(item) for item in relocs_to_add)), 80)))
+        
         reloc_table = RelocationTable.build(relocs)
         new_size = reloc_table.size
         data_directory = pe.data_directory
@@ -455,6 +465,9 @@ def _main():
             fn.write(bytes(reloc_size - new_size))
         data_directory.basereloc.size = new_size
         data_directory.rewrite()
+        
+        pe.reread()
+        assert set(pe.relocation_table) == relocs
 
     # Add new section to the executable
     if new_section_offset > new_section.physical_offset:
