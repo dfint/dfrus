@@ -208,7 +208,7 @@ def mach_lea(dest, src: Operand):
     if mode == 1:
         mach.append(src.disp)
     else:
-        mach += src.disp.to_bytes(4, byteorder='little')
+        mach += src.disp.to_bytes(4, byteorder='little', signed=True)
     return mach
 
 
