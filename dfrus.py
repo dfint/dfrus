@@ -338,7 +338,7 @@ def _main():
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
                     relocs_to_remove |= {item + ref_rva for item in fix['deleted_relocs']}
-                elif is_long:
+                elif new_str_rva:
                     fpoke4(fn, ref, new_str_rva)
 
                 metadata[(string, ref)] = fix
