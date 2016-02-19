@@ -206,7 +206,7 @@ def mach_lea(dest, src: Operand):
         mach.append(join_byte(mode, dest, src.base_reg))  # just mod r/m byte
 
     if mode == 1:
-        mach.append(src.disp)
+        mach += src.disp.to_bytes(1, byteorder='little', signed=True)
     else:
         mach += src.disp.to_bytes(4, byteorder='little', signed=True)
     return mach
