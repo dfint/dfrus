@@ -96,21 +96,20 @@ code, rdata, data = range(3)
 
 def get_cross_references(fn, relocs, sections, image_base):
     xrefs = defaultdict(list)
-    data_lower_bound = sections[rdata].rva
-    data_upper_bound = sections[data].rva + sections[data].virtual_size
-    # Read entire code section to the memory (about 9.2 MB for DF 0.40.13):
-    code_section = fpeek(fn, sections[code].physical_offset, sections[code].physical_size)
+    code_upper_bound = sections[code].rva + sections[code].virtual_size
+    # Read all the file sections:
+    base_offset = sections[code].physical_offset
+    size = sections[-1].physical_offset + sections[-1].physical_size - base_offset
+    buffer = fpeek(fn, base_offset, size)
     for reloc in relocs:
-        reloc -= sections[code].rva
-        if not (0 <= reloc < sections[code].virtual_size):
-            # Relocation doesn't belong to the code section
-            continue
-        obj_rva = from_dword(code_section[reloc:reloc+4]) - image_base
+        reloc_off = sections.rva_to_offset(reloc)
+        local_off = reloc_off - base_offset
+        obj_rva = from_dword(buffer[local_off:local_off+4]) - image_base
         reloc += sections[code].physical_offset
-        if data_lower_bound <= obj_rva <= data_upper_bound:
+        if code_upper_bound <= obj_rva:
             obj_off = sections.rva_to_offset(obj_rva)
             if obj_off is not None:
-                xrefs[obj_off].append(reloc)
+                xrefs[obj_off].append(reloc_off)
     
     return xrefs
 
