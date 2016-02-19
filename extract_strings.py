@@ -14,6 +14,19 @@ def is_allowed(x):
     return x in allowed or (' ' <= x < chr(127) or x.isalpha() and x not in forbidden)
 
 
+def check_string_array(buf, offset):
+    start = None
+    for i, c in enumerate(buf):
+        if c != 0:
+            if not is_allowed(chr(c)):
+                break
+            if not start:
+                start = i
+        elif start:
+            yield (offset + start, buf[start:i])
+            start = None
+
+
 def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
     prev_string = None
     s_xrefs = sorted(xrefs)
@@ -30,9 +43,10 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
             if c == 0:
                 s_len = i
                 break
-            elif not is_allowed(chr(c)):
+            c = buf[i:i+1].decode(encoding=encoding, errors='ignore')
+            if not is_allowed(c):
                 break
-            elif chr(c).isalpha():
+            elif c.isalpha():
                 letters += 1
         
         if s_len and letters > 0:
@@ -40,22 +54,11 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
             yield current_string
             
             upper_bound = (s_xrefs[j + 1] - obj_off) if j < len(s_xrefs) - 1 else -1
-            buf = (buf[:upper_bound])[s_len+1:]
-            
-            cur_off = obj_off + s_len + 1
-            line_len = s_len + 1
-            start = None
-            for i, c in enumerate(buf):
-                if c != 0:
-                    if not is_allowed(chr(c)):
-                        break
-                    if not start:
-                        start = i
-                elif start:
-                    prev_string = current_string
-                    current_string = (cur_off + start, buf[start:i].decode(encoding=encoding))
-                    yield current_string
-                    start = None
+            buf = buf[:upper_bound]
+            for off, s in check_string_array(buf[s_len:], obj_off + s_len):
+                prev_string = current_string
+                current_string = (off, s.decode(encoding=encoding))
+                yield current_string
             
             prev_string = current_string
 
