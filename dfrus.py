@@ -341,7 +341,7 @@ def _main():
                 elif new_str_rva:
                     fpoke4(fn, ref, new_str_rva)
 
-                metadata[(string, ref)] = fix
+                metadata[(string, ref_rva+image_base)] = fix
 
     # Extract information of functions parameters
     functions = defaultdict(dict)
