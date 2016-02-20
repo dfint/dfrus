@@ -30,7 +30,8 @@ def init_argparser():
     parser.add_argument('-d', '--dict', default='dict.txt', dest='dictionary',
                         help='path to the dictionary file, default=dict.txt')
     parser.add_argument('--debug', action='store_true', help='enable debugging mode')
-    parser.add_argument('--codepage', help='enable given codepage by name')
+    parser.add_argument('-c', '--codepage', help='enable given codepage by name')
+    parser.add_argument('-oc', '--original_codepage', default='cp437', help='specify original codepage of strings in the executable')
     parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
                         type=lambda s: tuple(int(x) for x in s.split(':')))
 
@@ -103,7 +104,7 @@ def _main():
 
     encoding = args.codepage if args.codepage else 'cp437'
     try:
-        with open(args.dictionary, encoding=encoding) as trans:
+        with open(args.dictionary, encoding='utf-8') as trans:
             trans_table = pd.load_trans_file(trans)
 
             if not debug:
@@ -248,7 +249,7 @@ def _main():
     # --------------------------------------------------------
     print("Translating...")
 
-    strings = list(extract_strings(fn, xref_table, encoding='cp1252'))
+    strings = list(extract_strings(fn, xref_table, encoding=args.original_codepage))
 
     if debug:
         print("%d strings extracted." % len(strings))
