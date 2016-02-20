@@ -281,8 +281,10 @@ def _main():
                     for j, ref in enumerate(refs):
                         mid_refs = xref_table[off + k]
                         delta = ref - mid_refs[0]
-                        if len(mid_refs) == 1 and 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
-                            refs[j] = mid_refs[0]
+                        for item in mid_refs:
+                            if 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
+                                refs[j] = mid_refs[0]
+                                break
                     k += 4
 
             aligned_len = align(len(string) + 1)
