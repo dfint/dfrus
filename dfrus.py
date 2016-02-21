@@ -61,6 +61,14 @@ def add_fix(fixes, offset, fix):
     return fixes
 
 
+def myrepr(s):
+    text = repr(s)
+    if sys.stdout:
+        b = text.encode(sys.stdout.encoding, 'backslashreplace')
+        text = b.decode(sys.stdout.encoding, 'strict')
+    return text
+
+
 def _main():
     parser = init_argparser()
 
@@ -396,9 +404,9 @@ def _main():
                         add_fix(fixes, src_off, fix)
             elif debug:
                 if 'fixed' in info and info['fixed'] == 'no':
-                    print('Length not fixed: %r (reference from 0x%x)' % string, info)
+                    print('Length not fixed: %s (reference from 0x%x)' % (myrepr(string[0]), string[1]), info)
                 else:
-                    print('Status unknown: %r (reference from 0x%x)' % string, info)
+                    print('Status unknown: %s (reference from 0x%x)' % (myrepr(string[0]), string[1]), info)
 
     # Delayed fix
     for fix in fixes.values():
