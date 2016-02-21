@@ -636,7 +636,7 @@ def get_length(s, oldlen):
                     saved_mach += line.data
             elif left_operand.type == 'ref rel':
                 # mov [reg1+disp], reg2
-                if right_operand.reg <= Reg.edx:
+                if right_operand.type == 'reg gen' and right_operand.reg <= Reg.edx:
                     assert left_operand.index_reg is None
                     assert regs[right_operand.reg] == right_operand.data_size, (regs[right_operand.reg], right_operand.data_size)
                     regs[right_operand.reg] = None  # Mark register as free
