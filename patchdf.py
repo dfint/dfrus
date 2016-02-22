@@ -262,7 +262,14 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         # mov reg32, offset str
         reg = pre[-1] & 7
         meta['func'] = which_func(oldnext,
-            stop_cond=lambda line: line.operands and line.operands[0].type == 'reg gen' and line.operands[0].reg == reg)
+            stop_cond=lambda line:
+                line.operands and
+                (
+                    (line.operands and line.operands[0].type == 'reg gen' and line.operands[0].reg == reg) or
+                    (len(line.operands)>1 and line.operands[1].type == 'ref rel' and line.operands[1].base_reg == reg)
+                )
+            )
+                
         if reg == Reg.eax:
             # mov eax, offset str
             meta['str'] = 'eax'
@@ -432,7 +439,6 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
             # movsw
             # movsb
             meta['str'] = 'esi'
-            meta['len'] = 'ecx*4'
             r = (oldlen+1) % 4
             dword_count = (oldlen+1)//4
             new_dword_count = (newlen-r)//4 + 1
@@ -440,11 +446,13 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
             if match_mov_reg_imm32(pre[-6:-1], Reg.ecx, dword_count):
                 # mov ecx, dword_count
                 fpoke4(fn, offset-5, new_dword_count)
+                meta['len'] = 'ecx*4'
                 meta['fixed'] = 'yes'
                 return meta
             elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
                 fpoke(fn, offset-2, new_dword_count)
+                meta['len'] = 'ecx*4'
                 meta['fixed'] = 'yes'
                 return meta
             elif newlen > oldlen:
@@ -459,6 +467,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                         offset = line.address
                         data = line.data
                         if data[0] == Prefix.rep:
+                            meta['len'] = 'ecx*4'
                             meta['fixed'] = 'no'
                             return meta
                         elif data[0] == jmp_near:
@@ -474,6 +483,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                                 skip = 3
                             
                             if skip is not None:
+                                meta['len'] = 'ecx*4'
                                 retvalue = dict(
                                     src_off=line.address+1,
                                     new_code=bytes((mov_reg_imm | 8 | Reg.ecx,)) + to_dword(dword_count),
@@ -486,10 +496,12 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                             return meta
                         elif len(data) == 5 and match_mov_reg_imm32(data, Reg.ecx, dword_count):
                             fpoke4(fn, line.address + 1, new_dword_count)
+                            meta['len'] = 'ecx*4'
                             meta['fixed'] = 'yes'
                             return meta
                         elif data[0] == lea and data[1] & 0xf8 == mod_1_ecx_0 and data[2] == dword_count:
                             fpoke(fn, line.address + 2, new_dword_count)
+                            meta['len'] = 'ecx*4'
                             meta['fixed'] = 'yes'
                             return meta
                     meta['fixed'] = 'no'
