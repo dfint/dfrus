@@ -431,7 +431,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 else:
                     meta['fixed'] = 'no'
                     return meta
-        elif reg == Reg.esi and isinstance(func, tuple) and func[0] == 'rep':
+        elif reg == Reg.esi and isinstance(func, tuple) and func[0].startswith('rep'):
             # Sample code:
             # ; oldlen = 22
             # ; r = (oldlen+1) % 4 = 3 (3 bytes moved with 1 movsw and 1 movsb)
