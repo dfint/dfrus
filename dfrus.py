@@ -326,7 +326,10 @@ def _main():
                     fix = dict(fixed='not needed')
 
                 assert isinstance(fix, dict)
-                if 'new_code' in fix:
+                if 'str' in fix and fix['str'] == 'cmp reg':
+                    # This is probably a bound of an array, not a string reference
+                    continue
+                elif 'new_code' in fix:
                     new_code = fix['new_code']
                     assert isinstance(new_code, (bytes, bytearray, MachineCode))
                     src_off = fix['src_off']

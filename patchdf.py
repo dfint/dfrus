@@ -626,6 +626,9 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         meta['str'] = 'add offset'
         meta['fixed'] = 'not needed'
         return meta
+    elif pre[-2] == op_rm_imm | 1 and pre[-1] & 0xF8 == 0xF8:
+        # cmp reg, offset string
+        meta['str'] = 'cmp reg'
     meta['prev_bytes'] = ' '.join('%02X' % x for x in pre[-4:])
     return meta
 
