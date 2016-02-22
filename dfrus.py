@@ -366,10 +366,11 @@ def _main():
             if 'str' in item:
                 str_param = item['str']
                 if 'str' not in functions[offset]:
-                    functions[offset]['str'] = str_param
-                elif functions[offset]['str'] != str_param:
-                    raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
-                                     (address, functions[offset]['str'], str_param))
+                    functions[offset]['str'] = {str_param}
+                elif str_param not in functions[offset]['str']:
+                    print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
+                                     (address, str_param, functions[offset]['str']))
+                    functions[offset]['str'].add(str_param)
 
             if 'len' in item:
                 len_param = item['len']
