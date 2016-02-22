@@ -611,6 +611,12 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                     )
                     retvalue.update(meta)
                     return retvalue
+    elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
+        # mov reg8, string[reg]
+        meta['func'] = 'strcpy'
+        meta['str'] = 'mov byte'
+        meta['fixed'] = 'not needed'
+        return meta  # No need fixing
 
     return meta
 
