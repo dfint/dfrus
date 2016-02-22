@@ -638,7 +638,6 @@ def get_length(s, oldlen):
                 # mov [reg1+disp], reg2
                 if right_operand.type == 'reg gen' and right_operand.reg <= Reg.edx:
                     assert left_operand.index_reg is None
-                    assert regs[right_operand.reg] == right_operand.data_size, (regs[right_operand.reg], right_operand.data_size)
                     regs[right_operand.reg] = None  # Mark register as free
                     if (dest is None or dest.base_reg == left_operand.base_reg and
                                         dest.disp > left_operand.disp):
@@ -658,6 +657,10 @@ def get_length(s, oldlen):
             saved_mach += line.data
         else:
             raise ValueError('Unallowed operation (not mov, nor lea): %s' % line)
+    
+    if not length:
+        length = len(s)
+    
     if dest is None:
         raise ValueError('Destination not recognized.')
     return dict(length=length, dest=dest, deleted=deleted, saved_mach=saved_mach)
