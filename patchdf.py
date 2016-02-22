@@ -230,7 +230,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
             except ValueError:
                 func = (line.mnemonic + ' indirect', line.address, str(line.operands[0]))
         else:
-            func = str(line)
+            func = ('not reached',)
         return func
     
     next_off = offset+4
@@ -261,15 +261,18 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
         reg = pre[-1] & 7
-        meta['func'] = which_func(oldnext,
+        func = which_func(oldnext,
             stop_cond=lambda line:
                 line.operands and
                 (
                     (line.operands and line.operands[0].type == 'reg gen' and line.operands[0].reg == reg) or
                     (len(line.operands)>1 and line.operands[1].type == 'ref rel' and line.operands[1].base_reg == reg)
                 )
-            )
-                
+        )
+        
+        if isinstance(func, tuple):
+            meta['func'] = func
+        
         if reg == Reg.eax:
             # mov eax, offset str
             meta['str'] = 'eax'
@@ -428,7 +431,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 else:
                     meta['fixed'] = 'no'
                     return meta
-        elif reg == Reg.esi:
+        elif reg == Reg.esi and isinstance(func, tuple) and func[0] == 'rep':
             # Sample code:
             # ; oldlen = 22
             # ; r = (oldlen+1) % 4 = 3 (3 bytes moved with 1 movsw and 1 movsb)
@@ -504,9 +507,10 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                             meta['len'] = 'ecx*4'
                             meta['fixed'] = 'yes'
                             return meta
-                    meta['fixed'] = 'no'
                     return meta
-        meta['fixed'] = 'no'
+        else:
+            meta['str'] = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
+            meta['offset'] = offset
         return meta
     elif pre[-1] == mov_acc_mem | 1 or pre[-2] == mov_reg_rm | 1:
         # mov eax, [addr] or mov reg, [addr]
@@ -617,6 +621,12 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         meta['str'] = 'mov byte'
         meta['fixed'] = 'not needed'
         return meta  # No need fixing
+    elif pre[-1] == add_acc_imm | 1:
+        # add reg, offset string
+        meta['func'] = 'array'
+        meta['str'] = 'add offset'
+        meta['fixed'] = 'not needed'
+        return meta
 
     return meta
 
