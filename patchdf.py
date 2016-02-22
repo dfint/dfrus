@@ -510,7 +510,6 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                     return meta
         else:
             meta['str'] = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
-            meta['offset'] = offset
         return meta
     elif pre[-1] == mov_acc_mem | 1 or pre[-2] == mov_reg_rm | 1:
         # mov eax, [addr] or mov reg, [addr]
@@ -627,7 +626,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         meta['str'] = 'add offset'
         meta['fixed'] = 'not needed'
         return meta
-
+    meta['prev_bytes'] = ' '.join('%02X' % x for x in pre[-4:])
     return meta
 
 
