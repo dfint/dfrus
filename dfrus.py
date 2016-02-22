@@ -294,6 +294,8 @@ def _main():
                                 refs[j] = mid_refs[0]
                                 break
                     k += 4
+            else:
+                refs = []
 
             aligned_len = align(len(string) + 1)
             is_long = aligned_len < len(translation) + 1
