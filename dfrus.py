@@ -387,6 +387,9 @@ def _main():
             print('sub_%x: %r' % (sections[code].offset_to_rva(func)+image_base, value))
         print()
     
+    status_unknown = dict()
+    not_fixed = dict()
+    
     # Add strlen before call of functions for strings which length was not fixed
     for string, info in metadata.items():
         if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
@@ -408,9 +411,18 @@ def _main():
                         add_fix(fixes, src_off, fix)
             elif debug:
                 if 'fixed' in info and info['fixed'] == 'no':
-                    print('Length not fixed: %s (reference from 0x%x)' % (myrepr(string[0]), string[1]), info)
+                    not_fixed[string[1]] = (string[0], info)
                 else:
-                    print('Status unknown: %s (reference from 0x%x)' % (myrepr(string[0]), string[1]), info)
+                    status_unknown[string[1]] = (string[0], info)
+    
+    if debug:
+        for ref, (string, info) in sorted(not_fixed.items(), key=lambda x: x[0]):
+            print('Length not fixed: %s (reference from 0x%x)' % (myrepr(string), ref), info)
+        
+        print()
+        
+        for ref, (string, info) in sorted(status_unknown.items(), key=lambda x: x[0]):
+            print('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), info)
 
     # Delayed fix
     for fix in fixes.values():
