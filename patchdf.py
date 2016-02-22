@@ -569,7 +569,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
                 return meta
             else:
                 try:
-                    x = get_length(aft, oldlen + 1)
+                    x = get_length(aft, oldlen)
                 except ValueError:
                     meta['fixed'] = 'no'
                     return meta
@@ -634,7 +634,8 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
 
 
 def get_length(s, oldlen):
-    curlen = 0
+    copied_len = 0
+    oldlen += 1
     regs = [None, None, None]
     deleted = set()
     dest = None
@@ -642,8 +643,8 @@ def get_length(s, oldlen):
     length = None
     for line in disasm(s):
         offset = line.address
-        assert curlen <= oldlen
-        if curlen >= oldlen:
+        assert copied_len <= oldlen
+        if copied_len == oldlen:
             length = offset
             break
         if line.mnemonic != 'db':
@@ -672,7 +673,7 @@ def get_length(s, oldlen):
                     if (dest is None or dest.base_reg == left_operand.base_reg and
                                         dest.disp > left_operand.disp):
                         dest = left_operand
-                    curlen += 1 << right_operand.data_size
+                    copied_len += 1 << right_operand.data_size
                 else:
                     saved_mach += line.data
             else:
@@ -688,7 +689,7 @@ def get_length(s, oldlen):
         else:
             raise ValueError('Unallowed operation (not mov, nor lea): %s' % line)
     
-    if not length:
+    if not length and copied_len == oldlen:
         length = len(s)
     
     if dest is None:
