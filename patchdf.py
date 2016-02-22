@@ -260,9 +260,9 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         return meta  # No need fixing
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
-        meta['func'] = which_func(oldnext,
-            stop_cond=lambda line: line.operands and str(line.operands[0]) in {'eax', 'ax', 'ah', 'al'})
         reg = pre[-1] & 7
+        meta['func'] = which_func(oldnext,
+            stop_cond=lambda line: line.operands and line.operands[0].type == 'reg gen' and line.operands[0].reg == reg)
         if reg == Reg.eax:
             # mov eax, offset str
             meta['str'] = 'eax'
