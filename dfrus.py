@@ -313,12 +313,15 @@ def _main():
             # Fix string length for each reference
             for ref in refs:
                 ref_rva = sections.offset_to_rva(ref)
-                try:
-                    fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
-                                     new_str_rva=new_str_rva)
-                except Exception:
-                    print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
-                    raise
+                if 0 <= (ref - sections[code].physical_offset) < sections[code].physical_size:
+                    try:
+                        fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
+                                         new_str_rva=new_str_rva)
+                    except Exception:
+                        print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
+                        raise
+                else:
+                    fix = dict(fixed='not needed')
 
                 assert isinstance(fix, dict)
                 if 'new_code' in fix:
