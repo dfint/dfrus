@@ -304,11 +304,11 @@ def _main():
                 write_string(fn, translation,
                              off=off, encoding=encoding,
                              new_len=aligned_len)
-                new_str_rva = None
+                string_rva = sections.offset_to_rva(off)
             else:
                 # Add the translation to the separate section
                 str_off = new_section_offset
-                new_str_rva = new_section.offset_to_rva(str_off) + image_base
+                string_rva = new_section.offset_to_rva(str_off) + image_base
                 new_section_offset = pd.add_to_new_section(fn, new_section_offset,
                                                            bytes(translation + '\0', encoding=encoding))
 
@@ -318,7 +318,7 @@ def _main():
                 if 0 <= (ref - sections[code].physical_offset) < sections[code].physical_size:
                     try:
                         fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
-                                         new_str_rva=new_str_rva, cap_len=cap_len)
+                                         string_rva=string_rva)
                     except Exception:
                         print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
                         raise
@@ -342,14 +342,14 @@ def _main():
                         new_ref = None
 
                     if new_ref is not None:
-                        if bytes(new_code)[new_ref:new_ref+4] != to_dword(new_str_rva):
+                        if bytes(new_code)[new_ref:new_ref+4] != to_dword(string_rva):
                             raise ValueError('new_ref in fix code is broken for string %r, reference from offset 0x%x' %
                                              (string, ref))
 
                     add_fix(fixes, src_off, fix)
                 elif 'new_ref' in fix:
                     new_ref = fix['new_ref']
-                    if fpeek(fn, ref + new_ref, 4) != to_dword(new_str_rva):
+                    if fpeek(fn, ref + new_ref, 4) != to_dword(string_rva):
                         raise ValueError('new_ref broken for string %r, reference from offset 0x%x' % (string, ref))
                     # Add relocation for the new reference
                     relocs_to_add.add(ref_rva + new_ref)
@@ -357,8 +357,8 @@ def _main():
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
                     relocs_to_remove |= {item + ref_rva for item in fix['deleted_relocs']}
-                elif new_str_rva:
-                    fpoke4(fn, ref, new_str_rva)
+                elif is_long and string_rva:
+                    fpoke4(fn, ref, string_rva)
 
                 metadata[(string, ref_rva+image_base)] = fix
 

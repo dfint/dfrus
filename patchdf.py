@@ -217,7 +217,7 @@ count_before = 0x20
 count_after = 0x100
 
 
-def fix_len(fn, offset, oldlen, newlen, new_str_rva, cap_len):
+def fix_len(fn, offset, oldlen, newlen, string_rva):
     def which_func(offset, stop_cond=lambda _: False):
         line = trace_code(fn, next_off, stop_cond=lambda cur_line: cur_line.mnemonic.startswith('rep') or stop_cond(cur_line))
         if line is None:
@@ -520,7 +520,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva, cap_len):
         else:
             next_off = offset - get_start(pre)
             aft = fpeek(fn, next_off, count_after)
-            if newlen <= cap_len:
+            if newlen <= align(oldlen+1)-1:
                 r = (oldlen+1) % 4
                 flag = 0
                 reg = None
@@ -574,7 +574,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva, cap_len):
                     meta['fixed'] = 'no'
                     return meta
                 
-                mach, new_ref_off = mach_memcpy(new_str_rva, x['dest'], newlen + 1)
+                mach, new_ref_off = mach_memcpy(string_rva, x['dest'], newlen + 1)
                 if x['saved_mach']:
                     mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
                     new_ref_off += len(x['saved_mach'])
