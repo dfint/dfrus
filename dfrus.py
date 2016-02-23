@@ -268,12 +268,12 @@ def _main():
         if 0 < len(strings) <= 16:
             print('All remaining strings:')
             for item in strings:
-                print("0x%x : %r" % item)
+                print("0x%x : %r" % item[:2])
 
     fixes = dict()
     metadata = dict()
 
-    for off, string in strings:
+    for off, string, cap_len in strings:
         if string in trans_table:
             translation = trans_table[string]
 
@@ -298,7 +298,7 @@ def _main():
                 refs = []
 
             aligned_len = align(len(string) + 1)
-            is_long = aligned_len < len(translation) + 1
+            is_long = cap_len < len(translation)
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
                 write_string(fn, translation,
@@ -318,7 +318,7 @@ def _main():
                 if 0 <= (ref - sections[code].physical_offset) < sections[code].physical_size:
                     try:
                         fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
-                                         new_str_rva=new_str_rva)
+                                         new_str_rva=new_str_rva, cap_len=cap_len)
                     except Exception:
                         print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
                         raise
