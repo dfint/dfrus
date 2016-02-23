@@ -491,7 +491,7 @@ def _main():
         reloc_size = data_directory.basereloc.size
         fn.seek(reloc_off)
         reloc_table.to_file(fn)
-        assert new_size <= reloc_size
+        assert new_size <= sections[4].physical_size
         if new_size < reloc_size:
             fn.seek(reloc_off + new_size)
             fn.write(bytes(reloc_size - new_size))
