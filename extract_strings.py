@@ -16,15 +16,33 @@ def is_allowed(x):
 
 def check_string_array(buf, offset):
     start = None
+    end = None
     for i, c in enumerate(buf):
-        if c != 0:
+        if c:
+            if end:
+                yield (offset + start, buf[start:end], i - start - 1)
+                start = None
+                end = None
+            
             if not is_allowed(chr(c)):
                 break
+            
             if not start:
                 start = i
-        elif start:
-            yield (offset + start, buf[start:i])
-            start = None
+                end = None
+        elif start and not end:
+            end = i
+    
+    if end:
+        yield (offset + start, buf[start:end], len(buf) - start - 1)
+
+
+def count_zeros(buf):
+    for i, item in enumerate(buf):
+        if item:
+            return i
+    
+    return len(buf)
 
 
 def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
@@ -36,6 +54,8 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
         
         fn.seek(obj_off)
         buf = fn.read(blocksize)
+        upper_bound = (s_xrefs[j + 1] - obj_off) if j < len(s_xrefs) - 1 else -1
+        buf = buf[:upper_bound]
         
         s_len = None
         letters = 0
@@ -50,14 +70,16 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
                 letters += 1
         
         if s_len and letters > 0:
-            current_string = (obj_off, buf[:s_len].decode(encoding=encoding))
+            s = buf[:s_len].decode(encoding=encoding)
+            
+            buf = buf[s_len:]
+            cap_len = s_len + count_zeros(buf) - 1
+            current_string = (obj_off, s, cap_len)
             yield current_string
             
-            upper_bound = (s_xrefs[j + 1] - obj_off) if j < len(s_xrefs) - 1 else -1
-            buf = buf[:upper_bound]
-            for off, s in check_string_array(buf[s_len:], obj_off + s_len):
+            for off, s, cap_len in check_string_array(buf, obj_off + s_len):
                 prev_string = current_string
-                current_string = (off, s.decode(encoding=encoding))
+                current_string = (off, s.decode(encoding=encoding), cap_len)
                 yield current_string
             
             prev_string = current_string
@@ -84,15 +106,15 @@ if __name__ == "__main__":
                 relocs = pe.relocation_table
                 xrefs = get_cross_references(fn, relocs, sections, image_base)
                 encoding = 'cp437' if len(sys.argv)<=3 else sys.argv[3]
-                print(encoding)
                 strings = list(extract_strings(fn, xrefs, encoding=encoding))
                 count = Counter(x[1] for x in strings)
                 with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
-                    for _, s in strings:
+                    for offset, s, cap_len in strings:
                         if count[s] >= 1:
                             s = s.replace('\r', '\\r')
                             s = s.replace('\t', '\\t')
-                            print(myrepr(s))
+                            print(hex(offset), myrepr(s), cap_len)
+                            assert cap_len >= len(s)
                             print(s, file=dump)
                             count[s] = 0
         except OSError:
