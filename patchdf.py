@@ -217,7 +217,7 @@ count_before = 0x20
 count_after = 0x100
 
 
-def fix_len(fn, offset, oldlen, newlen, new_str_rva):
+def fix_len(fn, offset, oldlen, newlen, new_str_rva, cap_len):
     def which_func(offset, stop_cond=lambda _: False):
         line = trace_code(fn, next_off, stop_cond=lambda cur_line: cur_line.mnemonic.startswith('rep') or stop_cond(cur_line))
         if line is None:
@@ -520,7 +520,7 @@ def fix_len(fn, offset, oldlen, newlen, new_str_rva):
         else:
             next_off = offset - get_start(pre)
             aft = fpeek(fn, next_off, count_after)
-            if newlen+1 <= align(oldlen+1):
+            if newlen <= cap_len:
                 r = (oldlen+1) % 4
                 flag = 0
                 reg = None
