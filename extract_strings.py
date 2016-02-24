@@ -45,17 +45,28 @@ def count_zeros(buf):
     return len(buf)
 
 
+def find_next_string_xref(s_xrefs, i, obj_off, s_len):
+    i += 1
+    if i >= len(s_xrefs):
+        return -1
+    
+    while s_xrefs[i] - obj_off <= s_len:
+        i += 1
+        if i >= len(s_xrefs):
+            return -1
+    
+    return s_xrefs[i]
+
+
 def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
     prev_string = None
     s_xrefs = sorted(xrefs)
-    for j, obj_off in enumerate(s_xrefs):
+    for i, obj_off in enumerate(s_xrefs):
         if prev_string is not None and obj_off <= prev_string[0]+len(prev_string[1]):
             continue  # it's not the beginning of the string
         
         fn.seek(obj_off)
         buf = fn.read(blocksize)
-        upper_bound = (s_xrefs[j + 1] - obj_off) if j < len(s_xrefs) - 1 else -1
-        buf = buf[:upper_bound]
         
         s_len = None
         letters = 0
@@ -72,7 +83,8 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
         if s_len and letters > 0:
             s = buf[:s_len].decode(encoding=encoding)
             
-            buf = buf[s_len:]
+            upper_bound = find_next_string_xref(s_xrefs, i, obj_off, s_len)
+            buf = buf[s_len:upper_bound]
             cap_len = s_len + count_zeros(buf) - 1
             current_string = (obj_off, s, cap_len)
             yield current_string
