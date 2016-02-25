@@ -5,16 +5,25 @@ from peclasses import PortableExecutable
 from patchdf import get_cross_references
 from collections import Counter
 
-forbidden = set("$;@^{}")
+forbidden = set(b'$^')
 
-allowed = set("\r\t")
+allowed = set(b'\r\t')
 
 
 def is_allowed(x):
-    return x in allowed or (' ' <= x < chr(127) or x.isalpha() and x not in forbidden)
+    return x in allowed or (ord(' ') <= x and x not in forbidden)
 
 
-def check_string_array(buf, offset):
+def possible_to_decode(c, encoding):
+    try:
+        c.decode(encoding=encoding)
+    except UnicodeDecodeError:
+        return False
+    else:
+        return True
+
+
+def check_string_array(buf, offset, encoding):
     start = None
     end = None
     for i, c in enumerate(buf):
@@ -24,7 +33,7 @@ def check_string_array(buf, offset):
                 start = None
                 end = None
             
-            if not is_allowed(chr(c)):
+            if not is_allowed(c) or not possible_to_decode(buf[i:i+1], encoding):
                 if start:
                     start = None
                 continue
@@ -76,10 +85,10 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
             if c == 0:
                 s_len = i
                 break
-            c = buf[i:i+1].decode(encoding=encoding, errors='ignore')
-            if not is_allowed(c):
+            
+            if not is_allowed(c) or not possible_to_decode(buf[i:i+1], encoding):
                 break
-            elif c.isalpha():
+            elif buf[i:i+1].isalpha():
                 letters += 1
         
         if s_len and letters > 0:
@@ -91,7 +100,7 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
             current_string = (obj_off, s, cap_len)
             yield current_string
             
-            for off, s, cap_len in check_string_array(buf, obj_off + s_len):
+            for off, s, cap_len in check_string_array(buf, obj_off + s_len, encoding):
                 prev_string = current_string
                 current_string = (off, s.decode(encoding=encoding), cap_len)
                 yield current_string
