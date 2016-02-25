@@ -126,10 +126,9 @@ if __name__ == "__main__":
                     for offset, s, cap_len in strings:
                         if count[s] >= 1:
                             assert cap_len >= len(s)
-                            s = s.replace(b'\r', b'\\r')
-                            s = s.replace(b'\t', b'\\t')
+                            s = s.replace('\r', '\\r')
+                            s = s.replace('\t', '\\t')
                             print(hex(offset), myrepr(s), cap_len)
-                            assert cap_len >= len(s)
                             print(s, file=dump)
                             count[s] = 0
         except OSError:
