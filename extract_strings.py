@@ -25,7 +25,9 @@ def check_string_array(buf, offset):
                 end = None
             
             if not is_allowed(chr(c)):
-                break
+                if start:
+                    start = None
+                continue
             
             if not start:
                 start = i
@@ -123,8 +125,9 @@ if __name__ == "__main__":
                 with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
                     for offset, s, cap_len in strings:
                         if count[s] >= 1:
-                            s = s.replace('\r', '\\r')
-                            s = s.replace('\t', '\\t')
+                            assert cap_len >= len(s)
+                            s = s.replace(b'\r', b'\\r')
+                            s = s.replace(b'\t', b'\\t')
                             print(hex(offset), myrepr(s), cap_len)
                             assert cap_len >= len(s)
                             print(s, file=dump)
