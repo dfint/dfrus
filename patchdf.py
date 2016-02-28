@@ -647,8 +647,8 @@ def get_length(s, oldlen):
         if copied_len == oldlen:
             length = offset
             break
-        if line.mnemonic != 'db':
-            assert ValueError('Unknown instruction encountered.')
+        if line.mnemonic == 'db':
+            raise ValueError('Unknown instruction encountered.')
         if line.mnemonic == 'mov':
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
