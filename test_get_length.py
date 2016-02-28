@@ -11,7 +11,7 @@ from opcodes import Reg
 # 4c1da7     mov         [esp+20h], eax
 # 4c1dab     mov         [esp+24h], ecx
 test_data_1 = bytes.fromhex(
-    '8B 15 44 4B 52 00 8B F0  A1 48 4B 52 00 89 54 24 '
+    '8B 0D 50 4B 52 00 8B F0  A1 4C 4B 52 00 89 44 24 '
     '20 89 4C 24 24'
 )
 
@@ -69,7 +69,7 @@ def test_get_length_push():
 # 414139 !   mov         [?data_617998], edx
 # 41413f !   mov         [?data_61799c], ax
 # 414145 !   cmp         ecx, 0fh
-test_data_sub = bytes.fromhex(
+test_data_abs_ref = bytes.fromhex(
     '8B 15 38 3E 54 00 '
     'A1 3C 3E 54 00 '
     '2B 0D E0 82 D6 0A '
@@ -83,8 +83,8 @@ test_data_sub = bytes.fromhex(
 )
 
 
-def test_get_length_sub():
-    result = get_length(test_data_sub, 13)
+def test_get_length_abs_ref():
+    result = get_length(test_data_abs_ref, 13)
     result['dest'] = str(result['dest'])
     assert result == dict(
         deleted_relocs={2, 7, 13, 19, 25, 30, 36, 42, 48},
@@ -92,4 +92,31 @@ def test_get_length_sub():
         dest='[617990h]',
         length=52,
         saved_mach=bytes.fromhex('2B 0D E0 82 D6 0A ')  # sub ecx, [0ad682e0h]
+    )
+
+
+# 428605 !   mov         eax, [strz_nausea_5452c4]
+# 42860a !   mov         cx, [data_5452c8]
+# 428611 !   mov         dl, [data_5452ca]
+# 428617 !   mov         [?data_ae19178], eax
+# 42861c !   mov         [?data_ae1917c], cx
+# 428623 !   mov         [?data_ae1917e], dl
+# 428629 !   mov         dword ptr [?data_ad6848c], 0ffffff93h
+test_data_abs_ref_simple = bytes.fromhex(
+    'A1 C4 52 54 00 66 8B 0D  C8 52 54 00 8A 15 CA 52 '
+    '54 00 A3 78 91 E1 0A 66  89 0D 7C 91 E1 0A 88 15 '
+    '7E 91 E1 0A C7 05 8C 84  D6 0A 93 FF FF FF 33 F6 '
+    'FF D3 99 B9 03 00 00 00  F7 F9 8B FA FF D3 99 B9 '
+)
+
+
+def test_get_length_abs_ref_simple():
+    result = get_length(test_data_abs_ref_simple, 6)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={1, 8, 14, 19, 26, 32},
+        added_relocs=set(),
+        dest='[0AE19178h]',
+        length=36,
+        saved_mach=bytes()
     )
