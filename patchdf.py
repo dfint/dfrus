@@ -687,7 +687,7 @@ def get_length(s, oldlen):
                 dest = Operand(base_reg=left_operand.reg, disp=0)
             saved_mach += line.data
         else:
-            raise ValueError('Unallowed operation (not mov, nor lea): %s' % line)
+            saved_mach += line.data
     
     if not length and copied_len == oldlen:
         length = len(s)
