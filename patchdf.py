@@ -686,6 +686,8 @@ def get_length(s, oldlen):
                                 dest.disp >= right_operand.disp):
                 dest = Operand(base_reg=left_operand.reg, disp=0)
             saved_mach += line.data
+        elif line.mnemonic.startswith('jmp'):
+            raise ValueError('Jump encountered at offset %x' % line.address)
         else:
             saved_mach += line.data
     
