@@ -570,14 +570,19 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
             else:
                 try:
                     x = get_length(aft, oldlen)
-                except ValueError:
+                except ValueError as err:
                     meta['fixed'] = 'no'
+                    meta['get_length_error'] = str(err)
                     return meta
                 
-                mach, new_ref_off = mach_memcpy(string_rva, x['dest'], newlen + 1)
+                added_relocs = x['added_relocs']
+                
+                mach, new_refs = mach_memcpy(string_rva, x['dest'], newlen + 1)
                 if x['saved_mach']:
                     mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
-                    new_ref_off += len(x['saved_mach'])
+                    new_refs = {item + len(x['saved_mach']) for item in new_refs}
+                
+                added_relocs.update(new_refs)
 
                 proc = None
                 if len(mach) > x['length']:
@@ -596,13 +601,13 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
                 fpoke(fn, next_off, mach)
                 
                 # Make deleted relocs offsets relative to the given offset
-                deleted_relocs = [next_off + item - offset for item in x['deleted']]
+                deleted_relocs = [next_off + item - offset for item in x['deleted_relocs']]
                 
                 if not proc:
-                    # Make new_ref relative to the given offset
-                    new_ref = next_off + new_ref_off - offset
+                    # Make new relocations relative to the given offset
+                    added_relocs = {next_off + ref - offset for ref in added_relocs}
                     meta['fixed'] = 'yes'
-                    retvalue = dict(deleted_relocs=deleted_relocs, new_ref=new_ref)
+                    retvalue = dict(deleted_relocs=deleted_relocs, added_relocs=added_relocs)
                     retvalue.update(meta)
                     return retvalue
                 else:
@@ -610,7 +615,7 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
                         src_off=next_off + 1,
                         new_code=proc,
                         deleted_relocs=deleted_relocs,
-                        new_ref=new_ref_off
+                        added_relocs=added_relocs
                     )
                     retvalue.update(meta)
                     return retvalue
@@ -637,7 +642,8 @@ def get_length(s, oldlen):
     copied_len = 0
     oldlen += 1
     regs = [None, None, None]
-    deleted = set()
+    deleted_relocs = set()
+    added_relocs = set()
     dest = None
     saved_mach = bytes()
     length = None
@@ -658,26 +664,34 @@ def get_length(s, oldlen):
                     if right_operand.type == 'ref abs':
                         # mov reg, [mem]
                         regs[left_operand.reg] = left_operand.data_size
-                        deleted.add(offset + line.data.index(to_dword(right_operand.disp)))
+                        deleted_relocs.add(offset + line.data.index(to_dword(right_operand.disp)))
                     else:
                         # mov reg1, [reg2+disp]
                         regs[left_operand.reg] = -1
                         saved_mach += line.data
                 else:
                     saved_mach += line.data
-            elif left_operand.type == 'ref rel':
-                # mov [reg1+disp], reg2
+            elif left_operand.type in {'ref rel', 'ref abs'}:
+                # `mov [reg1+disp], reg2` or `mov [off], reg`
                 if right_operand.type == 'reg gen' and right_operand.reg <= Reg.edx:
                     assert left_operand.index_reg is None
+                    if regs[right_operand.reg] is None:
+                        raise ValueError('Copying of a string to several diferent locations not supported.')
+                    
                     regs[right_operand.reg] = None  # Mark register as free
-                    if (dest is None or dest.base_reg == left_operand.base_reg and
+                    if (dest is None or dest.type == left_operand.type and
+                                        dest.base_reg == left_operand.base_reg and
                                         dest.disp > left_operand.disp):
                         dest = left_operand
+                    
+                    if left_operand.type == 'ref abs':
+                        deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
+                    
                     copied_len += 1 << right_operand.data_size
                 else:
                     saved_mach += line.data
             else:
-                raise ValueError('Unallowed left operand type: %s, type is %r' % (left_operand, type(left_operand)))
+                raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' % (left_operand, left_operand.type, str(line)))
         elif line.mnemonic == 'lea':
             left_operand, right_operand = line.operands
             if left_operand.reg <= Reg.edx:
@@ -689,32 +703,48 @@ def get_length(s, oldlen):
         elif line.mnemonic.startswith('jmp'):
             raise ValueError('Jump encountered at offset %x' % line.address)
         else:
+            abs_refs = [operand.disp for operand in line.operands if operand.type == 'ref abs'] if line.operands else None
+            if abs_refs:
+                assert len(abs_refs) == 1
+                local_offset = line.data.index(to_dword(abs_refs[0]))
+                deleted_relocs.add(offset + local_offset)
+                added_relocs.add(len(saved_mach) + local_offset)
             saved_mach += line.data
     
     if not length and copied_len == oldlen:
         length = len(s)
-    
+    assert length is not None, (copied_len, oldlen)
     if dest is None:
         raise ValueError('Destination not recognized.')
-    return dict(length=length, dest=dest, deleted=deleted, saved_mach=saved_mach)
+    return dict(
+        length=length,
+        dest=dest,
+        deleted_relocs=deleted_relocs,
+        saved_mach=saved_mach,
+        added_relocs=added_relocs
+    )
 
 
 def mach_memcpy(src, dest: Operand, count):
     mach = bytearray()
     mach.append(pushad)  # pushad
-    
+    new_references = set()
     assert dest.index_reg is None
     # If the destination address is not in edi yet, put it there
     if dest.base_reg != Reg.edi or dest.disp != 0:
         if dest.disp == 0:
             # mov edi, reg
             mach += bytes((mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)))
+        elif dest.base_reg is None:
+            # mov edi, imm32
+            mach.append(mov_reg_imm | 8 | Reg.edi)  # mov edi, ...
+            new_references.add(len(mach))
         else:
             # lea edi, [reg+imm]
             mach += mach_lea(Reg.edi, dest)
 
     mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
-    new_reference = len(mach)
+    new_references.add(len(mach))
     mach += to_dword(src)  # imm32
     
     mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
@@ -724,7 +754,7 @@ def mach_memcpy(src, dest: Operand, count):
     
     mach.append(popad)  # popad
 
-    return mach, new_reference
+    return mach, new_references
 
 
 def add_to_new_section(fn, dest, s, alignment=4, padding_byte=b'\0'):

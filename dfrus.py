@@ -333,30 +333,15 @@ def _main():
                     new_code = fix['new_code']
                     assert isinstance(new_code, (bytes, bytearray, MachineCode))
                     src_off = fix['src_off']
-
-                    if 'new_ref' in fix:
-                        new_ref = fix['new_ref']
-                    elif isinstance(new_code, MachineCode) and list(new_code.absolute_references):
-                        new_ref = next(new_code.absolute_references)
-                    else:
-                        new_ref = None
-
-                    if new_ref is not None:
-                        if bytes(new_code)[new_ref:new_ref+4] != to_dword(string_rva):
-                            raise ValueError('new_ref in fix code is broken for string %r, reference from offset 0x%x' %
-                                             (string, ref))
-
+                
                     add_fix(fixes, src_off, fix)
-                elif 'new_ref' in fix:
-                    new_ref = fix['new_ref']
-                    if fpeek(fn, ref + new_ref, 4) != to_dword(string_rva):
-                        raise ValueError('new_ref broken for string %r, reference from offset 0x%x' % (string, ref))
-                    # Add relocation for the new reference
-                    relocs_to_add.add(ref_rva + new_ref)
+                elif 'added_relocs' in fix:
+                    # Add relocations of new references of moved items
+                    relocs_to_add.update(item + ref_rva for item in fix['added_relocs'])
 
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
-                    relocs_to_remove |= {item + ref_rva for item in fix['deleted_relocs']}
+                    relocs_to_remove.update(item + ref_rva for item in fix['deleted_relocs'])
                 elif is_long and string_rva:
                     fpoke4(fn, ref, string_rva)
 
@@ -458,13 +443,13 @@ def _main():
         new_section_offset = pd.add_to_new_section(fn, hook_off, bytes(mach), padding_byte=int3)
 
         # If there are absolute references in the code, add them to relocation table
-        if 'new_ref' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
+        if 'added_relocs' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
             new_refs = list(mach.absolute_references) if isinstance(mach, MachineCode) else []
 
-            if 'new_ref' in fix:
-                new_refs.append(fix['new_ref'])
+            if 'added_relocs' in fix:
+                new_refs.append(fix['added_relocs'])
 
-            relocs_to_add.update({hook_rva + item for item in new_refs})
+            relocs_to_add.update(hook_rva + item for item in new_refs)
         
         if 'poke' in fix:
             fpoke(fn, fix['poke'][0], fix['poke'][1])

@@ -345,7 +345,7 @@ def disasm(s, start_address=0):
             if i > j:  # Are there any prefixes?
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
-            line = DisasmLine(start_address+j, data=[s[i]], mnemonic=op_1byte_nomask_noargs[s[i]])
+            line = DisasmLine(start_address+j, data=s[i:i+1], mnemonic=op_1byte_nomask_noargs[s[i]])
             i += 1
         elif s[i] == ret_near_n:
             if i > j:
