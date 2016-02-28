@@ -520,105 +520,58 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
         else:
             next_off = offset - get_start(pre)
             aft = fpeek(fn, next_off, count_after)
-            if newlen <= align(oldlen+1)-1:
-                r = (oldlen+1) % 4
-                flag = 0
-                reg = None
-                move_to_reg = None
-                for x, i in analyse_mach(aft):
-                    if r == 1:
-                        if flag == 0:
-                            if x['data'][0] == mov_reg_rm and 'modrm' in x:
-                                # Copying 1 byte from memory to a register
-                                modrm = x['modrm']
-                                if modrm.mode == 0 and modrm.regmem == 5:
-                                    reg = modrm.reg
-                                    move_to_reg = i
-                                    flag += 1
-                            elif x['data'][0] == mov_acc_mem:
-                                # Copying 1 byte from memory to accumulator (al)
-                                reg = Reg.eax
-                                move_to_reg = i
-                                flag += 1
-                        else:
-                            if x['data'][0] == mov_rm_reg and 'modrm' in x:
-                                # Copying from register to memory
-                                modrm = x['modrm']
-                                if modrm.mode != 3 and modrm.reg == reg:
-                                    move_to_mem = i
-                                    # Make code move 4 bytes instead of 1:
-                                    opcode = aft[move_to_reg]
-                                    fpoke(fn, next_off+move_to_reg, opcode | 1)  # set size flag of the opcode
-                                    opcode = aft[move_to_mem]
-                                    fpoke(fn, next_off+move_to_mem, opcode | 1)  # set size flag of the opcode
-                                    meta['fixed'] = 'yes'
-                                    return meta
-                    else:
-                        if x['data'][0] == Prefix.operand_size:
-                            if flag == 0:
-                                move_to_reg = i
-                                flag += 1
-                            else:
-                                move_to_mem = i
-                                fpoke(fn, next_off+move_to_reg, nop)  # clear operand size prefix
-                                fpoke(fn, next_off+move_to_mem, nop)  # clear operand size prefix
-                                meta['fixed'] = 'yes'
-                                return meta
-                    assert(flag < 2)
+            
+            try:
+                x = get_length(aft, oldlen)
+            except ValueError as err:
                 meta['fixed'] = 'no'
+                meta['get_length_error'] = str(err)
                 return meta
-            else:
-                try:
-                    x = get_length(aft, oldlen)
-                except ValueError as err:
-                    meta['fixed'] = 'no'
-                    meta['get_length_error'] = str(err)
-                    return meta
-                
-                added_relocs = x['added_relocs']
-                
-                mach, new_refs = mach_memcpy(string_rva, x['dest'], newlen + 1)
-                if x['saved_mach']:
-                    mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
-                    new_refs = {item + len(x['saved_mach']) for item in new_refs}
-                
-                added_relocs.update(new_refs)
+            
+            added_relocs = x['added_relocs']
+            
+            mach, new_refs = mach_memcpy(string_rva, x['dest'], newlen + 1)
+            if x['saved_mach']:
+                mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
+                new_refs = {item + len(x['saved_mach']) for item in new_refs}
+            
+            added_relocs.update(new_refs)
 
-                proc = None
+            proc = None
+            if len(mach) > x['length']:
+                # if memcpy code is to long, try to write it into the new section and make call to it
+                mach.append(ret_near)
+                proc = mach
+                
+                mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
                 if len(mach) > x['length']:
-                    # if memcpy code is to long, try to write it into the new section and make call to it
-                    mach.append(ret_near)
-                    proc = mach
-                    
-                    mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
-                    if len(mach) > x['length']:
-                        # Too tight here, even for a procedure call
-                        meta['fixed'] = 'no'
-                        return meta
-                
-                # Write replacement code
-                mach = pad_tail(mach, x['length'], nop)
-                fpoke(fn, next_off, mach)
-                
-                # Make deleted relocs offsets relative to the given offset
-                deleted_relocs = [next_off + item - offset for item in x['deleted_relocs']]
-                
-                if not proc:
-                    # Make new relocations relative to the given offset
-                    added_relocs = {next_off + ref - offset for ref in added_relocs}
-                    meta['fixed'] = 'yes'
-                    retvalue = dict(deleted_relocs=deleted_relocs, added_relocs=added_relocs)
-                    retvalue.update(meta)
-                    return retvalue
-                else:
-                    retvalue = dict(
-                        src_off=next_off + 1,
-                        new_code=proc,
-                        deleted_relocs=deleted_relocs,
-                        added_relocs=added_relocs
-                    )
-                    retvalue.update(meta)
-                    return retvalue
+                    # Too tight here, even for a procedure call
+                    meta['fixed'] = 'no'
+                    return meta
+            
+            # Write replacement code
+            mach = pad_tail(mach, x['length'], nop)
+            fpoke(fn, next_off, mach)
+            
+            # Make deleted relocs offsets relative to the given offset
+            deleted_relocs = [next_off + item - offset for item in x['deleted_relocs']]
+            
+            if not proc:
+                # Make new relocations relative to the given offset
+                added_relocs = {next_off + ref - offset for ref in added_relocs}
+                meta['fixed'] = 'yes'
+                retvalue = dict(deleted_relocs=deleted_relocs, added_relocs=added_relocs)
+                retvalue.update(meta)
+                return retvalue
+            else:
+                retvalue = dict(
+                    src_off=next_off + 1,
+                    new_code=proc,
+                    deleted_relocs=deleted_relocs,
+                    added_relocs=added_relocs
+                )
+                retvalue.update(meta)
+                return retvalue
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
         # mov reg8, string[reg]
         meta['func'] = 'strcpy'
