@@ -656,6 +656,9 @@ def get_length(s, oldlen):
         elif line.mnemonic.startswith('jmp'):
             raise ValueError('Jump encountered at offset %x' % line.address)
         else:
+            if line.mnemonic.startswith('rep'):
+                regs[Reg.ecx] = None  # Mark ecx as unoccupied
+            
             abs_refs = [operand.disp for operand in line.operands if operand.type == 'ref abs'] if line.operands else None
             if abs_refs:
                 assert len(abs_refs) == 1
