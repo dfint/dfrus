@@ -205,7 +205,7 @@ def _main():
         needle = None
         for obj_off in xref_table:
             off = obj_off - physical_offset
-            if off >= 0 and off < physical_size:
+            if 0 <= off < physical_size:
                 buf = data_section[off:off+len(unicode_table_start)]
                 if buf == unicode_table_start:
                     needle = obj_off
