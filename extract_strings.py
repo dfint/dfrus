@@ -23,7 +23,7 @@ def possible_to_decode(c, encoding):
         return True
 
 
-def check_string_array(buf, offset, encoding):
+def check_string_array(buf, offset, encoding='cp437'):
     start = None
     end = None
     for i, c in enumerate(buf):
