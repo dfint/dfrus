@@ -84,6 +84,7 @@ cmp_rm_imm = 0x80
 cmp_rm_reg = 0x38  # | dir<<1 | width
 
 nop = 0x90
+cdq = 0x99
 
 lea = 0x8d
 

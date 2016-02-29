@@ -275,7 +275,8 @@ def analyse_mach(s):
 
 op_1byte_nomask_noargs = {
     nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
-    popad: "popad", leave: "leave", int3: "int3", Prefix.rep: "repz", Prefix.repne: "repnz"
+    popad: "popad", leave: "leave", int3: "int3", Prefix.rep: "repz", Prefix.repne: "repnz",
+    cdq: "cdq", movsb: "movsb", movsd: "movsd",
 }
 op_nomask = {call_near: "call near", jmp_near: "jmp near", jmp_short: "jmp short"}
 op_FE_width_REG_RM = {test_rm_reg: "test", xchg_rm_reg: "xchg"}
