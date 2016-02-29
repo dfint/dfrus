@@ -608,7 +608,7 @@ def get_length(s, oldlen):
             break
         if line.mnemonic == 'db':
             raise ValueError('Unknown instruction encountered.')
-        if line.mnemonic == 'mov':
+        if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
                 # mov reg, [...]
