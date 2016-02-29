@@ -288,10 +288,10 @@ def _main():
                 while off + k in xref_table and k < len(string) + 1:
                     for j, ref in enumerate(refs):
                         mid_refs = xref_table[off + k]
-                        delta = ref - mid_refs[0]
                         for item in mid_refs:
+                            delta = ref - item
                             if 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
-                                refs[j] = mid_refs[0]
+                                refs[j] = item
                                 break
                     k += 4
             else:
