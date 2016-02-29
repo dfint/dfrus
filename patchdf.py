@@ -547,6 +547,7 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
                 if len(mach) > x['length']:
                     # Too tight here, even for a procedure call
                     meta['fixed'] = 'no'
+                    meta['cause'] = 'to tight to call'
                     return meta
             
             # Write replacement code
@@ -559,10 +560,7 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
             if not proc:
                 # Make new relocations relative to the given offset
                 added_relocs = {next_off + ref - offset for ref in added_relocs}
-                meta['fixed'] = 'yes'
                 retvalue = dict(deleted_relocs=deleted_relocs, added_relocs=added_relocs)
-                retvalue.update(meta)
-                return retvalue
             else:
                 retvalue = dict(
                     src_off=next_off + 1,
@@ -570,8 +568,10 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
                     deleted_relocs=deleted_relocs,
                     added_relocs=added_relocs
                 )
-                retvalue.update(meta)
-                return retvalue
+            
+            meta['fixed'] = 'yes'
+            retvalue.update(meta)
+            return retvalue
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
         # mov reg8, string[reg]
         meta['func'] = 'strcpy'
