@@ -350,7 +350,7 @@ def disasm(s, start_address=0):
                 else:
                     yield BytesLine(start_address+j, data=s[j:i])
                     j = i
-            line = DisasmLine(start_address+j, data=s[i:i+1], mnemonic=mnemonic)
+            line = DisasmLine(start_address+j, data=s[j:i+1], mnemonic=mnemonic)
             i += 1
         elif s[i] == ret_near_n:
             if i > j:
