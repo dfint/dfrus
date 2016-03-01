@@ -2,8 +2,9 @@ from disasm import disasm
 
 
 def test_mov_al_1():
-    s = str(next(disasm(bytes.fromhex('B0 01'))))
-    assert s == 'mov al, 1'
+    assert str(next(disasm(bytes.fromhex('B0 01')))) == 'mov al, 1'
+    assert str(next(disasm(bytes.fromhex('66 B8 01')))) == 'mov ax, 1'
+    assert str(next(disasm(bytes.fromhex('B8 01')))) == 'mov eax, 1'
 
 
 def test_movsw():
