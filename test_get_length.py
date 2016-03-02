@@ -120,3 +120,50 @@ def test_get_length_abs_ref_simple():
         length=36,
         saved_mach=bytes()
     )
+
+
+test_data_nausea = bytes.fromhex(
+    '0F B7 15 C8 52 54 00 '  # movzx edx, word [5452C8h]
+    'B9 0A 00 00 00 '  # mov ecx, 0Ah
+    'BE 30 63 54 00 '  # mov esi, 546330h
+    'BF F5 B3 62 00 '  # mov edi, 62B3F5h
+    'F3 A5 '  # rep movsd
+    'B9 0E 00 00 00 '  # mov ecx, 0Eh
+    'BE 58 63 54 00 '  # mov esi, 546358h
+    'BF F5 B7 62 00 '  # mov edi, 62B7F5h
+    'F3 A5 '  # rep movsd
+    '66 A5 '  # movsw
+    '8B 0D C4 52 54 00 '  # mov ecx, [5452C4h]
+    'A4 '  # movsb
+    '89 0D 5C BC 62 00 '  # mov [62BC5Ch], ecx
+    '0F B6 0D CA 52 54 00 '  # movzx cx, byte [5452CAh]
+    '88 0D 62 BC 62 00 '  # mov [62BC62h], cl
+    '66 89 15 60 BC 62 00 '  # mov [62BC60h], dx
+    'B0 01 '  # <-- mov al, 1
+    'A2 5A BC 62 00 '  # mov [62BC5Ah], al
+    'B9 08 00 00 00 '  # mov ecx, 8
+)
+
+
+def test_get_length_nausea():
+    saved = bytes.fromhex(
+        'B9 0A 00 00 00 '  # mov ecx, 0Ah
+        'BE 30 63 54 00 '  # mov esi, 546330h
+        'BF F5 B3 62 00 '  # mov edi, 62B3F5h
+        'F3 A5 '  # rep movsd
+        'B9 0E 00 00 00 '  # mov ecx, 0Eh
+        'BE 58 63 54 00 '  # mov esi, 546358h
+        'BF F5 B7 62 00 '  # mov edi, 62B7F5h
+        'F3 A5 '  # rep movsd
+        '66 A5 '  # movsw
+        'A4 '  # movsb
+    )
+    result = get_length(test_data_nausea, len('nausea'))
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={3, 13, 18, 30, 35, 45, 52, 59, 65, 72},
+        added_relocs={6, 11, 23, 28},
+        dest='[62BC5Ch]',
+        length=76,
+        saved_mach=saved
+    )

@@ -623,6 +623,12 @@ def get_length(s, oldlen):
                         regs[left_operand.reg] = -1
                         saved_mach += line.data
                 else:
+                    if right_operand.type == 'ref abs' or right_operand.type == 'imm' and right_operand.value >= 0x400000:
+                        value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
+                        local_offset = line.data.index(to_dword(value))
+                        deleted_relocs.add(offset + local_offset)
+                        added_relocs.add(len(saved_mach) + local_offset)
+                    
                     saved_mach += line.data
             elif left_operand.type in {'ref rel', 'ref abs'}:
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
