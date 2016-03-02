@@ -520,7 +520,7 @@ def disasm(s, start_address=0):
             imm_size = 1 << size
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
-            op1 = Operand(reg=reg)
+            op1 = Operand(reg=reg, data_size=size)
             op2 = Operand(value=immediate)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
         elif s[i] & 0xFE in {shift_op_rm_1, shift_op_rm_cl, shift_op_rm_imm8}:
