@@ -69,6 +69,19 @@ def myrepr(s):
     return text
 
 
+def find_earliest_midrefs(off, refs, xref_table, length):
+    k = 4
+    while off + k in xref_table and k < length + 1:
+        for j, ref in enumerate(refs):
+            mid_refs = xref_table[off + k]
+            for mid_ref in reversed(sorted(mid_refs)):
+                if mid_ref < ref and ref - mid_ref < 70:  # Empyrically picked number
+                    refs[j] = mid_ref
+                    break
+        k += 4
+    return refs
+
+
 def _main():
     parser = init_argparser()
 
@@ -284,16 +297,7 @@ def _main():
                 refs = xref_table[off]
 
                 # Find the earliest reference to the string (even if it is a reference to the middle of the string)
-                k = 4
-                while off + k in xref_table and k < len(string) + 1:
-                    for j, ref in enumerate(refs):
-                        mid_refs = xref_table[off + k]
-                        for item in mid_refs:
-                            delta = ref - item
-                            if 0 < delta <= 6:  # 6 is the length of mov reg, [imm32]
-                                refs[j] = item
-                                break
-                    k += 4
+                refs = find_earliest_midrefs(off, refs, xref_table, len(string))
             else:
                 refs = []
 
