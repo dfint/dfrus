@@ -217,7 +217,7 @@ count_before = 0x20
 count_after = 0x100
 
 
-def fix_len(fn, offset, oldlen, newlen, string_rva):
+def fix_len(fn, offset, oldlen, newlen, string_rva, original_string_address=None):
     def which_func(offset, stop_cond=lambda _: False):
         line = trace_code(fn, next_off, stop_cond=lambda cur_line: cur_line.mnemonic.startswith('rep') or stop_cond(cur_line))
         if line is None:
@@ -522,7 +522,7 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
             aft = fpeek(fn, next_off, count_after)
             
             try:
-                x = get_length(aft, oldlen)
+                x = get_length(aft, oldlen, original_string_address)
             except ValueError as err:
                 meta['fixed'] = 'no'
                 meta['get_length_error'] = str(err)
@@ -591,7 +591,11 @@ def fix_len(fn, offset, oldlen, newlen, string_rva):
     return meta
 
 
-def get_length(s, oldlen):
+def get_length(s, oldlen, original_string_address=None):
+    def belongs_to_the_string(value):
+        osa = original_string_address
+        return osa is None or 0 <= value - osa < oldlen
+    
     copied_len = 0
     oldlen += 1
     regs = [None, None, None]
@@ -616,11 +620,17 @@ def get_length(s, oldlen):
                     assert regs[left_operand.reg] is None, 'Register is already marked as occupied: %s' % left_operand
                     if right_operand.type == 'ref abs':
                         # mov reg, [mem]
-                        regs[left_operand.reg] = left_operand.data_size
-                        deleted_relocs.add(offset + line.data.index(to_dword(right_operand.disp)))
+                        local_offset = line.data.index(to_dword(right_operand.disp))
+                        if belongs_to_the_string(right_operand.disp):
+                            regs[left_operand.reg] = left_operand.data_size
+                        else:
+                            regs[left_operand.reg] = -1
+                            added_relocs.add(len(saved_mach) + local_offset)
+                            saved_mach += line.data
+                        
+                        deleted_relocs.add(offset + local_offset)
                     else:
                         # mov reg1, [reg2+disp]
-                        regs[left_operand.reg] = -1
                         saved_mach += line.data
                 else:
                     if right_operand.type == 'ref abs' or right_operand.type == 'imm' and right_operand.value >= 0x400000:
@@ -634,20 +644,35 @@ def get_length(s, oldlen):
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
                 if right_operand.type == 'reg gen' and right_operand.reg <= Reg.edx:
                     assert left_operand.index_reg is None
+                    
                     if regs[right_operand.reg] is None:
                         raise ValueError('Copying of a string to several diferent locations not supported.')
+                    elif regs[right_operand.reg] < 0:
+                        if left_operand.type == 'ref abs':
+                            local_offset = line.data.index(to_dword(left_operand.disp))
+                            deleted_relocs.add(offset + local_offset)
+                            added_relocs.add(len(saved_mach) + local_offset)
+                        
+                        saved_mach += line.data
+                    else:
+                        if (dest is None or dest.type == left_operand.type and
+                                            dest.base_reg == left_operand.base_reg and
+                                            dest.disp > left_operand.disp):
+                            dest = left_operand
+                        
+                        if left_operand.type == 'ref abs':
+                            deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
+                        
+                        copied_len += 1 << right_operand.data_size
                     
-                    regs[right_operand.reg] = None  # Mark register as free
-                    if (dest is None or dest.type == left_operand.type and
-                                        dest.base_reg == left_operand.base_reg and
-                                        dest.disp > left_operand.disp):
-                        dest = left_operand
-                    
-                    if left_operand.type == 'ref abs':
-                        deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
-                    
-                    copied_len += 1 << right_operand.data_size
+                    regs[right_operand.reg] = None  # Mark the register as free
                 else:
+                    if right_operand.type == 'ref abs' or right_operand.type == 'imm' and right_operand.value >= 0x400000:
+                        value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
+                        local_offset = line.data.index(to_dword(value))
+                        deleted_relocs.add(offset + local_offset)
+                        added_relocs.add(len(saved_mach) + local_offset)
+                    
                     saved_mach += line.data
             else:
                 raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' % (left_operand, left_operand.type, str(line)))
@@ -664,6 +689,10 @@ def get_length(s, oldlen):
         else:
             if line.mnemonic.startswith('rep'):
                 regs[Reg.ecx] = None  # Mark ecx as unoccupied
+            
+            if line.mnemonic.startswith('set'):
+                # setz, setnz etc.
+                regs[line.operands[0].reg] = -1
             
             abs_refs = [operand.disp for operand in line.operands if operand.type == 'ref abs'] if line.operands else None
             if abs_refs:

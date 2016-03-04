@@ -303,12 +303,13 @@ def _main():
 
             aligned_len = align(len(string) + 1)
             is_long = cap_len < len(translation)
+            original_string_rva = sections.offset_to_rva(off)
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
                 write_string(fn, translation,
                              off=off, encoding=encoding,
                              new_len=aligned_len)
-                string_rva = sections.offset_to_rva(off)
+                string_rva = original_string_rva
             else:
                 # Add the translation to the separate section
                 str_off = new_section_offset
@@ -322,7 +323,8 @@ def _main():
                 if 0 <= (ref - sections[code].physical_offset) < sections[code].physical_size:
                     try:
                         fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
-                                         string_rva=string_rva)
+                                         string_rva=string_rva,
+                                         original_string_address=original_string_rva + image_base)
                     except Exception:
                         print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
                         raise
