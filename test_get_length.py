@@ -167,3 +167,36 @@ def test_get_length_nausea():
         length=76,
         saved_mach=saved
     )
+
+
+test_data_whimper_gnaw_intersection = bytes.fromhex(
+    '8B 0D 04 1F 54 00 '  # mov ecx, dword ptr ds:aWhimper+4
+    '85 C0 '  # test eax, eax
+    'A1 00 1F 54 00 '  # mov eax, dword ptr ds:aWhimper
+    '0F 95 C2 '  # setnz dl
+    'A3 58 F2 8F 06 '  # mov dword ptr buffer_68FF258, eax
+    'A0 6C 2F 55 00 '  # mov al, byte ptr ds:aGnaw+4
+    'A2 66 F2 8F 06 '  # mov buffer_68FF262+4, al
+    'B0 32 '  # mov al, 32h
+    '89 0D 5C F2 8F 06 '  # mov dword ptr buffer_68FF258+4, ecx
+    'C6 05 75 F2 8F 06 3C '  # mov byte_68FF275, 3Ch
+)
+
+
+def test_get_length_whimper_gnaw_intersection():
+    saved = bytes.fromhex(
+        '85 C0 '  # test eax, eax
+        '0F 95 C2 '  # setnz dl
+        'A0 6C 2F 55 00 '  # mov al, byte ptr ds:aGnaw+4
+        'A2 66 F2 8F 06 '  # mov buffer_68FF262+4, al
+        'B0 32 '  # mov al, 32h
+    )
+    result = get_length(test_data_whimper_gnaw_intersection, len('whimper'), 0x541F00)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={2, 9, 17, 22, 27, 35},
+        added_relocs={6, 11},
+        dest='[68FF258h]',
+        length=39,
+        saved_mach=saved
+    )
