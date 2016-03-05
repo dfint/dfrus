@@ -10,3 +10,7 @@ def test_mov_al_1():
 def test_movsw():
     data = bytes.fromhex('66 A5')  # movsw
     assert next(disasm(data)).data == data
+
+
+def test_push_ff():
+    assert str(next(disasm(bytes.fromhex('6A FF')))) == 'push 0FFFFFFFFh'

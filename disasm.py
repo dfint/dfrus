@@ -495,7 +495,7 @@ def disasm(s, start_address=0):
             size_flag = s[i] & 2
             i += 1
             if size_flag:
-                immediate = s[i]
+                immediate = s[i] | (s[i] >> 7) * 0xFFFFFF00  # 6A FF -> push 0FFFFFFFFh
                 i += 1
             else:
                 immediate = int.from_bytes(s[i:i+4], byteorder='little')
