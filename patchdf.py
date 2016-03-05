@@ -604,6 +604,9 @@ def get_length(s, oldlen, original_string_address=None):
         osa = original_string_address
         return osa is None or 0 <= value - osa < oldlen
     
+    def valid_reference(value):
+        return 0x400000 <= value < 0x80000000
+    
     copied_len = 0
     oldlen += 1
     regs = [None, None, None]
@@ -638,14 +641,14 @@ def get_length(s, oldlen, original_string_address=None):
                                 nops[offset] = len(line.data)
                         else:
                             regs[left_operand.reg] = -1
-                            not_moveable_after = offset
+                            not_moveable_after = not_moveable_after or offset
                     else:
                         # mov reg1, [reg2+disp]
                         if not_moveable_after is None:
                             saved_mach += line.data
                 elif not_moveable_after is None:
                     if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and
-                            0x400000 <= right_operand.value < 0x80000000):
+                            valid_reference(right_operand.value)):
                         value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
@@ -684,7 +687,7 @@ def get_length(s, oldlen, original_string_address=None):
                     regs[right_operand.reg] = None  # Mark the register as free
                 else:
                     if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and 
-                            0x400000 <= right_operand.value < 0x80000000):
+                            valid_reference(right_operand.value)):
                         value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
@@ -706,18 +709,30 @@ def get_length(s, oldlen, original_string_address=None):
         else:
             if line.mnemonic.startswith('rep'):
                 regs[Reg.ecx] = None  # Mark ecx as unoccupied
-            
-            if line.mnemonic.startswith('set'):
+            elif line.mnemonic.startswith('set'):
                 # setz, setnz etc.
                 regs[line.operands[0].reg] = -1
+            elif line.mnemonic == 'push':
+                if line.operands[0].type == 'reg gen' and line.operands[0].reg < Reg.edx:
+                    regs[line.operands[0].reg] = None  # Mark the pushed register as unoccupied
+                elif line.operands[0].type == 'imm' and valid_reference(line.operands[0].value):
+                    not_moveable_after = not_moveable_after or offset
             
-            abs_refs = [operand.disp for operand in line.operands if operand.type == 'ref abs'] if line.operands else None
-            if abs_refs:
-                assert len(abs_refs) == 1
-                local_offset = line.data.index(to_dword(abs_refs[0]))
-                deleted_relocs.add(offset + local_offset)
-                added_relocs.add(len(saved_mach) + local_offset)
-            saved_mach += line.data
+            if not_moveable_after is None:
+                if line.operands:
+                    abs_refs = [operand for operand in line.operands if operand.type in {'ref abs', 'imm'}]
+                    
+                    for ref in abs_refs:
+                        value = ref.disp if ref.type == 'ref abs' else ref.value
+                        
+                        if ref.type == 'imm' and not valid_reference(value):
+                            continue
+                        
+                        local_offset = line.data.index(to_dword(value))
+                        deleted_relocs.add(offset + local_offset)
+                        added_relocs.add(len(saved_mach) + local_offset)
+                
+                saved_mach += line.data
     
     if not length and copied_len == oldlen:
         length = len(s)
