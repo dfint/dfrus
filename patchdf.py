@@ -540,6 +540,9 @@ def fix_len(fn, offset, oldlen, newlen, string_rva, original_string_address=None
             proc = None
             if len(mach) > x['length']:
                 # if memcpy code is to long, try to write it into the new section and make call to it
+                if isinstance(mach, bytes):
+                    mach = bytearray(mach)
+                
                 mach.append(ret_near)
                 proc = mach
                 
@@ -553,6 +556,11 @@ def fix_len(fn, offset, oldlen, newlen, string_rva, original_string_address=None
             # Write replacement code
             mach = pad_tail(mach, x['length'], nop)
             fpoke(fn, next_off, mach)
+            
+            # Nop-out old instructions
+            if 'nops' in x:
+                for off, count in enumerate(x['nops']):
+                    fpoke(fn, next_off, bytes(nop for _ in range(count)))
             
             # Make deleted relocs offsets relative to the given offset
             deleted_relocs = [next_off + item - offset for item in x['deleted_relocs']]
@@ -603,6 +611,8 @@ def get_length(s, oldlen, original_string_address=None):
     added_relocs = set()
     dest = None
     saved_mach = bytes()
+    not_moveable_after = None
+    nops = dict()
     length = None
     for line in disasm(s):
         offset = line.address
@@ -623,17 +633,19 @@ def get_length(s, oldlen, original_string_address=None):
                         local_offset = line.data.index(to_dword(right_operand.disp))
                         if belongs_to_the_string(right_operand.disp):
                             regs[left_operand.reg] = left_operand.data_size
+                            deleted_relocs.add(offset + local_offset)
+                            if not_moveable_after is not None:
+                                nops[offset] = len(line.data)
                         else:
                             regs[left_operand.reg] = -1
-                            added_relocs.add(len(saved_mach) + local_offset)
-                            saved_mach += line.data
-                        
-                        deleted_relocs.add(offset + local_offset)
+                            not_moveable_after = offset
                     else:
                         # mov reg1, [reg2+disp]
-                        saved_mach += line.data
-                else:
-                    if right_operand.type == 'ref abs' or right_operand.type == 'imm' and right_operand.value >= 0x400000:
+                        if not_moveable_after is None:
+                            saved_mach += line.data
+                elif not_moveable_after is None:
+                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and
+                            0x400000 <= right_operand.value < 0x80000000):
                         value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
@@ -648,12 +660,13 @@ def get_length(s, oldlen, original_string_address=None):
                     if regs[right_operand.reg] is None:
                         raise ValueError('Copying of a string to several diferent locations not supported.')
                     elif regs[right_operand.reg] < 0:
-                        if left_operand.type == 'ref abs':
-                            local_offset = line.data.index(to_dword(left_operand.disp))
-                            deleted_relocs.add(offset + local_offset)
-                            added_relocs.add(len(saved_mach) + local_offset)
-                        
-                        saved_mach += line.data
+                        if not_moveable_after is None:
+                            if left_operand.type == 'ref abs':
+                                local_offset = line.data.index(to_dword(left_operand.disp))
+                                deleted_relocs.add(offset + local_offset)
+                                added_relocs.add(len(saved_mach) + local_offset)
+                            
+                            saved_mach += line.data
                     else:
                         if (dest is None or dest.type == left_operand.type and
                                             dest.base_reg == left_operand.base_reg and
@@ -664,10 +677,14 @@ def get_length(s, oldlen, original_string_address=None):
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
                         
                         copied_len += 1 << right_operand.data_size
+                        
+                        if not_moveable_after is not None:
+                            nops[offset] = len(line.data)
                     
                     regs[right_operand.reg] = None  # Mark the register as free
                 else:
-                    if right_operand.type == 'ref abs' or right_operand.type == 'imm' and right_operand.value >= 0x400000:
+                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and 
+                            0x400000 <= right_operand.value < 0x80000000):
                         value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
@@ -704,16 +721,22 @@ def get_length(s, oldlen, original_string_address=None):
     
     if not length and copied_len == oldlen:
         length = len(s)
-    assert length is not None, (copied_len, oldlen)
+    assert length is not None
+    if not_moveable_after is not None:
+        length = not_moveable_after  # return length of code which can be moved harmlessly
     if dest is None:
         raise ValueError('Destination not recognized.')
-    return dict(
+    
+    result = dict(
         length=length,
         dest=dest,
         deleted_relocs=deleted_relocs,
         saved_mach=saved_mach,
         added_relocs=added_relocs
     )
+    if nops:
+        result['nops'] = nops
+    return result
 
 
 def mach_memcpy(src, dest: Operand, count):
