@@ -198,3 +198,38 @@ def test_get_length_whimper_gnaw_intersection():
         saved_mach=saved,
         nops={33: 6},
     )
+
+
+test_data_tanning_tan_intersection = bytes.fromhex(
+    '8B 0D B8 AB 55 00'  # mov ecx, [strz_Tanning_55abb8]
+    'A1 AC 91 CA 0A'  # mov eax, [?data_aca91ac]
+    '8B 15 BC AB 55 00'  # mov edx, [strz_ing_55abbc]
+    '83 C4 0C'  # add esp, 0ch
+    '56'  # push esi
+    '6A 05'  # push 5
+    '6A 40'  # push 40h
+    '68 C0 AB 55 00'  # push strz_tan_55abc0
+    '68 C4 AB 55 00'  # push strz_Select_a_skin_to_tan_55abc4
+    '50'  # push eax
+    '89 8C 24 40 0D 00 00'  # mov [esp+0d40h], ecx
+    '8B 0D CC 7A CA 0A'  # mov ecx, [?data_aca7acc]
+    '51'  # push ecx
+    '6A FF'  # push 0ffffffffh
+    '6A 02'  # push 2
+    '89 94 24 50 0D 00 00'  # mov [esp+0d50h], edx
+    '89 35 18 96 E1 0A'  # mov [?data_ae19618], esi
+)
+
+
+def test_get_length_tanning_tan_intersection():
+    saved = bytes()
+    result = get_length(test_data_tanning_tan_intersection, len('Tanning'), 0x55ABB8)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={2, 13},
+        added_relocs=set(),
+        dest='[esp+0D40h]',
+        length=6,
+        saved_mach=saved,
+        nops={11: 6, 36: 7, 54: 7},
+    )
