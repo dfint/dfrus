@@ -450,10 +450,10 @@ def _main():
 
         # If there are absolute references in the code, add them to relocation table
         if 'added_relocs' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
-            new_refs = list(mach.absolute_references) if isinstance(mach, MachineCode) else []
+            new_refs = set(mach.absolute_references) if isinstance(mach, MachineCode) else set()
 
             if 'added_relocs' in fix:
-                new_refs.append(fix['added_relocs'])
+                new_refs.update(fix['added_relocs'])
 
             relocs_to_add.update(hook_rva + item for item in new_refs)
         
@@ -466,7 +466,7 @@ def _main():
 
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
-        assert relocs & relocs_to_remove == relocs_to_remove
+        assert not (relocs_to_remove - relocs), ', '.join(sorted(hex(item+image_base) for item in (relocs_to_remove - relocs)))
         relocs -= relocs_to_remove
         relocs |= relocs_to_add
         if debug:

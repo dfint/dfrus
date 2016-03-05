@@ -187,16 +187,14 @@ def test_get_length_whimper_gnaw_intersection():
     saved = bytes.fromhex(
         '85 C0 '  # test eax, eax
         '0F 95 C2 '  # setnz dl
-        'A0 6C 2F 55 00 '  # mov al, byte ptr ds:aGnaw+4
-        'A2 66 F2 8F 06 '  # mov buffer_68FF262+4, al
-        'B0 32 '  # mov al, 32h
     )
     result = get_length(test_data_whimper_gnaw_intersection, len('whimper'), 0x541F00)
     result['dest'] = str(result['dest'])
     assert result == dict(
-        deleted_relocs={2, 9, 17, 22, 27, 35},
-        added_relocs={6, 11},
+        deleted_relocs={2, 9, 17, 35},
+        added_relocs=set(),
         dest='[68FF258h]',
-        length=39,
-        saved_mach=saved
+        length=21,
+        saved_mach=saved,
+        nops={33: 6},
     )
