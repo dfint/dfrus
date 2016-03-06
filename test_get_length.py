@@ -148,24 +148,16 @@ test_data_nausea = bytes.fromhex(
 def test_get_length_nausea():
     saved = bytes.fromhex(
         'B9 0A 00 00 00 '  # mov ecx, 0Ah
-        'BE 30 63 54 00 '  # mov esi, 546330h
-        'BF F5 B3 62 00 '  # mov edi, 62B3F5h
-        'F3 A5 '  # rep movsd
-        'B9 0E 00 00 00 '  # mov ecx, 0Eh
-        'BE 58 63 54 00 '  # mov esi, 546358h
-        'BF F5 B7 62 00 '  # mov edi, 62B7F5h
-        'F3 A5 '  # rep movsd
-        '66 A5 '  # movsw
-        'A4 '  # movsb
     )
     result = get_length(test_data_nausea, len('nausea'))
     result['dest'] = str(result['dest'])
     assert result == dict(
-        deleted_relocs={3, 13, 18, 30, 35, 45, 52, 59, 65, 72},
-        added_relocs={6, 11, 23, 28},
+        deleted_relocs={3, 45, 52, 59, 65, 72},
+        added_relocs=set(),
         dest='[62BC5Ch]',
-        length=76,
-        saved_mach=saved
+        length=12,
+        saved_mach=saved,
+        nops={43: 6, 50: 6, 56: 7, 63: 6, 69: 7}
     )
 
 
@@ -232,4 +224,33 @@ def test_get_length_tanning_tan_intersection():
         length=6,
         saved_mach=saved,
         nops={11: 6, 36: 7, 54: 7},
+    )
+
+
+test_data_stimulant = bytes.fromhex(
+    '8b155c645400'                  # mov         edx, [0054645c] ; "stim"
+    'b90a000000'                    # mov         ecx, 0xa
+    'be34645400'                    # mov         esi, 00546434
+    'bf56de6200'                    # mov         edi, 0062de56
+    'f3a5'                          # repz movsd
+    '8b0d60645400'                  # mov         ecx, [00546460] ; "ulan"
+    '891527c96200'                  # mov         [0062c927], edx
+    '0fb71564645400'                # movzx       edx, word ptr [00546464] ; "t\0"
+    '890d2bc96200'                  # mov         [0062c92b], ecx
+    '6689152fc96200'                # mov         [0062c92f], dx
+    '8b1588645400'                  # mov         edx, [00546488]
+)
+
+
+def test_get_length_stimulant():
+    saved = bytes.fromhex('B9 0A 00 00 00')  # mov ecx, 0Ah
+    result = get_length(test_data_stimulant, len('stimulant'), 0x54645c)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={2, 25, 31, 38, 44, 51},
+        added_relocs=set(),
+        dest='[62C927h]',
+        length=11,
+        saved_mach=saved,
+        nops={23: 6, 29: 6, 35: 7, 42: 6, 48: 7},
     )
