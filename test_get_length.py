@@ -322,21 +322,73 @@ test_data_smoked = bytes.fromhex(
 
 
 def test_get_length_smoked():
-    saved = bytes.fromhex(
-        '893dcca38901'                  # mov         [0189a3cc], edi
-        '33ff'                          # xor         edi, edi
-        '891d8ca38901'                  # mov         [0189a38c], ebx
-        '893dc4a38901'                  # mov         [0189a3c4], edi
-        'c605c2a3890101'                # mov         byte ptr [0189a3c2], 0x1
-        '89351ca38901'                  # mov         [0189a31c], esi
-        'c60524a3890164'                # mov         byte ptr [0189a324], 0x64
-    )
     result = get_length(test_data_smoked, len('smoked %s'), 0x545B60)
     result['dest'] = str(result['dest'])
     assert result == dict(
-        deleted_relocs=set(2, 7, 14, 20, 28, 34, 40, 47, 53, 60, 65, 72),
-        added_relocs=set(2, 10, 16, 22, 29, 35),
+        deleted_relocs={2, 7, 14, 60, 65, 72},
+        added_relocs=set(),
         dest='[189A325h]',
-        length=len(test_data_smoked)-1,  # all except trailing nop
-        saved_mach=saved,
+        length=18,
+        saved_mach=bytes(),
+        nops={58: 6, 64: 5, 69: 7}
+    )
+
+
+test_data_mild_low_pressure = bytes.fromhex(
+    '8b3580ac5700'                  # mov         esi, [0057ac80]
+    '8935beaae10a'                  # mov         [0ae1aabe], esi
+    '8b3584ac5700'                  # mov         esi, [0057ac84]
+    '881d34aae10a'                  # mov         [0ae1aa34], bl
+    '0fb61d6cac5700'                # movzx       ebx, byte ptr [0057ac6c]
+    '8935c2aae10a'                  # mov         [0ae1aac2], esi
+    '8b3588ac5700'                  # mov         esi, [0057ac88]
+    '881d51aae10a'                  # mov         [0ae1aa51], bl
+    '0fb61d7eac5700'                # movzx       ebx, byte ptr [0057ac7e]
+    '8935c6aae10a'                  # mov         [0ae1aac6], esi
+    '8b358cac5700'                  # mov         esi, [0057ac8c]
+    '890dd8a9e10a'                  # mov         [0ae1a9d8], ecx
+    '0fb70d3cac5700'                # movzx       ecx, word ptr [0057ac3c]
+    '8935caaae10a'                  # mov         [0ae1aaca], esi
+    '0fb73590ac5700'                # movzx       esi, word ptr [0057ac90]
+    'a3d4a9e10a'                    # mov         [0ae1a9d4], eax
+    'a138ac5700'                    # mov         eax, [0057ac38]
+    '8915dca9e10a'                  # mov         [0ae1a9dc], edx
+    '8a153eac5700'                  # mov         dl, [0057ac3e]
+    '881d9daae10a'                  # mov         [0ae1aa9d], bl
+    'b314'                          # mov         bl, 0x14
+    '66890de4a9e10a'                # mov         [0ae1a9e4], cx
+    'a3e0a9e10a'                    # mov         [0ae1a9e0], eax
+    '8815e6a9e10a'                  # mov         [0ae1a9e6], dl
+    'c705f4a9e10a02050001'          # mov         dword ptr [0ae1a9f4], 01000502
+    '66c705f8a9e10a0302'            # mov         word ptr [0ae1a9f8], 0x203
+    'c7051baae10a03060103'          # mov         dword ptr [0ae1aa1b], 03010603
+    'b10a'                          # mov         cl, 0xa
+    '66c7051faae10a0a14'            # mov         word ptr [0ae1aa1f], 0x140a
+    'c70542aae10a03060204'          # mov         dword ptr [0ae1aa42], 04020603
+    '66c70546aae10a0a1e'            # mov         word ptr [0ae1aa46], 0x1e0a
+    'c60548aae10a00'                # mov         byte ptr [0ae1aa48], 0x0
+    'c70569aae10a03060304'          # mov         dword ptr [0ae1aa69], 04030603
+    '66c7056daae10a083c'            # mov         word ptr [0ae1aa6d], 0x3c08
+    'c6056faae10a08'                # mov         byte ptr [0ae1aa6f], 0x8
+    'c70590aae10a02040604'          # mov         dword ptr [0ae1aa90], 04060402
+    '66c70594aae10a0a50'            # mov         word ptr [0ae1aa94], 0x500a
+    'c60596aae10a0c'                # mov         byte ptr [0ae1aa96], 0xc
+    'c705b7aae10a01020a0a'          # mov         dword ptr [0ae1aab7], 0a0a0201
+    '66c705bbaae10a1450'            # mov         word ptr [0ae1aabb], 0x5014
+    '881dbdaae10a'                  # mov         [0ae1aabd], bl
+    '668935ceaae10a'                # mov         [0ae1aace], si
+    '90'
+)
+
+
+def test_get_length_mild_low_pressure():
+    result = get_length(test_data_mild_low_pressure, len('mild low pressure'), 0x57AC80)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={2, 8, 14, 33, 39, 58, 64, 83, 90, 288},
+        added_relocs=set(),
+        dest='[0AE1AABEh]',
+        length=18,
+        saved_mach=bytes(),
+        nops={31: 6, 37: 6, 56: 6, 62: 6, 81: 6, 87: 7, 285: 7}
     )

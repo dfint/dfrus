@@ -609,12 +609,24 @@ def get_length(s, oldlen, original_string_address=None):
     
     copied_len = 0
     oldlen += 1
-    regs = [None, None, None]
+    
+    # A list to store states of registers
+    # Possible states:
+    # * None - unknown or empty: state unknown or freed by an instruction not related to the string copying
+    # * -1   - not empty: a value which is not related to the string copying is stored here
+    # * 0    - empty: freed by string copying instruction
+    # * > 0  - not empty: a value of the specific size is stored in the register
+    regs = [None for _ in range(8)]
+    
+    is_empty = lambda reg_state: reg_state is None or reg_state == 0
+    
     deleted_relocs = set()
     added_relocs = set()
     dest = None
     saved_mach = bytes()
     not_moveable_after = None
+    is_moveable = lambda x: x is None
+    
     nops = dict()
     length = None
     for line in disasm(s):
@@ -629,50 +641,40 @@ def get_length(s, oldlen, original_string_address=None):
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
                 # mov reg, [...]
-                if left_operand.reg <= Reg.edx:
-                    assert regs[left_operand.reg] is None or \
-                            left_operand.reg in {right_operand.base_reg, right_operand.index_reg}, \
-                            'Register is already marked as occupied: %s' % left_operand
-                    if right_operand.type == 'ref abs':
-                        # mov reg, [mem]
-                        local_offset = line.data.index(to_dword(right_operand.disp))
-                        if belongs_to_the_string(right_operand.disp):
-                            regs[left_operand.reg] = left_operand.data_size
-                            deleted_relocs.add(offset + local_offset)
-                            if not_moveable_after is not None:
-                                nops[offset] = len(line.data)
-                        else:
-                            regs[left_operand.reg] = -1
-                            not_moveable_after = not_moveable_after or offset
-                    elif right_operand.type == 'imm' and valid_reference(right_operand.value):
-                        not_moveable_after = not_moveable_after or offset
+                assert is_empty(regs[left_operand.reg]) or \
+                        left_operand.reg in {right_operand.base_reg, right_operand.index_reg}, \
+                        'Register is already marked as occupied: %s' % left_operand
+                if right_operand.type == 'ref abs':
+                    # mov reg, [mem]
+                    local_offset = line.data.index(to_dword(right_operand.disp))
+                    if belongs_to_the_string(right_operand.disp):
+                        regs[left_operand.reg] = 1 << left_operand.data_size
+                        deleted_relocs.add(offset + local_offset)
+                        if not_moveable_after is not None:
+                            nops[offset] = len(line.data)
                     else:
-                        # `mov reg1, [reg2+disp]` or `mov reg, imm`
                         regs[left_operand.reg] = -1
-                        if not_moveable_after is None:
-                            saved_mach += line.data
-                elif not_moveable_after is None:
-                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and
-                            valid_reference(right_operand.value)):
                         not_moveable_after = not_moveable_after or offset
-                    else:
+                elif right_operand.type == 'imm' and valid_reference(right_operand.value):
+                    not_moveable_after = not_moveable_after or offset
+                else:
+                    # `mov reg1, [reg2+disp]` or `mov reg, imm`
+                    regs[left_operand.reg] = -1
+                    if is_moveable(not_moveable_after):
                         saved_mach += line.data
             elif left_operand.type in {'ref rel', 'ref abs'}:
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
-                if right_operand.type == 'reg gen' and right_operand.reg <= Reg.edx:
-                    assert left_operand.index_reg is None
-                    
-                    if regs[right_operand.reg] is None:
-                        raise ValueError('Copying of a string to several diferent locations not supported.')
-                    elif regs[right_operand.reg] < 0:
-                        if not_moveable_after is None:
-                            if left_operand.type == 'ref abs':
-                                local_offset = line.data.index(to_dword(left_operand.disp))
-                                deleted_relocs.add(offset + local_offset)
-                                added_relocs.add(len(saved_mach) + local_offset)
-                            
-                            saved_mach += line.data
+                if right_operand.type == 'reg gen':
+                    if regs[right_operand.reg] is None or regs[right_operand.reg] < 0:
+                        # It can be a part of a copying code of another string. Leave it as is.
+                        not_moveable_after = not_moveable_after or offset
+                        regs[right_operand.reg] = None  # Mark the register as free
                     else:
+                        assert left_operand.index_reg is None
+                        
+                        if regs[right_operand.reg] == 0:
+                            raise ValueError('Copying of a string to several diferent locations not supported.')
+                        
                         if (dest is None or dest.type == left_operand.type and
                                             dest.base_reg == left_operand.base_reg and
                                             dest.disp > left_operand.disp):
@@ -683,31 +685,34 @@ def get_length(s, oldlen, original_string_address=None):
                         
                         copied_len += 1 << right_operand.data_size
                         
-                        if not_moveable_after is not None:
+                        if not is_moveable(not_moveable_after):
                             nops[offset] = len(line.data)
+                        
+                        regs[right_operand.reg] = 0  # Mark the register as freed
+                elif is_moveable(not_moveable_after):
+                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and 
+                            valid_reference(right_operand.value)):
+                        # TODO: check if this actually a reference. Until then just skip
+                        not_moveable_after = not_moveable_after or offset
+                        continue
+                        # value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
+                        # local_offset = line.data.rindex(to_dword(value))  # use rindex() to find the second operand
+                        # deleted_relocs.add(offset + local_offset)
+                        # added_relocs.add(len(saved_mach) + local_offset)
                     
-                    regs[right_operand.reg] = None  # Mark the register as free
-                elif not_moveable_after is None:
                     if left_operand.type == 'ref abs':
                         value = left_operand.disp
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
                         added_relocs.add(len(saved_mach) + local_offset)
                     
-                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and 
-                            valid_reference(right_operand.value)):
-                        value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
-                        local_offset = line.data.rindex(to_dword(value))  # use rindex() to find the second operand
-                        deleted_relocs.add(offset + local_offset)
-                        added_relocs.add(len(saved_mach) + local_offset)
-                    
                     saved_mach += line.data
             else:
+                # Segment register etc.
                 raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' % (left_operand, left_operand.type, str(line)))
         elif line.mnemonic == 'lea':
             left_operand, right_operand = line.operands
-            if left_operand.reg <= Reg.edx:
-                regs[left_operand.reg] = -1
+            regs[left_operand.reg] = -1
             if (dest is None or dest.base_reg == right_operand.base_reg and
                                 dest.disp >= right_operand.disp):
                 dest = Operand(base_reg=left_operand.reg, disp=0)
@@ -717,14 +722,19 @@ def get_length(s, oldlen, original_string_address=None):
         else:
             if line.mnemonic.startswith('rep'):
                 regs[Reg.ecx] = None  # Mark ecx as unoccupied
+            elif line.mnemonic.startswith('movs'):
+                regs[Reg.esi] = None
+                regs[Reg.edi] = None
             elif line.mnemonic.startswith('set'):
                 # setz, setnz etc.
                 regs[line.operands[0].reg] = -1
             elif line.mnemonic == 'push':
-                if line.operands[0].type == 'reg gen' and line.operands[0].reg < Reg.edx:
+                if line.operands[0].type == 'reg gen':
                     regs[line.operands[0].reg] = None  # Mark the pushed register as unoccupied
                 elif line.operands[0].type == 'imm' and valid_reference(line.operands[0].value):
                     not_moveable_after = not_moveable_after or offset
+            elif line.mnemonic == 'xor' and line.operands[0].type == 'reg gen':
+                regs[line.operands[0].reg] = -1
             
             if not_moveable_after is None:
                 if line.operands:
