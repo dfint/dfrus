@@ -686,10 +686,16 @@ def get_length(s, oldlen, original_string_address=None):
                     
                     regs[right_operand.reg] = None  # Mark the register as free
                 elif not_moveable_after is None:
+                    if left_operand.type == 'ref abs':
+                        value = left_operand.disp
+                        local_offset = line.data.index(to_dword(value))
+                        deleted_relocs.add(offset + local_offset)
+                        added_relocs.add(len(saved_mach) + local_offset)
+                    
                     if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and 
                             valid_reference(right_operand.value)):
                         value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
-                        local_offset = line.data.index(to_dword(value))
+                        local_offset = line.data.rindex(to_dword(value))  # use rindex() to find the second operand
                         deleted_relocs.add(offset + local_offset)
                         added_relocs.add(len(saved_mach) + local_offset)
                     
