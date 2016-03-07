@@ -525,7 +525,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                 x = get_length(aft, oldlen, original_string_address)
             except (ValueError, IndexError) as err:
                 meta['fixed'] = 'no'
-                meta['get_length_error'] = str(err)
+                meta['get_length_error'] = repr(err)
                 return meta
             
             added_relocs = x['added_relocs']
