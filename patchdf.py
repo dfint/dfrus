@@ -559,8 +559,8 @@ def fix_len(fn, offset, oldlen, newlen, string_rva, original_string_address=None
             
             # Nop-out old instructions
             if 'nops' in x:
-                for off, count in enumerate(x['nops']):
-                    fpoke(fn, next_off, bytes(nop for _ in range(count)))
+                for off, count in x['nops'].items():
+                    fpoke(fn, next_off + off, bytes(nop for _ in range(count)))
             
             # Make deleted relocs offsets relative to the given offset
             deleted_relocs = [next_off + item - offset for item in x['deleted_relocs']]
