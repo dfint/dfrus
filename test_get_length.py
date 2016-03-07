@@ -301,3 +301,42 @@ def test_get_length_linen_apron():
         saved_mach=bytes(),
         nops={46: 5},
     )
+
+
+test_data_smoked = bytes.fromhex(
+    '8b15605b5400'                  # mov         edx, [00545b60]
+    'a1645b5400'                    # mov         eax, [00545b64]
+    '668b0d685b5400'                # mov         cx, [00545b68]
+    '893dcca38901'                  # mov         [0189a3cc], edi
+    '33ff'                          # xor         edi, edi
+    '891d8ca38901'                  # mov         [0189a38c], ebx
+    '893dc4a38901'                  # mov         [0189a3c4], edi
+    'c605c2a3890101'                # mov         byte ptr [0189a3c2], 0x1
+    '89351ca38901'                  # mov         [0189a31c], esi
+    'c60524a3890164'                # mov         byte ptr [0189a324], 0x64
+    '891525a38901'                  # mov         [0189a325], edx
+    'a329a38901'                    # mov         [0189a329], eax
+    '66890d2da38901'                # mov         [0189a32d], cx
+    '90'
+)
+
+
+def test_get_length_smoked():
+    saved = bytes.fromhex(
+        '893dcca38901'                  # mov         [0189a3cc], edi
+        '33ff'                          # xor         edi, edi
+        '891d8ca38901'                  # mov         [0189a38c], ebx
+        '893dc4a38901'                  # mov         [0189a3c4], edi
+        'c605c2a3890101'                # mov         byte ptr [0189a3c2], 0x1
+        '89351ca38901'                  # mov         [0189a31c], esi
+        'c60524a3890164'                # mov         byte ptr [0189a324], 0x64
+    )
+    result = get_length(test_data_smoked, len('smoked %s'), 0x545B60)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs=set(2, 7, 14, 20, 28, 34, 40, 47, 53, 60, 65, 72),
+        added_relocs=set(2, 10, 16, 22, 29, 35),
+        dest='[189A325h]',
+        length=len(test_data_smoked)-1,  # all except trailing nop
+        saved_mach=saved,
+    )
