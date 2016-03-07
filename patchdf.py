@@ -642,6 +642,8 @@ def get_length(s, oldlen, original_string_address=None):
                         else:
                             regs[left_operand.reg] = -1
                             not_moveable_after = not_moveable_after or offset
+                    elif right_operand.type == 'imm' and valid_reference(right_operand.value):
+                        not_moveable_after = not_moveable_after or offset
                     else:
                         # `mov reg1, [reg2+disp]` or `mov reg, imm`
                         regs[left_operand.reg] = -1
@@ -683,7 +685,7 @@ def get_length(s, oldlen, original_string_address=None):
                             nops[offset] = len(line.data)
                     
                     regs[right_operand.reg] = None  # Mark the register as free
-                else:
+                elif not_moveable_after is None:
                     if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and 
                             valid_reference(right_operand.value)):
                         value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value

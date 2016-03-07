@@ -254,3 +254,30 @@ def test_get_length_stimulant():
         saved_mach=saved,
         nops={23: 6, 29: 6, 35: 7, 42: 6, 48: 7},
     )
+
+
+test_data_linen_apron = bytes.fromhex(
+    '8b0d180b5500'                  # mov         ecx, [00550b18]
+    '8b151c0b5500'                  # mov         edx, [00550b1c]
+    'a1200b5500'                    # mov         eax, [00550b20]
+    '890dc92d7006'                  # mov         [06702dc9], ecx
+    '8915cd2d7006'                  # mov         [06702dcd], edx
+    'bac02d7006'                    # mov         edx, 06702dc0
+    'b918065500'                    # mov         ecx, 00550618
+    'c6051a2e700653'                # mov         byte ptr [06702e1a], 0x53
+    'a3d12d7006'                    # mov         [06702dd1], eax
+    '90'
+)
+
+
+def test_get_length_linen_apron():
+    result = get_length(test_data_linen_apron, len('Linen apron'), 0x550b18)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={2, 8, 13, 19, 25, 47},
+        added_relocs=set(),
+        dest='[6702DC9h]',
+        length=29,
+        saved_mach=bytes(),
+        nops={46: 5},
+    )
