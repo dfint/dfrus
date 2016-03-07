@@ -766,6 +766,7 @@ def mach_memcpy(src, dest: Operand, count):
             # mov edi, imm32
             mach.append(mov_reg_imm | 8 | Reg.edi)  # mov edi, ...
             new_references.add(len(mach))
+            mach += to_dword(dest.disp)  # imm32
         else:
             # lea edi, [reg+imm]
             mach += mach_lea(Reg.edi, dest)
