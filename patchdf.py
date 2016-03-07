@@ -744,7 +744,8 @@ def get_length(s, oldlen, original_string_address=None):
     
     if not length and copied_len == oldlen:
         length = len(s)
-    assert length is not None
+    if length is None:
+        raise ValueError('Lenght of the copying code not recognized.')
     if not_moveable_after is not None:
         length = not_moveable_after  # return length of code which can be moved harmlessly
     if dest is None:
