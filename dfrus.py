@@ -303,17 +303,17 @@ def _main():
 
             aligned_len = align(len(string) + 1)
             is_long = cap_len < len(translation)
-            original_string_rva = sections.offset_to_rva(off)
+            original_string_address = sections.offset_to_rva(off) + image_base
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
                 write_string(fn, translation,
                              off=off, encoding=encoding,
                              new_len=aligned_len)
-                string_rva = original_string_rva
+                string_address = original_string_address
             else:
                 # Add the translation to the separate section
                 str_off = new_section_offset
-                string_rva = new_section.offset_to_rva(str_off) + image_base
+                string_address = new_section.offset_to_rva(str_off) + image_base
                 new_section_offset = pd.add_to_new_section(fn, new_section_offset,
                                                            bytes(translation + '\0', encoding=encoding))
 
@@ -323,8 +323,8 @@ def _main():
                 if 0 <= (ref - sections[code].physical_offset) < sections[code].physical_size:
                     try:
                         fix = pd.fix_len(fn, offset=ref, oldlen=len(string), newlen=len(translation),
-                                         string_rva=string_rva,
-                                         original_string_address=original_string_rva + image_base)
+                                         string_address=string_address,
+                                         original_string_address=original_string_address)
                     except Exception:
                         print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
                         raise
@@ -348,8 +348,8 @@ def _main():
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
                     relocs_to_remove.update(item + ref_rva for item in fix['deleted_relocs'])
-                elif is_long and string_rva:
-                    fpoke4(fn, ref, string_rva)
+                elif is_long and string_address:
+                    fpoke4(fn, ref, string_address)
 
                 metadata[(string, ref_rva+image_base)] = fix
 

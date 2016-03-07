@@ -217,7 +217,7 @@ count_before = 0x20
 count_after = 0x100
 
 
-def fix_len(fn, offset, oldlen, newlen, string_rva, original_string_address=None):
+def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address):
     def which_func(offset, stop_cond=lambda _: False):
         line = trace_code(fn, next_off, stop_cond=lambda cur_line: cur_line.mnemonic.startswith('rep') or stop_cond(cur_line))
         if line is None:
@@ -530,7 +530,7 @@ def fix_len(fn, offset, oldlen, newlen, string_rva, original_string_address=None
             
             added_relocs = x['added_relocs']
             
-            mach, new_refs = mach_memcpy(string_rva, x['dest'], newlen + 1)
+            mach, new_refs = mach_memcpy(string_address, x['dest'], newlen + 1)
             if x['saved_mach']:
                 mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
                 new_refs = {item + len(x['saved_mach']) for item in new_refs}
