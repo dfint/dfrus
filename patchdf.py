@@ -523,7 +523,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
             
             try:
                 x = get_length(aft, oldlen, original_string_address)
-            except ValueError as err:
+            except (ValueError, IndexError) as err:
                 meta['fixed'] = 'no'
                 meta['get_length_error'] = str(err)
                 return meta
