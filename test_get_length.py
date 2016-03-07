@@ -1,7 +1,7 @@
 import pytest
 
-from patchdf import get_length
-from disasm import Operand
+from patchdf import get_length, mach_memcpy
+from disasm import Operand, disasm
 from opcodes import Reg
 
 
@@ -254,6 +254,26 @@ def test_get_length_stimulant():
         saved_mach=saved,
         nops={23: 6, 29: 6, 35: 7, 42: 6, 48: 7},
     )
+
+
+def test_mach_memcpy_stimulant():
+    x = get_length(test_data_stimulant, len('stimulant'), 0x54645c)
+    dest = x['dest']
+    string_addr = 0x123456
+    newlen = len('стимулятор')
+    count = newlen + 1
+    mach, new_refs = mach_memcpy(string_addr, dest, newlen + 1)
+    print([(line.address, ''.join('%02x' % x for x in line.data), str(line)) for line in disasm(mach)])
+    assert [str(line) for line in disasm(mach)] == [
+        'pushad',
+        'mov edi, %Xh' % dest.disp,
+        'mov esi, %Xh' % string_addr,
+        'xor ecx, ecx',
+        'mov cl, %d' % ((count+3)//4),
+        'repz', 'movsd',
+        'popad',
+    ]
+    assert new_refs == {2, 7}
 
 
 test_data_linen_apron = bytes.fromhex(
