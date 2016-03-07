@@ -630,7 +630,9 @@ def get_length(s, oldlen, original_string_address=None):
             if left_operand.type == 'reg gen':
                 # mov reg, [...]
                 if left_operand.reg <= Reg.edx:
-                    assert regs[left_operand.reg] is None, 'Register is already marked as occupied: %s' % left_operand
+                    assert regs[left_operand.reg] is None or \
+                            left_operand.reg in {right_operand.base_reg, right_operand.index_reg}, \
+                            'Register is already marked as occupied: %s' % left_operand
                     if right_operand.type == 'ref abs':
                         # mov reg, [mem]
                         local_offset = line.data.index(to_dword(right_operand.disp))
