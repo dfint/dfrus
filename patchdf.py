@@ -323,14 +323,13 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
         reg = pre[-1] & 7
-        func = which_func(oldnext,
-            stop_cond=lambda line:
-                line.operands and
-                (
-                    (line.operands and line.operands[0].type == 'reg gen' and line.operands[0].reg == reg) or
-                    (len(line.operands)>1 and line.operands[1].type == 'ref rel' and line.operands[1].base_reg == reg)
-                )
+
+        stop_func = lambda line: line.operands and (
+            (line.operands[0].type == 'reg gen' and line.operands[0].reg == reg) or
+            (len(line.operands) > 1 and line.operands[1].type == 'ref rel' and line.operands[1].base_reg == reg)
         )
+
+        func = which_func(oldnext, stop_cond=stop_func)
         
         if isinstance(func, tuple):
             meta['func'] = func
