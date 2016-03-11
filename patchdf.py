@@ -213,14 +213,9 @@ def match_mov_reg_imm32(b, reg, imm):
     return b[0] == mov_reg_imm | 8 | reg and from_dword(b[1:]) == imm
 
 
-def get_fix_for_moves(buffer, oldlen, newlen, string_address, original_string_address, meta):
-    try:
-        x = get_length(buffer, oldlen, original_string_address)
-    except (ValueError, IndexError) as err:
-        meta['fixed'] = 'no'
-        meta['get_length_error'] = repr(err)
-        return meta
-    
+def get_fix_for_moves(get_length_info, newlen, string_address, meta):
+    x = get_length_info
+
     added_relocs = x['added_relocs']
     
     mach, new_refs = mach_memcpy(string_address, x['dest'], newlen + 1)
@@ -581,7 +576,14 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         else:
             next_off = offset - get_start(pre)
             aft = fpeek(fn, next_off, count_after)
-            fix = get_fix_for_moves(aft, oldlen, newlen, string_address, original_string_address, meta)
+            try:
+                x = get_length(aft, oldlen, original_string_address)
+            except (ValueError, IndexError) as err:
+                meta['fixed'] = 'no'
+                meta['get_length_error'] = repr(err)
+                return meta
+
+            fix = get_fix_for_moves(x, newlen, string_address, meta)
 
             if fix['fixed'] == 'yes':
                 # Make deleted relocs offsets relative to the given offset
