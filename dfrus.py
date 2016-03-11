@@ -31,7 +31,8 @@ def init_argparser():
                         help='path to the dictionary file, default=dict.txt')
     parser.add_argument('--debug', action='store_true', help='enable debugging mode')
     parser.add_argument('-c', '--codepage', help='enable given codepage by name')
-    parser.add_argument('-oc', '--original_codepage', default='cp437', help='specify original codepage of strings in the executable')
+    parser.add_argument('-oc', '--original_codepage', default='cp437',
+                        help='specify original codepage of strings in the executable')
     parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
                         type=lambda s: tuple(int(x) for x in s.split(':')))
 
@@ -215,7 +216,6 @@ def _main():
         physical_offset = sections[data].physical_offset
         physical_size = sections[data].physical_size
         data_section = fpeek(fn, physical_offset, physical_size)
-        needle = None
         for obj_off in xref_table:
             off = obj_off - physical_offset
             if 0 <= off < physical_size:
@@ -223,13 +223,12 @@ def _main():
                 if buf == unicode_table_start:
                     needle = obj_off
                     break
-
-        if needle is None:
+        else:
             fn.close()
             print("Charmap table not found.")
             sys.exit()
-        else:
-            print("Charmap table found at offset 0x%X" % needle)
+
+        print("Charmap table found at offset 0x%X" % needle)
 
         try:
             print("Patching charmap table to %s..." % args.codepage)
@@ -281,7 +280,7 @@ def _main():
         if 0 < len(strings) <= 16:
             print('All remaining strings:')
             for item in strings:
-                print("0x%x : %r" % item[:2])
+                print("0x%x : %r" % tuple(item[:2]))
 
     fixes = dict()
     metadata = dict()
@@ -326,7 +325,8 @@ def _main():
                                          string_address=string_address,
                                          original_string_address=original_string_address)
                     except Exception:
-                        print('Catched %s exception on string %r at reference 0x%x' % (sys.exc_info()[0], string, ref_rva+image_base))
+                        print('Catched %s exception on string %r at reference 0x%x' %
+                              (sys.exc_info()[0], string, ref_rva + image_base))
                         raise
                 else:
                     fix = dict(fixed='not needed')
@@ -365,7 +365,7 @@ def _main():
                     functions[offset]['str'] = {str_param}
                 elif str_param not in functions[offset]['str']:
                     print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
-                                     (address, str_param, functions[offset]['str']))
+                          (address, str_param, functions[offset]['str']))
                     functions[offset]['str'].add(str_param)
 
             if 'len' in item:
@@ -464,16 +464,21 @@ def _main():
         disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
         fpoke(fn, src_off, to_dword(disp, signed=True))
 
+    def int_list_to_hex_str(s):
+        return ', '.join(hex(item) for item in sorted(s))
+
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
-        assert not (relocs_to_remove - relocs), ', '.join(sorted(hex(item+image_base) for item in (relocs_to_remove - relocs)))
+        assert not (relocs_to_remove - relocs),\
+            int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs))
+
         relocs -= relocs_to_remove
         relocs |= relocs_to_add
         if debug:
             print("\nRemoved relocations:")
-            print("[%s]" % '\n'.join(textwrap.wrap(', '.join(sorted(hex(item) for item in relocs_to_remove)), 80)))
+            print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_remove), 80)))
             print("\nAdded relocations:")
-            print("[%s]" % '\n'.join(textwrap.wrap(', '.join(sorted(hex(item) for item in relocs_to_add)), 80)))
+            print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_add), 80)))
         
         reloc_table = RelocationTable.build(relocs)
         new_size = reloc_table.size
