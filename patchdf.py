@@ -530,10 +530,8 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                             meta['fixed'] = 'no'
                             return meta
                         elif data[0] == jmp_near:
-                            next_off_2 = line.address
-                            jmp = data[0]
                             next_off_2 = line.operands[0].value
-                            aft = fpeek(fn, next_off_2, count_after)
+                            aft = fpeek(fn, offset, count_after)
                             
                             skip = None
                             if match_mov_reg_imm32(aft[:5], Reg.ecx, dword_count):
@@ -733,8 +731,7 @@ def get_length(s, oldlen, original_string_address=None):
         elif line.mnemonic == 'lea':
             left_operand, right_operand = line.operands
             regs[left_operand.reg] = -1
-            if (dest is None or dest.base_reg == right_operand.base_reg and
-                                dest.disp >= right_operand.disp):
+            if dest is None or dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
                 dest = Operand(base_reg=left_operand.reg, disp=0)
             saved_mach += line.data
         elif line.mnemonic.startswith('jmp'):
