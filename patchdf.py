@@ -748,8 +748,7 @@ def get_length(s, oldlen, original_string_address=None):
             elif line.mnemonic == 'push':
                 if line.operands[0].type == 'reg gen':
                     regs[line.operands[0].reg] = None  # Mark the pushed register as unoccupied
-                elif line.operands[0].type == 'imm' and valid_reference(line.operands[0].value):
-                    not_moveable_after = not_moveable_after or offset
+                not_moveable_after = not_moveable_after or offset
             elif line.mnemonic == 'xor' and line.operands[0].type == 'reg gen':
                 regs[line.operands[0].reg] = -1
             elif line.mnemonic.startswith('call'):
