@@ -752,6 +752,8 @@ def get_length(s, oldlen, original_string_address=None):
                     not_moveable_after = not_moveable_after or offset
             elif line.mnemonic == 'xor' and line.operands[0].type == 'reg gen':
                 regs[line.operands[0].reg] = -1
+            elif line.mnemonic.startswith('call'):
+                not_moveable_after = not_moveable_after or offset
             
             if not_moveable_after is None:
                 if line.operands:
