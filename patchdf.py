@@ -566,7 +566,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         else:
             meta['str'] = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
         return meta
-    elif pre[-1] == mov_acc_mem | 1 or pre[-2] == mov_reg_rm | 1:
+    elif pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and pre[-1] & 0xC7 == join_byte(0, 0, 5)):
         # mov eax, [addr] or mov reg, [addr]
         meta['str'] = 'mov'
         if newlen <= oldlen:
