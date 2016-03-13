@@ -1,4 +1,4 @@
-from disasm import disasm
+from disasm import disasm, analyse_modrm
 
 
 def test_mov_al_1():
@@ -14,3 +14,10 @@ def test_movsw():
 
 def test_push_ff():
     assert str(next(disasm(bytes.fromhex('6A FF')))) == 'push 0FFFFFFFFh'
+
+
+def test_mov_4ecx_imm():
+    data = bytes.fromhex('8b0c8dc0eed00a')
+    d = next(disasm(data))
+    assert str(d) == 'mov ecx, [4*ecx+0AD0EEC0h]'
+    assert d.data == data

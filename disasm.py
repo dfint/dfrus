@@ -74,6 +74,10 @@ def analyse_modrm(s, i):
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 result['disp'] = disp
                 i += 4
+            elif sib.base_reg == Reg.ebp:
+                disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
+                result['disp'] = disp
+                i += 4
 
     return result, i
 
@@ -229,14 +233,13 @@ def unify_operands(x):
             else:
                 # Use the SIB, Luke
                 sib = x['sib']
-                if sib.index_reg == 4:
-                    # Don't use index register
-                    op2 = Operand(scale=sib.scale, base_reg=sib.base_reg)
-                else:
-                    op2 = Operand(scale=sib.scale, index_reg=sib.index_reg, base_reg=sib.base_reg)
+                
+                base = sib.base_reg if not (sib.base_reg == Reg.ebp and modrm.mode == 0) else None
+                index = sib.index_reg if sib.index_reg != 4 else None
+                
+                op2 = Operand(scale=sib.scale, index_reg=index, base_reg=base)
 
-            if modrm.mode > 0:
-                op2.disp = x['disp']
+            op2.disp = x.get('disp', None)
 
     return op1, op2
 
