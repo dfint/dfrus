@@ -241,7 +241,7 @@ def unify_operands(x):
                 
                 op2 = Operand(scale=sib.scale, index_reg=index, base_reg=base)
 
-            op2.disp = x.get('disp', None)
+            op2.disp = x.get('disp', 0)
 
     return op1, op2
 
