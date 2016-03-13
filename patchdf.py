@@ -617,7 +617,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
     return meta
 
 
-def get_length(s, oldlen, original_string_address=None):
+def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
     def belongs_to_the_string(value):
         osa = original_string_address
         return osa is None or 0 <= value - osa < oldlen
@@ -634,16 +634,16 @@ def get_length(s, oldlen, original_string_address=None):
     # * -1   - not empty: a value which is not related to the string copying is stored here
     # * 0    - empty: freed by string copying instruction
     # * > 0  - not empty: a value of the specific size is stored in the register
-    regs = [None for _ in range(8)]
+    regs = regs or [None for _ in range(8)]
     
     is_empty = lambda reg_state: reg_state is None or reg_state == 0
     
     deleted_relocs = set()
     added_relocs = set()
-    dest = None
     saved_mach = bytes()
     not_moveable_after = None
     is_moveable = lambda x: x is None
+    pokes=dict()
     
     nops = dict()
     length = None
@@ -744,7 +744,19 @@ def get_length(s, oldlen, original_string_address=None):
                 dest = Operand(base_reg=left_operand.reg, disp=0)
             saved_mach += line.data
         elif line.mnemonic.startswith('j'):
-            raise ValueError('Jump encountered at offset %x' % line.address)
+            if line.mnemonic.startswith('jmp'):
+                not_moveable_after = not_moveable_after or offset
+                x = get_length(s[line.operands[0].value:], oldlen-copied_len-1, original_string_address, regs, dest)
+                dest = x['dest']
+                if 'short' in line.mnemonic:
+                    disp = line.data[1] + x['length']
+                    pokes = {offset+1: disp}
+                else:
+                    disp = from_dword(line.data[1:]) + x['length']
+                    pokes = {offset+1: to_dword(disp)}
+                break
+            else:
+                raise ValueError('Conditional jump encountered at offset 0x%02x' % line.address)
         else:
             if line.mnemonic.startswith('rep'):
                 regs[Reg.ecx] = None  # Mark ecx as unoccupied
@@ -787,10 +799,10 @@ def get_length(s, oldlen, original_string_address=None):
     
     if not length and copied_len == oldlen:
         length = len(s)
-    if length is None:
-        raise ValueError('Lenght of the copying code not recognized.')
     if not_moveable_after is not None:
         length = not_moveable_after  # return length of code which can be moved harmlessly
+    if length is None:
+        raise ValueError('Length of the copying code not recognized.')
     if dest is None:
         raise ValueError('Destination not recognized.')
     
@@ -803,6 +815,8 @@ def get_length(s, oldlen, original_string_address=None):
     )
     if nops:
         result['nops'] = nops
+    if pokes:
+        result['pokes'] = pokes
     return result
 
 

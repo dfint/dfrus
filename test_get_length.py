@@ -394,7 +394,7 @@ def test_get_length_mild_low_pressure():
     )
 
 
-test_data_for_some_time = bytes.fromhex(
+test_data_tribesman = bytes.fromhex(
     '8b15743d5400'                  # mov         edx, [00543d74]
     'a1783d5400'                    # mov         eax, [00543d78]
     '8d0cff'                        # lea         ecx, [edi*9]
@@ -412,13 +412,13 @@ test_data_for_some_time = bytes.fromhex(
 )
 
 
-def test_get_length_for_some_time():
+def test_get_length_tribesman():
     saved = bytes.fromhex(
         '8d 0c ff'                  # lea         ecx, [edi*9]
         '8b 0c 8d c0 ee d0 0a'      # mov         ecx, [ecx*4+0ad0eec0]
         '2b 0d e0 82 d6 0a'         # sub         ecx, [0ad682e0]
     )
-    result = get_length(test_data_for_some_time, len('for some time'), 0x543d74)
+    result = get_length(test_data_tribesman, len('for some time'), 0x543d74)
     result['dest'] = str(result['dest'])
     assert result == dict(
         deleted_relocs={2, 7, 17, 23, 31, 40},
@@ -427,4 +427,32 @@ def test_get_length_for_some_time():
         length=44,
         saved_mach=saved,
         nops={47: 3, 50: 4}
+    )
+
+
+test_data_tribesman_peasant_intersection = bytes.fromhex(
+    '66a1e4bf5400'                   # mov         ax, [0054bfe4]
+    '8b0ddcbf5400'                   # mov         ecx, [0054bfdc]
+    '8b15e0bf5400'                   # mov         edx, [0054bfe0]
+    '66894598'                       # mov         [ebp-00000068], ax
+    'eb0c'                           # jmp         skip
+    '8b0dd02b5500'                   # mov         ecx, [00552bd0]
+    '8b15d42b5500'                   # mov         edx, [00552bd4]
+                                     # skip:
+    '895594'                         # mov         [ebp-0000006c], edx
+    '894d90'                         # mov         [ebp-00000070], ecx
+    '8d4590'                         # lea         eax, [ebp-00000070]
+)
+
+
+def test_get_length_tribesman_peasant_intersection():
+    result = get_length(test_data_tribesman_peasant_intersection, len('tribesman'), 0x54bfdc)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={2, 8, 14},
+        added_relocs=set(),
+        dest='[ebp-70h]',
+        length=22,
+        saved_mach=bytes(),
+        pokes={23: 0x0C+6},
     )
