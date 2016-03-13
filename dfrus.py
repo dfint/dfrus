@@ -293,6 +293,7 @@ def _main():
 
     fixes = dict()
     metadata = dict()
+    delayed_pokes = dict()
 
     for off, string, cap_len in strings:
         if string in trans_table:
@@ -350,9 +351,13 @@ def _main():
                     src_off = fix['src_off']
                 
                     add_fix(fixes, src_off, fix)
-                elif 'added_relocs' in fix:
-                    # Add relocations of new references of moved items
-                    relocs_to_add.update(item + ref_rva for item in fix['added_relocs'])
+                else:
+                    if 'added_relocs' in fix:
+                        # Add relocations of new references of moved items
+                        relocs_to_add.update(item + ref_rva for item in fix['added_relocs'])
+
+                    if 'pokes' in fix:
+                        delayed_pokes.update(fix['pokes'])
 
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
@@ -361,6 +366,9 @@ def _main():
                     fpoke4(fn, ref, string_address)
 
                 metadata[(string, ref_rva+image_base)] = fix
+
+    for offset, b in delayed_pokes.items():
+        fpoke(fn, offset, b)
 
     # Extract information of functions parameters
     functions = defaultdict(dict)
@@ -466,8 +474,9 @@ def _main():
 
             relocs_to_add.update(hook_rva + item for item in new_refs)
         
-        if 'poke' in fix:
-            fpoke(fn, fix['poke'][0], fix['poke'][1])
+        if 'pokes' in fix:
+            for off, b in fix['pokes'].items():
+                fpoke(fn, off, b)
         
         src_rva = sections[code].offset_to_rva(src_off)
         disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
