@@ -65,6 +65,8 @@ def analyse_modrm(s, i):
                 sib = Sib.split(s[i])
                 result['sib'] = sib
                 i += 1
+            else:
+                sib = None
 
             if modrm.mode == 1:
                 disp = to_signed(s[i], 8)
@@ -74,7 +76,7 @@ def analyse_modrm(s, i):
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 result['disp'] = disp
                 i += 4
-            elif sib.base_reg == Reg.ebp:
+            elif sib and sib.base_reg == Reg.ebp:
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 result['disp'] = disp
                 i += 4
@@ -165,7 +167,7 @@ class Operand:
 
                     result += regs[self.index_reg][2]
 
-                if self.disp != 0 or not result:
+                if self.disp or not result:
                     if self.disp >= 0:
                         if not result:
                             result += asmhex(self.disp)
