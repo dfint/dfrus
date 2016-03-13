@@ -487,8 +487,7 @@ def _main():
 
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
-        assert not (relocs_to_remove - relocs),\
-            int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs))
+        assert not (relocs_to_remove - relocs), int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs))
 
         relocs -= relocs_to_remove
         relocs |= relocs_to_add

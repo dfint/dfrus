@@ -1,11 +1,13 @@
 
+import csv
+import sys
+
 from disasm import *
 from binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from opcodes import *
 from collections import defaultdict
 from machinecode import MachineCode, Reference
 from warnings import warn
-import csv
 
 
 def ord_utf16(c):
@@ -582,6 +584,10 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                 meta['get_length_error'] = repr(err)
                 return meta
 
+            if False and 'pokes' in x:
+                for off, b in x['pokes'].items():
+                    fpoke(fn, next_off + off, b)
+
             fix = get_fix_for_moves(x, newlen, string_address, meta)
 
             if fix['fixed'] == 'yes':
@@ -662,8 +668,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                 if (not is_empty(regs[left_operand.reg]) and 
                         left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
                     warn('%s register is already marked as occupied. String address: 0x%x' %
-                         (left_operand, original_string_address),
-                         stacklevel=2)
+                         (left_operand, original_string_address), stacklevel=2)
                 
                 if right_operand.type == 'ref abs':
                     # mov reg, [mem]
