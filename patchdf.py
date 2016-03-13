@@ -731,7 +731,7 @@ def get_length(s, oldlen, original_string_address=None):
         elif line.mnemonic == 'lea':
             left_operand, right_operand = line.operands
             regs[left_operand.reg] = -1
-            if dest is None or dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
+            if dest is not None and dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
                 dest = Operand(base_reg=left_operand.reg, disp=0)
             saved_mach += line.data
         elif line.mnemonic.startswith('j'):
