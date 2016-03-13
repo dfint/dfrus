@@ -734,7 +734,7 @@ def get_length(s, oldlen, original_string_address=None):
             if dest is None or dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
                 dest = Operand(base_reg=left_operand.reg, disp=0)
             saved_mach += line.data
-        elif line.mnemonic.startswith('jmp'):
+        elif line.mnemonic.startswith('j'):
             raise ValueError('Jump encountered at offset %x' % line.address)
         else:
             if line.mnemonic.startswith('rep'):
