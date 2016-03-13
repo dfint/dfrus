@@ -571,23 +571,24 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
     elif pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and pre[-1] & 0xC7 == join_byte(0, 0, 5)):
         # mov eax, [addr] or mov reg, [addr]
         meta['str'] = 'mov'
-        if newlen <= oldlen:
+
+        next_off = offset - get_start(pre)
+        aft = fpeek(fn, next_off, count_after)
+        try:
+            x = get_length(aft, oldlen, original_string_address)
+        except (ValueError, IndexError) as err:
+            meta['fixed'] = 'no'
+            meta['get_length_error'] = repr(err)
+            return meta
+
+        if 'pokes' in x:
+            for off, b in x['pokes'].items():
+                fpoke(fn, next_off + off, b)
+
+        if newlen <= oldlen and 'pokes' not in x:
             meta['fixed'] = 'not needed'
             return meta
         else:
-            next_off = offset - get_start(pre)
-            aft = fpeek(fn, next_off, count_after)
-            try:
-                x = get_length(aft, oldlen, original_string_address)
-            except (ValueError, IndexError) as err:
-                meta['fixed'] = 'no'
-                meta['get_length_error'] = repr(err)
-                return meta
-
-            if False and 'pokes' in x:
-                for off, b in x['pokes'].items():
-                    fpoke(fn, next_off + off, b)
-
             fix = get_fix_for_moves(x, newlen, string_address, meta)
 
             if fix['fixed'] == 'yes':
