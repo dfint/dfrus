@@ -54,8 +54,9 @@ def test_get_length_push():
         deleted_relocs={2, 7, 13, 30},
         added_relocs=set(),
         dest='[ecx]',
-        length=53,
-        saved_mach=bytes.fromhex('8D 8D 90 FB FF FF  51')  # lea ecx, [ebp-470h] ; push ecx
+        length=40,
+        saved_mach=bytes.fromhex('8D 8D 90 FB FF FF'),  # lea ecx, [ebp-470h] ; push ecx
+        nops={41: 6, 47: 6},
     )
 
 
