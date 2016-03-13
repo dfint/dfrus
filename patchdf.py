@@ -385,7 +385,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                                 retvalue = dict(
                                     src_off=line.address + 1,
                                     new_code=new_code,
-                                    poke=(line.address, jmp_near)  # Replace call with jump
+                                    pokes={line.address: jmp_near}  # Replace call with jump
                                 )
                                 retvalue.update(meta)
                                 return retvalue
@@ -595,8 +595,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                     fix['added_relocs'] = [next_off + ref - offset for ref in fix['added_relocs']]
 
                 if 'pokes' in fix:
-                    for off, s in fix['pokes'].items():
-                        fpoke(fn, next_off + off, s)
+                    fix['pokes'] = {next_off + off: b for off, b in fix['pokes'].items()}
 
             return fix
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
