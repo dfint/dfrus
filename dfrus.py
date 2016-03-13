@@ -71,7 +71,8 @@ def myrepr(s):
 
 
 def find_earliest_midrefs(off, refs, xref_table, length):
-    k = 4
+    increment = 4
+    k = increment
     while off + k in xref_table and k < length + 1:
         for j, ref in enumerate(refs):
             mid_refs = xref_table[off + k]
@@ -79,7 +80,11 @@ def find_earliest_midrefs(off, refs, xref_table, length):
                 if mid_ref < ref and ref - mid_ref < 70:  # Empyrically picked number
                     refs[j] = mid_ref
                     break
-        k += 4
+        
+        while k + increment >= length + 1 and increment > 1:
+            increment /= 2
+        
+        k += increment
     return refs
 
 
@@ -527,4 +532,5 @@ def _main():
     fn.close()
     print('Done.')
 
-_main()
+if __name__ == "__main__":
+    _main()
