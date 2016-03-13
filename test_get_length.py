@@ -264,7 +264,6 @@ def test_mach_memcpy_stimulant():
     newlen = len('стимулятор')
     count = newlen + 1
     mach, new_refs = mach_memcpy(string_addr, dest, newlen + 1)
-    print([(line.address, ''.join('%02x' % x for x in line.data), str(line)) for line in disasm(mach)])
     assert [str(line) for line in disasm(mach)] == [
         'pushad',
         'mov edi, %Xh' % dest.disp,
