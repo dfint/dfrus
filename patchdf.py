@@ -674,11 +674,17 @@ def get_length(s, oldlen, original_string_address=None):
                         regs[left_operand.reg] = -1
                         not_moveable_after = not_moveable_after or offset
                 elif right_operand.type == 'imm' and valid_reference(right_operand.value):
+                    # This may be a reference to another string
                     not_moveable_after = not_moveable_after or offset
                 else:
                     # `mov reg1, [reg2+disp]` or `mov reg, imm`
                     regs[left_operand.reg] = -1
                     if is_moveable(not_moveable_after):
+                        if valid_reference(right_operand.disp):
+                            value = right_operand.disp
+                            local_offset = line.data.rindex(to_dword(value))
+                            deleted_relocs.add(offset + local_offset)
+                            added_relocs.add(len(saved_mach) + local_offset)
                         saved_mach += line.data
             elif left_operand.type in {'ref rel', 'ref abs'}:
                 # `mov [reg1+disp], reg2` or `mov [off], reg`

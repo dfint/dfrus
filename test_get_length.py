@@ -393,3 +393,39 @@ def test_get_length_mild_low_pressure():
         saved_mach=bytes(),
         nops={31: 6, 37: 6, 56: 6, 62: 6, 81: 6, 87: 7, 285: 7}
     )
+
+
+test_data_for_some_time = bytes.fromhex(
+    '8b15743d5400'                  # mov         edx, [00543d74]
+    'a1783d5400'                    # mov         eax, [00543d78]
+    '8d0cff'                        # lea         ecx, [edi*9]
+    '8b0c8dc0eed00a'                # mov         ecx, [ecx*4+0ad0eec0]
+    '2b0de082d60a'                  # sub         ecx, [0ad682e0]
+    '8916'                          # mov         [esi], edx
+    '8b157c3d5400'                  # mov         edx, [00543d7c]
+    '894604'                        # mov         [esi+0x4], eax
+    '66a1803d5400'                  # mov         ax, [00543d80]
+    '83c40c'                        # add         esp, 0xc
+    '895608'                        # mov         [esi+0x8], edx
+    '6689460c'                      # mov         [esi+0xc], ax
+    '83f90a'                        # cmp         ecx, 0xa
+    '7d44'                          # jnl         0x1329f
+)
+
+
+def test_get_length_for_some_time():
+    saved = bytes.fromhex(
+        '8d 0c ff'                  # lea         ecx, [edi*9]
+        '8b 0c 8d c0 ee d0 0a'      # mov         ecx, [ecx*4+0ad0eec0]
+        '2b 0d e0 82 d6 0a'         # sub         ecx, [0ad682e0]
+    )
+    result = get_length(test_data_for_some_time, len('for some time'), 0x543d74)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        deleted_relocs={2, 7, 17, 23, 31, 40},
+        added_relocs={6, 12},
+        dest='[esi]',
+        length=44,
+        saved_mach=saved,
+        nops={47: 3, 50: 4}
+    )
