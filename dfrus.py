@@ -2,6 +2,7 @@ import os.path
 import argparse
 import sys
 import textwrap
+import warnings
 
 from shutil import copy
 from collections import defaultdict
@@ -94,7 +95,10 @@ def _main():
     args = parser.parse_args(sys.argv[1:])
 
     debug = args.debug
-
+    
+    if not debug:
+        warnings.simplefilter('ignore')
+    
     path = args.path
 
     if len(path) == 0 or not os.path.exists(path):

@@ -4,6 +4,7 @@ from binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from opcodes import *
 from collections import defaultdict
 from machinecode import MachineCode, Reference
+from warnings import warn
 import csv
 
 
@@ -659,9 +660,12 @@ def get_length(s, oldlen, original_string_address=None):
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
                 # mov reg, [...]
-                assert is_empty(regs[left_operand.reg]) or \
-                        left_operand.reg in {right_operand.base_reg, right_operand.index_reg}, \
-                        'Register is already marked as occupied: %s' % left_operand
+                if (not is_empty(regs[left_operand.reg]) and 
+                        left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
+                    warn('%s register is already marked as occupied. String address: 0x%x' %
+                         (left_operand, original_string_address),
+                         stacklevel=2)
+                
                 if right_operand.type == 'ref abs':
                     # mov reg, [mem]
                     local_offset = line.data.index(to_dword(right_operand.disp))
