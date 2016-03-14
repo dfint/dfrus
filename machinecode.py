@@ -90,6 +90,7 @@ class MachineCode:
             elif isinstance(item, str):
                 pass  # label name encountered, do nothing
             elif isinstance(item, Iterable):
+                j = 0
                 for j, b in enumerate(item, 1):
                     yield b
                 i += j
