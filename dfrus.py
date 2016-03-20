@@ -216,7 +216,7 @@ def _main():
     xref_table = pd.get_cross_references(fn, relocs, sections, image_base)
 
     # --------------------------------------------------------
-    if args.codepage and False:
+    if args.codepage:
         print("Searching for charmap table...")
         unicode_table_start = b''.join(
             to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
