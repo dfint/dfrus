@@ -4,6 +4,7 @@ import sys
 from peclasses import PortableExecutable
 from patchdf import get_cross_references
 from collections import Counter
+from disasm import align
 
 forbidden = set(b'$^')
 
@@ -56,12 +57,12 @@ def count_zeros(buf):
     return len(buf)
 
 
-def find_next_string_xref(s_xrefs, i, obj_off, s_len):
+def find_next_string_xref(s_xrefs, i, obj_off):
     i += 1
     if i >= len(s_xrefs):
         return -1
     
-    while s_xrefs[i] - obj_off <= s_len:
+    while s_xrefs[i] <= obj_off:
         i += 1
         if i >= len(s_xrefs):
             return -1
@@ -69,7 +70,7 @@ def find_next_string_xref(s_xrefs, i, obj_off, s_len):
     return s_xrefs[i]
 
 
-def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
+def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
     prev_string = None
     s_xrefs = sorted(xrefs)
     for i, obj_off in enumerate(s_xrefs):
@@ -94,16 +95,20 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437'):
         if s_len and letters > 0:
             s = buf[:s_len].decode(encoding=encoding)
             
-            upper_bound = find_next_string_xref(s_xrefs, i, obj_off, s_len)
-            buf = buf[s_len:upper_bound]
-            cap_len = s_len + count_zeros(buf) - 1
-            current_string = (obj_off, s, cap_len)
-            yield current_string
-            
-            for off, s, cap_len in check_string_array(buf, obj_off + s_len, encoding):
-                prev_string = current_string
-                current_string = (off, s.decode(encoding=encoding), cap_len)
+            if not arrays:
+                cap_len = align(len(s) + 1)
+                current_string = (obj_off, s, cap_len)
                 yield current_string
+            else:
+                upper_bound = find_next_string_xref(s_xrefs, i, obj_off + s_len)
+                buf = buf[s_len:upper_bound]
+                cap_len = s_len + count_zeros(buf) - 1
+                current_string = (obj_off, s, cap_len)
+                yield current_string
+
+                for off, s, cap_len in check_string_array(buf, obj_off + s_len, encoding):
+                    current_string = (off, s.decode(encoding=encoding), cap_len)
+                    yield current_string
             
             prev_string = current_string
 
