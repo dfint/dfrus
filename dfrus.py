@@ -310,14 +310,13 @@ def _main():
             else:
                 refs = []
 
-            aligned_len = align(len(string) + 1)
-            is_long = cap_len < len(translation)
+            is_long = cap_len < len(translation) + 1
             original_string_address = sections.offset_to_rva(off) + image_base
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
                 write_string(fn, translation,
                              off=off, encoding=encoding,
-                             new_len=aligned_len)
+                             new_len=cap_len)
                 string_address = original_string_address
             else:
                 # Add the translation to the separate section
