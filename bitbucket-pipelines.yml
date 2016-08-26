@@ -6,5 +6,5 @@ pipelines:
   default:
     - step:
         script: # Modify the commands below to build your repository.
-          - pip install -r test_requirements.txt
+          - pip install -r requirements_test.txt
           - py.test --cov-config .coveragerc --cov
