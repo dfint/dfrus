@@ -503,7 +503,7 @@ def _main():
             # TODO: Add necessary check (timedate etc.)
     except OSError:
         print("Unable to open '%s'" % df1)
-        sys.exit()
+        return
 
     # --------------------------------------------------------
     print("Loading translation file...")
@@ -519,7 +519,7 @@ def _main():
 
     except FileNotFoundError:
         print('Error: "%s" file not found.' % args.dictionary)
-        sys.exit()
+        return
 
     # --------------------------------------------------------
     print("Copying '%s'\nTo '%s'..." % (df1, df2))
@@ -528,7 +528,7 @@ def _main():
         copy(df1, df2)
     except IOError:
         print("Failed.")
-        sys.exit()
+        return
     else:
         print("Success.")
 
@@ -544,13 +544,12 @@ def _main():
                 print("Failed. '%s' is not an executable file." % df2)
                 fn.close()
                 os.remove(df2)
-                sys.exit()
+                return
             
             fix_df_exe(fn, pe, args.codepage, args.original_codepage, trans_table, debug)
         
     except OSError:
         print("Failed to open '%s'" % df2)
-        sys.exit()
 
 
 if __name__ == "__main__":
