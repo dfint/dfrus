@@ -497,15 +497,6 @@ def _main():
     df2 = os.path.join(dest_path, dest_name)
 
     # --------------------------------------------------------
-    try:
-        with open(df1, "rb"):
-            pass
-            # TODO: Add necessary check (timedate etc.)
-    except OSError:
-        print("Unable to open '%s'" % df1)
-        return
-
-    # --------------------------------------------------------
     print("Loading translation file...")
 
     try:
