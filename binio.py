@@ -1,4 +1,8 @@
 
+import collections
+import random
+
+
 def get_integer32(file_object):
     return int.from_bytes(file_object.read(4), byteorder='little')
 
@@ -95,8 +99,6 @@ def fpeek2u(file_object, off, count=1):
         file_object.seek(off)
         return [get_integer16(file_object) for _ in range(count)]
 
-import collections
-
 
 def fpoke4(file_object, off, x):
     if isinstance(x, collections.Iterable):
@@ -123,9 +125,6 @@ def fpoke(file_object, off, x):
     else:
         file_object.seek(off)
         file_object.write(bytes([to_unsigned(x, 8)]))
-
-
-import random
 
 
 class TestFileObject(object):
