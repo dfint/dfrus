@@ -125,9 +125,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         needle = search_charmap(fn, sections, xref_table)
         
         if needle is None:
-            fn.close()
             print("Charmap table not found.")
-            sys.exit()
+            return
 
         print("Charmap table found at offset 0x%X" % needle)
 
@@ -146,9 +145,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     last_section = sections[-1]
 
     if last_section.name == b'.new':
-        fn.close()
         print("There is '.new' section in the file already.")
-        sys.exit()
+        return
 
     file_alignment = pe.optional_header.file_alignment
     section_alignment = pe.optional_header.section_alignment
@@ -433,6 +431,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
         pe.file_header.rewrite()
         pe.optional_header.rewrite()
+    
+    print('Done.')
+
 
 
 def slice_translation(trans_table, bounds):
@@ -547,7 +548,6 @@ def _main():
             
             fix_df_exe(fn, pe, args.codepage, args.original_codepage, trans_table, debug)
         
-        print('Done.')
     except OSError:
         print("Failed to open '%s'" % df2)
         sys.exit()
