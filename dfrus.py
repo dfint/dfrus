@@ -187,12 +187,6 @@ def _main():
     except FileNotFoundError:
         print('Error: "%s" file not found.' % args.dictionary)
         sys.exit()
-    except LookupError as err:
-        if str(err).startswith('unknown encoding'):
-            print('Error: unknown codepage %r' % encoding)
-            sys.exit()
-        else:
-            raise
 
     # --------------------------------------------------------
     print("Copying '%s'\nTo '%s'..." % (df1, df2))
