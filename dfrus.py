@@ -435,6 +435,34 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         pe.optional_header.rewrite()
 
 
+def slice_translation(trans_table, bounds):
+    trans_table = list(trans_table)
+    print('%d translation pairs loaded.' % len(trans_table))
+
+    if not bounds:
+        pass
+    elif len(bounds) == 1:
+        i = bounds[0]
+        if 0 <= i < len(trans_table):
+            trans_table = [trans_table[i]]
+        else:
+            print('Warning: Translation index is too high or too low. Using all the translations.')
+
+    elif len(bounds) > 1:
+        start_index = bounds[0]
+        end_index = bounds[1]
+
+        if not 0 <= start_index <= end_index < len(trans_table):
+            print('Warning: Translation indices are too high or too low. Using all the translations.')
+        else:
+            print('Slicing translations (low, mid, high): %d:%d:%d' %
+                  (start_index, (start_index + end_index) // 2, end_index))
+            trans_table = trans_table[start_index:end_index + 1]
+            print('Leaving %d translations.' % len(trans_table))
+
+    return dict(trans_table)
+
+
 def _main():
     parser = init_argparser()
 
@@ -486,31 +514,8 @@ def _main():
             if not debug:
                 trans_table = dict(trans_table)
             else:
-                trans_table = list(trans_table)
-                print('%d translation pairs loaded.' % len(trans_table))
+                trans_table = slice_translation(trans_table, args.slice)
 
-                if not args.slice:
-                    pass
-                elif len(args.slice) == 1:
-                    i = args.slice[0]
-                    if 0 <= i < len(trans_table):
-                        trans_table = [trans_table[i]]
-                    else:
-                        print('Warning: Translation index is too high or too low. Using all the translations.')
-
-                elif len(args.slice) > 1:
-                    start_index = args.slice[0]
-                    end_index = args.slice[1]
-
-                    if not 0 <= start_index <= end_index < len(trans_table):
-                        print('Warning: Translation indices are too high or too low. Using all the translations.')
-                    else:
-                        print('Slicing translations (low, mid, high): %d:%d:%d' %
-                              (start_index, (start_index + end_index) // 2, end_index))
-                        trans_table = trans_table[start_index:end_index + 1]
-                        print('Leaving %d translations.' % len(trans_table))
-
-                trans_table = dict(trans_table)
     except FileNotFoundError:
         print('Error: "%s" file not found.' % args.dictionary)
         sys.exit()
