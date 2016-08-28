@@ -125,8 +125,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         needle = search_charmap(fn, sections, xref_table)
         
         if needle is None:
-            print("Charmap table not found.")
-            return
+            print("Warning: charmap table not found. Skipping.")
 
         print("Charmap table found at offset 0x%X" % needle)
 
@@ -134,7 +133,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             print("Patching charmap table to %s..." % codepage)
             pd.patch_unicode_table(fn, needle, codepage)
         except KeyError:
-            print("Codepage %s not implemented. Skipping." % codepage)
+            print("Warning: codepage %s not implemented. Skipping." % codepage)
         else:
             print("Done.")
 
