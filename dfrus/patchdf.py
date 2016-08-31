@@ -2,11 +2,11 @@
 import csv
 import sys
 
-from disasm import *
-from binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
-from opcodes import *
+from .disasm import *
+from .binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
+from .opcodes import *
 from collections import defaultdict
-from machinecode import MachineCode, Reference
+from .machinecode import MachineCode, Reference
 from warnings import warn
 
 

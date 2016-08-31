@@ -1,7 +1,7 @@
 from collections import Iterable, Sequence
-from opcodes import *
-from disasm import join_byte, Operand, mach_lea
-from binio import to_dword
+from .opcodes import *
+from .disasm import join_byte, Operand, mach_lea
+from .binio import to_dword
 
 '''
 # Concept:

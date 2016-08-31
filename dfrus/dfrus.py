@@ -7,14 +7,14 @@ import warnings
 from shutil import copy
 from collections import defaultdict
 
-from extract_strings import extract_strings
-from binio import write_string, to_dword, fpeek, fpoke4, fpoke
-from peclasses import PortableExecutable, Section, RelocationTable
-import patchdf as pd
-from patchdf import code, data
-from opcodes import *
-from machinecode import MachineCode
-from disasm import align, join_byte
+from .extract_strings import extract_strings
+from .binio import write_string, to_dword, fpeek, fpoke4, fpoke
+from .peclasses import PortableExecutable, Section, RelocationTable
+from . import patchdf as pd
+from .patchdf import code, data
+from .opcodes import *
+from .machinecode import MachineCode
+from .disasm import align, join_byte
 
 
 def init_argparser():
