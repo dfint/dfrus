@@ -11,7 +11,7 @@ pipelines:
   branches:
     package:
       - step:
-        script:
-          - pip install -e .
-          - pip install -r requirements_test
-          - py.test --cov
+          script:
+            - pip install -e .
+            - pip install -r requirements_test
+            - py.test --cov
