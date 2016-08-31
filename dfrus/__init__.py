@@ -1,1 +1,1 @@
-from dfrus import *
+from .dfrus import *
