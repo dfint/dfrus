@@ -15,6 +15,7 @@ def ord_utf16(c):
 
 
 codepages = {
+    'cp437': dict(),  # Stub entry, so that dfrus.py do not complain that cp437 is not implemented
     'cp737': {
         0x80: range(ord_utf16('Α'), ord_utf16('Ρ') + 1),
         0x91: range(ord_utf16('Σ'), ord_utf16('Ω') + 1),
