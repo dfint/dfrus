@@ -2,7 +2,7 @@
 import sys
 import argparse
 
-from peclasses import *
+from .peclasses import *
 
 
 def main():
