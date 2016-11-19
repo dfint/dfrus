@@ -1,10 +1,10 @@
 #! python3
 
 import sys
-from peclasses import PortableExecutable
-from patchdf import get_cross_references
+from .peclasses import PortableExecutable
+from .patchdf import get_cross_references
 from collections import Counter
-from disasm import align
+from .disasm import align
 
 forbidden = set(b'$^')
 

@@ -6,7 +6,7 @@ from collections import OrderedDict
 from array import array
 from itertools import zip_longest
 
-from disasm import align
+from .disasm import align
 
 
 class Structure:
