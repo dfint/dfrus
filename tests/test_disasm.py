@@ -1,4 +1,4 @@
-from disasm import disasm, analyse_modrm
+from dfrus.disasm import disasm, analyse_modrm
 
 
 def test_mov_al_1():
