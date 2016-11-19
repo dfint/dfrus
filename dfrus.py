@@ -89,121 +89,25 @@ def find_earliest_midrefs(off, refs, xref_table, length):
     return refs
 
 
-def _main():
-    parser = init_argparser()
-
-    args = parser.parse_args(sys.argv[1:])
-
-    debug = args.debug
+def search_charmap(fn, sections, xref_table):
+    unicode_table_start = b''.join(
+        to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
+    )
     
-    if not debug:
-        warnings.simplefilter('ignore')
+    offset = sections[1].physical_offset
+    size = sum(section.physical_size for section in sections[1:])
+    data_block = fpeek(fn, offset, size)
+    for obj_off in xref_table:
+        off = obj_off - offset
+        if 0 <= off < size:
+            buf = data_block[off:off+len(unicode_table_start)]
+            if buf == unicode_table_start:
+                return obj_off
     
-    path = args.path
+    return None
 
-    if len(path) == 0 or not os.path.exists(path):
-        if debug:
-            print("Path was not given or doesn't exist. Using defaults.")
-        df1 = "Dwarf Fortress.exe"
-    elif os.path.isdir(path):
-        df1 = os.path.join(path, "Dwarf Fortress.exe")
-    else:
-        df1 = path
-        path = os.path.dirname(path)
 
-    if args.dest:
-        dest_path, dest_name = os.path.split(args.dest)
-        if not dest_path:
-            dest_path = path
-    else:
-        dest_path = path
-        dest_name = 'Dwarf Fortress Patched.exe'
-
-    df2 = os.path.join(dest_path, dest_name)
-
-    # --------------------------------------------------------
-    try:
-        with open(df1, "rb"):
-            pass
-            # TODO: Add necessary check (timedate etc.)
-    except OSError:
-        print("Unable to open '%s'" % df1)
-        sys.exit()
-
-    # --------------------------------------------------------
-    print("Loading translation file...")
-
-    encoding = args.codepage if args.codepage else 'cp437'
-    try:
-        with open(args.dictionary, encoding='utf-8') as trans:
-            trans_table = pd.load_trans_file(trans)
-
-            if not debug:
-                trans_table = dict(trans_table)
-            else:
-                trans_table = list(trans_table)
-                print('%d translation pairs loaded.' % len(trans_table))
-
-                if not args.slice:
-                    pass
-                elif len(args.slice) == 1:
-                    i = args.slice[0]
-                    if 0 <= i < len(trans_table):
-                        trans_table = [trans_table[i]]
-                    else:
-                        print('Warning: Translation index is too high or too low. Using all the translations.')
-
-                elif len(args.slice) > 1:
-                    start_index = args.slice[0]
-                    end_index = args.slice[1]
-
-                    if not 0 <= start_index <= end_index < len(trans_table):
-                        print('Warning: Translation indices are too high or too low. Using all the translations.')
-                    else:
-                        print('Slicing translations (low, mid, high): %d:%d:%d' %
-                              (start_index, (start_index + end_index) // 2, end_index))
-                        trans_table = trans_table[start_index:end_index + 1]
-                        print('Leaving %d translations.' % len(trans_table))
-
-                trans_table = dict(trans_table)
-    except FileNotFoundError:
-        print('Error: "%s" file not found.' % args.dictionary)
-        sys.exit()
-    except LookupError as err:
-        if str(err).startswith('unknown encoding'):
-            print('Error: unknown codepage %r' % encoding)
-            sys.exit()
-        else:
-            raise
-
-    # --------------------------------------------------------
-    print("Copying '%s'\nTo '%s'..." % (df1, df2))
-
-    try:
-        copy(df1, df2)
-    except IOError:
-        print("Failed.")
-        sys.exit()
-    else:
-        print("Success.")
-
-    # --------------------------------------------------------
-    print("Finding cross-references...")
-
-    try:
-        fn = open(df2, "r+b")
-    except OSError:
-        print("Failed to open '%s'" % df2)
-        sys.exit()
-
-    try:
-        pe = PortableExecutable(fn)
-    except ValueError:
-        print("Failed. '%s' is not an executable file." % df2)
-        fn.close()
-        os.remove(df2)
-        sys.exit()
-
+def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     image_base = pe.optional_header.image_base
     sections = pe.section_table
 
@@ -216,34 +120,20 @@ def _main():
     xref_table = pd.get_cross_references(fn, relocs, sections, image_base)
 
     # --------------------------------------------------------
-    if args.codepage and False:
+    if codepage:
         print("Searching for charmap table...")
-        unicode_table_start = b''.join(
-            to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
-        )
+        needle = search_charmap(fn, sections, xref_table)
         
-        physical_offset = sections[data].physical_offset
-        physical_size = sections[data].physical_size
-        data_section = fpeek(fn, physical_offset, physical_size)
-        for obj_off in xref_table:
-            off = obj_off - physical_offset
-            if 0 <= off < physical_size:
-                buf = data_section[off:off+len(unicode_table_start)]
-                if buf == unicode_table_start:
-                    needle = obj_off
-                    break
-        else:
-            fn.close()
-            print("Charmap table not found.")
-            sys.exit()
+        if needle is None:
+            print("Warning: charmap table not found. Skipping.")
 
         print("Charmap table found at offset 0x%X" % needle)
 
         try:
-            print("Patching charmap table to %s..." % args.codepage)
-            pd.patch_unicode_table(fn, needle, args.codepage)
+            print("Patching charmap table to %s..." % codepage)
+            pd.patch_unicode_table(fn, needle, codepage)
         except KeyError:
-            print("Codepage %s not implemented. Skipping." % args.codepage)
+            print("Warning: codepage %s not implemented. Skipping." % codepage)
         else:
             print("Done.")
 
@@ -254,9 +144,8 @@ def _main():
     last_section = sections[-1]
 
     if last_section.name == b'.new':
-        fn.close()
         print("There is '.new' section in the file already.")
-        sys.exit()
+        return
 
     file_alignment = pe.optional_header.file_alignment
     section_alignment = pe.optional_header.section_alignment
@@ -278,7 +167,7 @@ def _main():
     # --------------------------------------------------------
     print("Translating...")
 
-    strings = list(extract_strings(fn, xref_table, encoding=args.original_codepage))
+    strings = list(extract_strings(fn, xref_table, encoding=original_codepage))
 
     if debug:
         print("%d strings extracted." % len(strings))
@@ -294,7 +183,9 @@ def _main():
     fixes = dict()
     metadata = dict()
     delayed_pokes = dict()
-
+    
+    encoding = codepage if codepage else 'cp437'
+    
     for off, string, cap_len in strings:
         if string in trans_table:
             translation = trans_table[string]
@@ -310,14 +201,13 @@ def _main():
             else:
                 refs = []
 
-            aligned_len = align(len(string) + 1)
-            is_long = cap_len < len(translation)
+            is_long = cap_len < len(translation) + 1
             original_string_address = sections.offset_to_rva(off) + image_base
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
                 write_string(fn, translation,
                              off=off, encoding=encoding,
-                             new_len=aligned_len)
+                             new_len=cap_len)
                 string_address = original_string_address
             else:
                 # Add the translation to the separate section
@@ -504,7 +394,7 @@ def _main():
         reloc_size = data_directory.basereloc.size
         fn.seek(reloc_off)
         reloc_table.to_file(fn)
-        assert new_size <= sections[4].physical_size
+        assert new_size <= sections[-1].physical_size
         if new_size < reloc_size:
             fn.seek(reloc_off + new_size)
             fn.write(bytes(reloc_size - new_size))
@@ -540,9 +430,117 @@ def _main():
 
         pe.file_header.rewrite()
         pe.optional_header.rewrite()
-
-    fn.close()
+    
     print('Done.')
+
+
+
+def slice_translation(trans_table, bounds):
+    trans_table = list(trans_table)
+    print('%d translation pairs loaded.' % len(trans_table))
+
+    if not bounds:
+        pass
+    elif len(bounds) == 1:
+        i = bounds[0]
+        if 0 <= i < len(trans_table):
+            trans_table = [trans_table[i]]
+        else:
+            print('Warning: Translation index is too high or too low. Using all the translations.')
+
+    elif len(bounds) > 1:
+        start_index = bounds[0]
+        end_index = bounds[1]
+
+        if not 0 <= start_index <= end_index < len(trans_table):
+            print('Warning: Translation indices are too high or too low. Using all the translations.')
+        else:
+            print('Slicing translations (low, mid, high): %d:%d:%d' %
+                  (start_index, (start_index + end_index) // 2, end_index))
+            trans_table = trans_table[start_index:end_index + 1]
+            print('Leaving %d translations.' % len(trans_table))
+
+    return dict(trans_table)
+
+
+def _main():
+    parser = init_argparser()
+
+    args = parser.parse_args(sys.argv[1:])
+
+    debug = args.debug
+    
+    if not debug:
+        warnings.simplefilter('ignore')
+    
+    path = args.path
+
+    if len(path) == 0 or not os.path.exists(path):
+        if debug:
+            print("Path was not given or doesn't exist. Using defaults.")
+        df1 = "Dwarf Fortress.exe"
+    elif os.path.isdir(path):
+        df1 = os.path.join(path, "Dwarf Fortress.exe")
+    else:
+        df1 = path
+        path = os.path.dirname(path)
+
+    if args.dest:
+        dest_path, dest_name = os.path.split(args.dest)
+        if not dest_path:
+            dest_path = path
+    else:
+        dest_path = path
+        dest_name = 'Dwarf Fortress Patched.exe'
+
+    df2 = os.path.join(dest_path, dest_name)
+
+    # --------------------------------------------------------
+    print("Loading translation file...")
+
+    try:
+        with open(args.dictionary, encoding='utf-8') as trans:
+            trans_table = pd.load_trans_file(trans)
+
+            if not debug:
+                trans_table = dict(trans_table)
+            else:
+                trans_table = slice_translation(trans_table, args.slice)
+
+    except FileNotFoundError:
+        print('Error: "%s" file not found.' % args.dictionary)
+        return
+
+    # --------------------------------------------------------
+    print("Copying '%s'\nTo '%s'..." % (df1, df2))
+
+    try:
+        copy(df1, df2)
+    except IOError:
+        print("Failed.")
+        return
+    else:
+        print("Success.")
+
+    # --------------------------------------------------------
+    print("Finding cross-references...")
+    
+    try:
+        with open(df2, "r+b") as fn:
+            fn = open(df2, "r+b")
+            try:
+                pe = PortableExecutable(fn)
+            except ValueError:
+                print("Failed. '%s' is not an executable file." % df2)
+                fn.close()
+                os.remove(df2)
+                return
+            
+            fix_df_exe(fn, pe, args.codepage, args.original_codepage, trans_table, debug)
+        
+    except OSError:
+        print("Failed to open '%s'" % df2)
+
 
 if __name__ == "__main__":
     _main()

@@ -15,6 +15,7 @@ def ord_utf16(c):
 
 
 codepages = {
+    'cp437': dict(),  # Stub entry, so that dfrus.py do not complain that cp437 is not implemented
     'cp737': {
         0x80: range(ord_utf16('Α'), ord_utf16('Ρ') + 1),
         0x91: range(ord_utf16('Σ'), ord_utf16('Ω') + 1),
@@ -620,6 +621,10 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
     elif pre[-2] == op_rm_imm | 1 and pre[-1] & 0xF8 == 0xF8:
         # cmp reg, offset string
         meta['str'] = 'cmp reg'
+    elif pre[-4] == mov_rm_imm | 1 and pre[-3] == join_byte(1, 0, 4) and pre[-2] == join_byte(0, 4, Reg.esp):
+        # mov [esp+N], offset string
+        meta['str'] = 'mov var'
+        meta['fixed'] = 'not needed'
     meta['prev_bytes'] = ' '.join('%02X' % x for x in pre[-4:])
     return meta
 
