@@ -407,15 +407,14 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             data_directory.rewrite()
         else:
             # Write relocation table to the new section
-            buffer = io.BytesIO()
-            reloc_table.to_file(buffer)
-            
-            data_directory.basereloc.size = new_size
-            data_directory.basereloc.virtual_address = new_section.offset_to_rva(new_section_offset)
-            data_directory.rewrite()
-            
-            new_section_offset = pd.add_to_new_section(fn, hook_off, buffer.getvalue())
-            buffer.close()
+            with io.BytesIO() as buffer:
+                reloc_table.to_file(buffer)
+                
+                data_directory.basereloc.size = new_size
+                data_directory.basereloc.virtual_address = new_section.offset_to_rva(new_section_offset)
+                data_directory.rewrite()
+                
+                new_section_offset = pd.add_to_new_section(fn, hook_off, buffer.getvalue())
         
         pe.reread()
         assert set(pe.relocation_table) == relocs
