@@ -1,5 +1,6 @@
 import os.path
 import argparse
+import io
 import sys
 import textwrap
 import warnings
@@ -392,14 +393,29 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         data_directory = pe.data_directory
         reloc_off = sections.rva_to_offset(data_directory.basereloc.virtual_address)
         reloc_size = data_directory.basereloc.size
-        fn.seek(reloc_off)
-        reloc_table.to_file(fn)
-        assert new_size <= sections[-1].physical_size
-        if new_size < reloc_size:
-            fn.seek(reloc_off + new_size)
-            fn.write(bytes(reloc_size - new_size))
-        data_directory.basereloc.size = new_size
-        data_directory.rewrite()
+        
+        if new_size <= sections[-1].physical_size:
+            fn.seek(reloc_off)
+            reloc_table.to_file(fn)
+            
+            if new_size < reloc_size:
+                # Clear empty bytes after the relocation table
+                fn.seek(reloc_off + new_size)
+                fn.write(bytes(reloc_size - new_size))
+            
+            data_directory.basereloc.size = new_size
+            data_directory.rewrite()
+        else:
+            # Write relocation table to the new section
+            buffer = io.BytesIO()
+            reloc_table.to_file(buffer)
+            
+            data_directory.basereloc.size = new_size
+            data_directory.basereloc.virtual_address = new_section.offset_to_rva(new_section_offset)
+            data_directory.rewrite()
+            
+            new_section_offset = pd.add_to_new_section(fn, hook_off, buffer.getvalue())
+            buffer.close()
         
         pe.reread()
         assert set(pe.relocation_table) == relocs
