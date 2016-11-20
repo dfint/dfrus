@@ -393,8 +393,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         data_directory = pe.data_directory
         reloc_off = sections.rva_to_offset(data_directory.basereloc.virtual_address)
         reloc_size = data_directory.basereloc.size
+        reloc_section = sections[sections.which_section(offset=reloc_off)]
         
-        if new_size <= sections[-1].physical_size:
+        if new_size <= reloc_section.physical_size:
             fn.seek(reloc_off)
             reloc_table.to_file(fn)
             
