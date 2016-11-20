@@ -1,6 +1,6 @@
 
-from opcodes import *
-from binio import to_signed
+from .opcodes import *
+from .binio import to_signed
 from collections import namedtuple, Sequence
 
 
