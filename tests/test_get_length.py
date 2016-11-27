@@ -1,8 +1,8 @@
 import pytest
 
-from patchdf import get_length, mach_memcpy
-from disasm import Operand, disasm
-from opcodes import Reg
+from dfrus.patchdf import get_length, mach_memcpy
+from dfrus.disasm import Operand, disasm
+from dfrus.opcodes import Reg
 
 
 # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
