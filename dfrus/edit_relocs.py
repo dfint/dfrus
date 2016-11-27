@@ -1,6 +1,6 @@
 #! python3
 import sys
-from peclasses import PortableExecutable, RelocationTable
+from .peclasses import PortableExecutable, RelocationTable
 
 cmd = sys.argv
 
