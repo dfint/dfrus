@@ -168,7 +168,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     # --------------------------------------------------------
     print("Translating...")
 
-    strings = list(extract_strings(fn, xref_table, encoding=original_codepage))
+    strings = list(extract_strings(fn, xref_table, encoding=original_codepage, arrays=True))
 
     if debug:
         print("%d strings extracted." % len(strings))
