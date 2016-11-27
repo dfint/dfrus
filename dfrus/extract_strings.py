@@ -24,6 +24,22 @@ def possible_to_decode(c, encoding):
         return True
 
 
+def check_string(buf, encoding):
+    s_len = None
+    letters = 0
+    for i, c in enumerate(buf):
+        if c == 0:
+            s_len = i
+            break
+        
+        if not is_allowed(c) or not possible_to_decode(buf[i:i+1], encoding):
+            break
+        elif buf[i:i+1].isalpha():
+            letters += 1
+    
+    return s_len, letters
+
+
 def check_string_array(buf, offset, encoding='cp437'):
     start = None
     end = None
@@ -39,10 +55,10 @@ def check_string_array(buf, offset, encoding='cp437'):
                     start = None
                 continue
             
-            if not start:
+            if start is None:
                 start = i
                 end = None
-        elif start and not end:
+        elif start is not None and not end:
             end = i
     
     if end:
@@ -72,6 +88,7 @@ def find_next_string_xref(s_xrefs, i, obj_off):
 
 def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
     prev_string = None
+    current_string = None
     s_xrefs = sorted(xrefs)
     for i, obj_off in enumerate(s_xrefs):
         if prev_string is not None and obj_off <= prev_string[0]+len(prev_string[1]):
@@ -80,35 +97,29 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
         fn.seek(obj_off)
         buf = fn.read(blocksize)
         
-        s_len = None
-        letters = 0
-        for i, c in enumerate(buf):
-            if c == 0:
-                s_len = i
-                break
-            
-            if not is_allowed(c) or not possible_to_decode(buf[i:i+1], encoding):
-                break
-            elif buf[i:i+1].isalpha():
-                letters += 1
+        s_len, letters = check_string(buf, encoding)
         
         if s_len and letters > 0:
-            s = buf[:s_len].decode(encoding=encoding)
-            
             if not arrays:
+                s = buf[:s_len].decode(encoding=encoding)
                 cap_len = align(len(s) + 1)
                 current_string = (obj_off, s, cap_len)
                 yield current_string
             else:
-                upper_bound = find_next_string_xref(s_xrefs, i, obj_off + s_len)
-                buf = buf[s_len:upper_bound]
-                cap_len = s_len + count_zeros(buf) - 1
-                current_string = (obj_off, s, cap_len)
-                yield current_string
-
-                for off, s, cap_len in check_string_array(buf, obj_off + s_len, encoding):
-                    current_string = (off, s.decode(encoding=encoding), cap_len)
+                upper_bound = find_next_string_xref(s_xrefs, i, obj_off + s_len) - obj_off
+                buf = buf[:upper_bound]
+                
+                string_array = list(check_string_array(buf, obj_off, encoding))
+                if not all(cap_len == string_array[0][2] for _, _, cap_len in string_array):
+                    cap_len = align(len(s) + 1)
+                    s = buf[:s_len].decode(encoding=encoding)
+                    cap_len = align(len(s) + 1)
+                    current_string = (obj_off, s, cap_len)
                     yield current_string
+                else:
+                    for off, s, cap_len in string_array:
+                        current_string = (off, s.decode(encoding=encoding), cap_len)
+                        yield current_string
             
             prev_string = current_string
 
@@ -134,7 +145,7 @@ if __name__ == "__main__":
                 relocs = pe.relocation_table
                 xrefs = get_cross_references(fn, relocs, sections, image_base)
                 encoding = 'cp437' if len(sys.argv)<=3 else sys.argv[3]
-                strings = list(extract_strings(fn, xrefs, encoding=encoding))
+                strings = list(extract_strings(fn, xrefs, encoding=encoding, arrays=True))
                 count = Counter(x[1] for x in strings)
                 with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
                     for offset, s, cap_len in strings:
