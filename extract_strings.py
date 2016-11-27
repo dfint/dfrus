@@ -39,10 +39,10 @@ def check_string_array(buf, offset, encoding='cp437'):
                     start = None
                 continue
             
-            if not start:
+            if start is None:
                 start = i
                 end = None
-        elif start and not end:
+        elif start is not None and not end:
             end = i
     
     if end:
