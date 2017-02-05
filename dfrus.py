@@ -204,18 +204,24 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
             is_long = cap_len < len(translation) + 1
             original_string_address = sections.offset_to_rva(off) + image_base
+            
+            try:
+                encoded_translation = translation.encode(encoding) + b'\0'
+            except UnicodeEncodeError:
+                encoded_translation = translation.encode(encoding, errors='replace') + b'\0'
+                print("Warning: some of characters in a translation strings can't be represented in {}, "
+                      "they will be replaced with ? marks.".format(encoding))
+                print("{!r}: {!r}".format(string, encoded_translation))
+            
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
-                write_string(fn, translation,
-                             off=off, encoding=encoding,
-                             new_len=cap_len)
+                fpoke(fn, off, encoded_translation.ljust(cap_len, b'\0'))
                 string_address = original_string_address
             else:
                 # Add the translation to the separate section
                 str_off = new_section_offset
                 string_address = new_section.offset_to_rva(str_off) + image_base
-                new_section_offset = pd.add_to_new_section(fn, new_section_offset,
-                                                           bytes(translation + '\0', encoding=encoding))
+                new_section_offset = pd.add_to_new_section(fn, new_section_offset, encoded_translation)
 
             # Fix string length for each reference
             for ref in refs:
