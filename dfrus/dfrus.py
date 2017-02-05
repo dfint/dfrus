@@ -215,7 +215,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
-                fpoke(fn, off=off, encoded_translation.ljust(cap_len, b'\0'))
+                fpoke(fn, off, encoded_translation.ljust(cap_len, b'\0'))
                 string_address = original_string_address
             else:
                 # Add the translation to the separate section
