@@ -487,7 +487,7 @@ def slice_translation(trans_table, bounds):
     return dict(trans_table)
 
 
-def _main(path, dest, dictionary_path, dict_slice, codepage, original_codepage, debug = False):
+def _main(path, dest, trans_table, dict_slice, codepage, original_codepage, debug = False):
     if not debug:
         warnings.simplefilter('ignore')
 
@@ -512,20 +512,12 @@ def _main(path, dest, dictionary_path, dict_slice, codepage, original_codepage, 
     df2 = os.path.join(dest_path, dest_name)
 
     # --------------------------------------------------------
-    print("Loading translation file...")
 
-    try:
-        with open(dictionary_path, encoding='utf-8') as trans:
-            trans_table = pd.load_trans_file(trans)
+    if not debug:
+        trans_table = dict(trans_table)
+    else:
+        trans_table = slice_translation(trans_table, dict_slice)
 
-            if not debug:
-                trans_table = dict(trans_table)
-            else:
-                trans_table = slice_translation(trans_table, dict_slice)
-
-    except FileNotFoundError:
-        print('Error: "%s" file not found.' % dictionary_path)
-        return
 
     # --------------------------------------------------------
     print("Copying '%s'\nTo '%s'..." % (df1, df2))
@@ -561,4 +553,13 @@ def _main(path, dest, dictionary_path, dict_slice, codepage, original_codepage, 
 if __name__ == "__main__":
     parser = init_argparser()
     args = parser.parse_args(sys.argv[1:])
-    _main(args.path, args.dest, args.dictionary, args.slice, args.codepage, args.original_codepage, args.debug)
+    
+    print("Loading translation file...")
+
+    try:
+        with open(args.dictionary, encoding='utf-8') as trans:
+            trans_table = list(pd.load_trans_file(trans))
+    except FileNotFoundError:
+        print('Error: "%s" file not found.' % dictionary_path)
+    else:
+        _main(args.path, args.dest, trans_table, args.slice, args.codepage, args.original_codepage, args.debug)
