@@ -487,17 +487,9 @@ def slice_translation(trans_table, bounds):
     return dict(trans_table)
 
 
-def _main():
-    parser = init_argparser()
-
-    args = parser.parse_args(sys.argv[1:])
-
-    debug = args.debug
-    
+def _main(path, dest, dictionary_path, dict_slice, codepage, original_codepage, debug = False):
     if not debug:
         warnings.simplefilter('ignore')
-    
-    path = args.path
 
     if len(path) == 0 or not os.path.exists(path):
         if debug:
@@ -509,8 +501,8 @@ def _main():
         df1 = path
         path = os.path.dirname(path)
 
-    if args.dest:
-        dest_path, dest_name = os.path.split(args.dest)
+    if dest:
+        dest_path, dest_name = os.path.split(dest)
         if not dest_path:
             dest_path = path
     else:
@@ -523,16 +515,16 @@ def _main():
     print("Loading translation file...")
 
     try:
-        with open(args.dictionary, encoding='utf-8') as trans:
+        with open(dictionary_path, encoding='utf-8') as trans:
             trans_table = pd.load_trans_file(trans)
 
             if not debug:
                 trans_table = dict(trans_table)
             else:
-                trans_table = slice_translation(trans_table, args.slice)
+                trans_table = slice_translation(trans_table, dict_slice)
 
     except FileNotFoundError:
-        print('Error: "%s" file not found.' % args.dictionary)
+        print('Error: "%s" file not found.' % dictionary_path)
         return
 
     # --------------------------------------------------------
@@ -558,7 +550,7 @@ def _main():
             os.remove(df2)
             return
         
-        fix_df_exe(fn, pe, args.codepage, args.original_codepage, trans_table, debug)
+        fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug)
         
         fn.close()
         
@@ -567,4 +559,6 @@ def _main():
 
 
 if __name__ == "__main__":
-    _main()
+    parser = init_argparser()
+    args = parser.parse_args(sys.argv[1:])
+    _main(args.path, args.dest, args.dictionary, args.slice, args.codepage, args.original_codepage, args.debug)
