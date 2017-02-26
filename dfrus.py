@@ -561,6 +561,5 @@ if __name__ == "__main__":
             trans_table = pd.load_trans_file(trans)
     except FileNotFoundError:
         print('Error: "%s" file not found.' % dictionary_path)
-        return
-    
-    _main(args.path, args.dest, trans_table, args.slice, args.codepage, args.original_codepage, args.debug)
+    else:
+        _main(args.path, args.dest, trans_table, args.slice, args.codepage, args.original_codepage, args.debug)
