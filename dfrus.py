@@ -109,7 +109,6 @@ def search_charmap(fn, sections, xref_table):
 
 
 def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
-    
     print("Finding cross-references...")
     
     image_base = pe.optional_header.image_base
@@ -550,17 +549,18 @@ def _main():
     # --------------------------------------------------------
     
     try:
-        with open(df2, "r+b") as fn:
-            fn = open(df2, "r+b")
-            try:
-                pe = PortableExecutable(fn)
-            except ValueError:
-                print("Failed. '%s' is not an executable file." % df2)
-                fn.close()
-                os.remove(df2)
-                return
-            
-            fix_df_exe(fn, pe, args.codepage, args.original_codepage, trans_table, debug)
+        fn = open(df2, "r+b")
+        try:
+            pe = PortableExecutable(fn)
+        except ValueError:
+            print("Failed. '%s' is not an executable file." % df2)
+            fn.close()
+            os.remove(df2)
+            return
+        
+        fix_df_exe(fn, pe, args.codepage, args.original_codepage, trans_table, debug)
+        
+        fn.close()
         
     except OSError:
         print("Failed to open '%s'" % df2)
