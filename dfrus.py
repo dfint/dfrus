@@ -558,7 +558,7 @@ if __name__ == "__main__":
 
     try:
         with open(args.dictionary, encoding='utf-8') as trans:
-            trans_table = pd.load_trans_file(trans)
+            trans_table = list(pd.load_trans_file(trans))
     except FileNotFoundError:
         print('Error: "%s" file not found.' % dictionary_path)
     else:
