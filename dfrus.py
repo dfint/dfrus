@@ -109,6 +109,9 @@ def search_charmap(fn, sections, xref_table):
 
 
 def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
+    
+    print("Finding cross-references...")
+    
     image_base = pe.optional_header.image_base
     sections = pe.section_table
 
@@ -545,7 +548,6 @@ def _main():
         print("Success.")
 
     # --------------------------------------------------------
-    print("Finding cross-references...")
     
     try:
         with open(df2, "r+b") as fn:
