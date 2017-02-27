@@ -458,7 +458,6 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     print('Done.')
 
 
-
 def slice_translation(trans_table, bounds):
     trans_table = list(trans_table)
     print('%d translation pairs loaded.' % len(trans_table))
@@ -487,11 +486,11 @@ def slice_translation(trans_table, bounds):
     return dict(trans_table)
 
 
-def _main(path, dest, trans_table, dict_slice, codepage, original_codepage, debug = False):
+def run(path: str, dest: str, trans_table: iter, dict_slice, codepage, original_codepage='cp437', debug=False):
     if not debug:
         warnings.simplefilter('ignore')
 
-    if len(path) == 0 or not os.path.exists(path):
+    if not path or not os.path.exists(path):
         if debug:
             print("Path was not given or doesn't exist. Using defaults.")
         df1 = "Dwarf Fortress.exe"
@@ -511,13 +510,10 @@ def _main(path, dest, trans_table, dict_slice, codepage, original_codepage, debu
 
     df2 = os.path.join(dest_path, dest_name)
 
-    # --------------------------------------------------------
-
     if not debug:
         trans_table = dict(trans_table)
     else:
         trans_table = slice_translation(trans_table, dict_slice)
-
 
     # --------------------------------------------------------
     print("Copying '%s'\nTo '%s'..." % (df1, df2))
@@ -531,7 +527,6 @@ def _main(path, dest, trans_table, dict_slice, codepage, original_codepage, debu
         print("Success.")
 
     # --------------------------------------------------------
-    
     try:
         fn = open(df2, "r+b")
         try:
@@ -550,16 +545,19 @@ def _main(path, dest, trans_table, dict_slice, codepage, original_codepage, debu
         print("Failed to open '%s'" % df2)
 
 
-if __name__ == "__main__":
+def _main():
     parser = init_argparser()
     args = parser.parse_args(sys.argv[1:])
-    
+
     print("Loading translation file...")
 
     try:
         with open(args.dictionary, encoding='utf-8') as trans:
             trans_table = list(pd.load_trans_file(trans))
     except FileNotFoundError:
-        print('Error: "%s" file not found.' % dictionary_path)
+        print('Error: "%s" file not found.' % args.dictionary)
     else:
-        _main(args.path, args.dest, trans_table, args.slice, args.codepage, args.original_codepage, args.debug)
+        run(args.path, args.dest, trans_table, args.slice, args.codepage, args.original_codepage, args.debug)
+
+if __name__ == "__main__":
+    _main()
