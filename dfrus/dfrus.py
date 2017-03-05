@@ -459,7 +459,11 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
 
 def slice_translation(trans_table, bounds):
-    trans_table = list(trans_table)
+    if isinstance(trans_table, dict):
+        trans_table = list(trans_table.items())
+    else:
+        trans_table = list(trans_table)
+    
     print('%d translation pairs loaded.' % len(trans_table))
 
     if not bounds:
