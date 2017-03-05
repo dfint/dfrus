@@ -486,7 +486,7 @@ def slice_translation(trans_table, bounds):
     return dict(trans_table)
 
 
-def run(path: str, dest: str, trans_table: iter, dict_slice, codepage, original_codepage='cp437', debug=False, stdout=None):
+def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp437', dict_slice=None, debug=False, stdout=None):
     if not debug:
         warnings.simplefilter('ignore')
     
@@ -560,7 +560,7 @@ def _main():
     except FileNotFoundError:
         print('Error: "%s" file not found.' % args.dictionary)
     else:
-        run(args.path, args.dest, trans_table, args.slice, args.codepage, args.original_codepage, args.debug)
+        run(args.path, args.dest, trans_table, args.codepage, args.original_codepage, args.slice, args.debug)
 
 if __name__ == "__main__":
     _main()
