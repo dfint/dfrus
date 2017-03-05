@@ -486,9 +486,12 @@ def slice_translation(trans_table, bounds):
     return dict(trans_table)
 
 
-def run(path: str, dest: str, trans_table: iter, dict_slice, codepage, original_codepage='cp437', debug=False):
+def run(path: str, dest: str, trans_table: iter, dict_slice, codepage, original_codepage='cp437', debug=False, stdout=None):
     if not debug:
         warnings.simplefilter('ignore')
+    
+    if stdout is not None:
+        sys.stdout = stdout
 
     if not path or not os.path.exists(path):
         if debug:
