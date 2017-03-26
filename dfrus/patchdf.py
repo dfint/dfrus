@@ -39,9 +39,9 @@ _codepages = dict()
 
 def generate_charmap_table_patch(enc1, enc2):
     bt = bytes(range(0x80, 0x100))
-    return OrderedDict((i, ord_utf16(b))
-                       for i, (a, b) in enumerate(zip(by.decode(enc1), by.decode(enc2, errors='replace')), start=0x80)
-                       if a != b and b.isalpha())
+    return dict((i, ord_utf16(b))
+                for i, (a, b) in enumerate(zip(by.decode(enc1), by.decode(enc2, errors='replace')), start=0x80)
+                if a != b and b.isalpha())
 
 
 def get_codepages():
