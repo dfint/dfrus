@@ -49,11 +49,11 @@ def get_codepages():
     if not _codepages:
         _codepages = dict()
         for i in range(700, 900):
-        try:
-            _codepages['cp%d' % i] = generate_charmap_table_patch('cp437', 'cp%d' % i)
-        except LookupError:
-            pass
-        _codepages.update(_additional_codepages)
+            try:
+                _codepages['cp%d' % i] = generate_charmap_table_patch('cp437', 'cp%d' % i)
+            except LookupError:
+                pass
+            _codepages.update(_additional_codepages)
     
     return _codepages
 
