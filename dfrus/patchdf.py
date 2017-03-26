@@ -46,7 +46,7 @@ def generate_charmap_table_patch(enc1, enc2):
 
 def get_codepages():
     global _codepages
-    if not _codepages
+    if not _codepages:
         _codepages = dict()
         for i in range(700, 900):
         try:
