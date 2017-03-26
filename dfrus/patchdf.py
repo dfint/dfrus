@@ -14,49 +14,8 @@ def ord_utf16(c):
     return int.from_bytes(c.encode('utf-16')[2:], 'little')
 
 
-codepages = {
+_additional_codepages = {
     'cp437': dict(),  # Stub entry, so that dfrus.py do not complain that cp437 is not implemented
-    'cp737': {
-        0x80: range(ord_utf16('Α'), ord_utf16('Ρ') + 1),
-        0x91: range(ord_utf16('Σ'), ord_utf16('Ω') + 1),
-        0x98: range(ord_utf16('α'), ord_utf16('ρ') + 1),
-        0xA9: range(ord_utf16('σ'), ord_utf16('ψ') + 1),
-        0xE0: ord_utf16('ω'),
-        0xE1: [ord_utf16(letter) for letter in 'άέήϊίόύϋώ'],
-        0xEA: [ord_utf16(letter) for letter in 'ΆΈΉΊΌΎΏ'],
-        0xF4: [ord_utf16('Ϊ'), ord_utf16('Ϋ')],
-    },
-    'cp850': {
-        0x9B: 0x00F8,
-        0x9D: 0x00D8,
-        0xB5: [0x00C1, 0x00C2, 0x00C0],
-        0xC6: [0x00E3, 0x00C3],
-        0xD0: [0x00F0, 0x00D0, 0x00CA, 0x00CB, 0x00C8, 0x0131, 0x00CD, 0x00CE, 0x00CF],
-        0xDE: 0x00CC,
-        0xE0: 0x00D3,
-        0xE2: [0x00D4, 0x00D2, 0x00F5, 0x00D5],
-        0xE7: [0x00FE, 0x00DE, 0x00DA, 0x00DB, 0x00D9, 0x00FD, 0x00DD],
-    },
-    'cp860': {
-        0x84: 0x00E3,
-        0x86: 0x00C1,
-        0x89: 0x00CA,
-        0x8B: [0x00CD, 0x00D4],
-        0x8E: [0x00C3, 0x00C2],
-        0x91: [0x00C0, 0x00C8],
-        0x94: 0x00F4,
-        0x96: 0x00DA,
-        0x98: [0x00CC, 0x00D5],
-        0x9D: 0x00D9,
-        0x9F: 0x00D3,
-        0xA9: 0x00D2,
-    },
-    'cp866': {
-        0x80: range(ord_utf16('А'), ord_utf16('Я') + 1),
-        0xA0: range(ord_utf16('а'), ord_utf16('п') + 1),
-        0xE0: range(ord_utf16('р'), ord_utf16('я') + 1),
-        0xF0: [ord_utf16(letter) for letter in 'ЁёЄєЇїЎў']
-    },
     'cp1251': {
         0xC0: range(ord_utf16('А'), ord_utf16('Я') + 1),
         0xE0: range(ord_utf16('а'), ord_utf16('я') + 1),
@@ -75,8 +34,32 @@ codepages = {
 }
 
 
+_codepages = dict()
+
+
+def generate_charmap_table_patch(enc1, enc2):
+    bt = bytes(range(0x80, 0x100))
+    return OrderedDict((i, ord_utf16(b))
+                       for i, (a, b) in enumerate(zip(by.decode(enc1), by.decode(enc2, errors='replace')), start=0x80)
+                       if a != b and b.isalpha())
+
+
+def get_codepages():
+    global _codepages
+    if not _codepages
+        _codepages = dict()
+        for i in range(700, 900):
+        try:
+            _codepages['cp%d' % i] = generate_charmap_table_patch('cp437', 'cp%d' % i)
+        except LookupError:
+            pass
+        _codepages.update(_additional_codepages)
+    
+    return _codepages
+
+
 def patch_unicode_table(fn, off, codepage):
-    cp = codepages[codepage]
+    cp = get_codepages()[codepage]
     for item in cp:
         fpoke4(fn, off + item*4, cp[item])
 
