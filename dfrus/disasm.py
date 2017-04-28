@@ -1,7 +1,6 @@
 
 from .opcodes import *
 from .binio import to_signed
-from .peclasses import PortableExecutable
 from collections import namedtuple, Sequence
 
 
@@ -636,4 +635,5 @@ def _main(argv):
 
 if __name__ == "__main__":
     import sys
+    from .peclasses import PortableExecutable
     _main(sys.argv)
