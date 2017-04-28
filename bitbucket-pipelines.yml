@@ -9,7 +9,7 @@ pipelines:
           - pip install -r requirements_test.txt
           - py.test --cov-config .coveragerc --cov
   branches:
-    package:
+    package,sse:
       - step:
           script:
             - pip install -e .
