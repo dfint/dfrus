@@ -154,6 +154,7 @@ x0f_setcc = 0x90
 x0f_movzx = 0xB6
 x0f_movsx = 0xBE
 x0f_jcc_near = 0x80
+x0f_movups = 0x10  # + dir
 
 shift_op_rm_1 = 0xd0  # + width
 shift_op_rm_cl = 0xd2  # + width
