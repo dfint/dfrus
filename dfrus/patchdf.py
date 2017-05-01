@@ -46,19 +46,6 @@ def get_cross_references(fn, relocs, sections, image_base):
     return xrefs
 
 
-def get_start(s):
-    i = 0
-    if s[-1-i] & 0xfe == mov_acc_mem:
-        i += 1
-    elif s[-1-i-1] & 0xf8 == mov_rm_reg and s[-1-i] & 0xc7 == 0x05:
-        i += 2
-
-    if s[-1-i] == Prefix.operand_size:
-        i += 1
-
-    return i
-
-
 MAX_LEN = 0x80
 
 
@@ -200,6 +187,19 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
     meta['fixed'] = 'yes'
     retvalue.update(meta)
     return retvalue
+
+
+def get_start(s):
+    i = 0
+    if s[-1-i] & 0xfe == mov_acc_mem:
+        i += 1
+    elif s[-1-i-1] & 0xf8 == mov_rm_reg and s[-1-i] & 0xc7 == 0x05:
+        i += 2
+
+    if s[-1-i] == Prefix.operand_size:
+        i += 1
+
+    return i
 
 
 count_before = 0x20
