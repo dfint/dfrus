@@ -12,6 +12,7 @@ from .extract_strings import extract_strings
 from .binio import write_string, to_dword, fpeek, fpoke4, fpoke
 from .peclasses import PortableExecutable, Section, RelocationTable
 from . import patchdf as pd
+from .patch_charmap import patch_unicode_table
 from .patchdf import code, data
 from .opcodes import *
 from .machinecode import MachineCode
@@ -134,7 +135,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
             try:
                 print("Patching charmap table to %s..." % codepage)
-                pd.patch_unicode_table(fn, needle, codepage)
+                patch_unicode_table(fn, needle, codepage)
             except KeyError:
                 print("Warning: codepage %s not implemented. Skipping." % codepage)
             else:
