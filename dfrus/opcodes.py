@@ -1,6 +1,7 @@
+from enum import IntEnum
 
 
-class Cond:
+class Cond(IntEnum):
     """Condition codes"""
 
     (overflow, not_overflow, below, not_below, equal, not_equal, below_equal, above, sign, not_sign, parity,
@@ -41,7 +42,7 @@ class Cond:
     nle = g
 
 
-class Reg:
+class Reg(IntEnum):
     """"Register codes"""
     al, cl, dl, bl, ah, ch, dh, bh = range(8)
     ax, cx, dx, bx, sp, bp, si, di = range(8)
@@ -49,7 +50,7 @@ class Reg:
     es, cs, ss, ds, fs, gs = range(6)
 
 
-class Prefix:
+class Prefix(IntEnum):
     """Prefix codes"""
     rep = 0xf3
     repe = rep
