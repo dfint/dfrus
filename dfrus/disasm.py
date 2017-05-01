@@ -105,9 +105,10 @@ op_sizes = ("byte", "word", "dword")
 
 class Operand:
     def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=None,
-                 seg_prefix=None, seg_reg=None):
+                 seg_prefix=None, reg_type=None):
         self.value = value
         self.reg = reg
+        self.reg_type = reg_type
         self.base_reg = base_reg
         assert(data_size is None or 0 <= data_size <= 2)
         self._data_size = data_size
@@ -115,7 +116,6 @@ class Operand:
         self.scale = scale
         self.disp = disp
         self.seg_prefix = seg_prefix
-        self.seg_reg = seg_reg
         if self.data_size is None and self.reg is not None:
             self.data_size = 2
     
@@ -124,9 +124,12 @@ class Operand:
         if self.value is not None:
             return 'imm'  # immediate value
         elif self.reg is not None:
-            return 'reg gen'  # general purpose register
-        elif self.seg_reg is not None:
-            return 'reg seg'  # segment register
+            if not self.reg_type:
+                return 'reg gen'  # general purpose register
+            elif self.reg_type == 'xmm':
+                return 'reg xmm'  # xmm register
+            elif self.reg_type == 'seg':
+                return 'reg seg'  # segment register
         elif self.base_reg is None and self.index_reg is None:
             return 'ref abs'  # absolute memory reference
         else:
@@ -148,9 +151,12 @@ class Operand:
             else:
                 return '-' + asmhex(-self.value)
         elif self.reg is not None:
-            return regs[self.reg][self.data_size]
-        elif self.seg_reg is not None:
-            return seg_regs[self.seg_reg]
+            if self.reg_type is None:
+                return regs[self.reg][self.data_size]
+            elif self.reg_type == 'xmm':
+                return 'xmm%d' % self.reg
+            elif self.reg_type == 'seg':
+                return seg_regs[self.reg]
         else:
             if self.base_reg is None and self.index_reg is None:
                 result = asmhex(self.disp)
@@ -486,8 +492,7 @@ def disasm(s, start_address=0):
             dir_flag = s[i] & 2
             x, i = analyse_modrm(s, i+1)
             op1, op2 = unify_operands(x)
-            op1.seg_reg = op1.reg
-            op1.reg = None
+            op1.reg_type = 'seg'
             if not dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
@@ -588,6 +593,15 @@ def disasm(s, start_address=0):
                 dest.data_size = flag_size+1
                 src.data_size = flag_size
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[dest, src])
+            elif s[i] & 0xFE == x0f_movups:
+                mnemonic = 'movups'
+                dir_flag = s[i] & 1
+                x, i = analyse_modrm(s, i+1)
+                op1, op2 = unify_operands(x)
+                op1.reg_type = 'xmm'
+                if dir_flag:
+                    op1, op2 = op2, op1
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
 
         if not line:
             i += 1
@@ -601,7 +615,6 @@ def _main(argv):
         pass
     else:
         with open(argv[1], "r+b") as fn:
-            from peclasses import PortableExecutable
             pe = PortableExecutable(fn)
             image_base = pe.optional_header.image_base
             sections = pe.section_table
@@ -622,4 +635,5 @@ def _main(argv):
 
 if __name__ == "__main__":
     import sys
+    from .peclasses import PortableExecutable
     _main(sys.argv)
