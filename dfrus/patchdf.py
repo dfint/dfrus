@@ -190,11 +190,14 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
 
 
 def get_start(s):
-    i = 0
-    if s[-1-i] & 0xfe == mov_acc_mem:
-        i += 1
-    elif s[-1-i-1] & 0xf8 == mov_rm_reg and s[-1-i] & 0xc7 == 0x05:
-        i += 2
+    i = None
+    if s[-1] & 0xfe == mov_acc_mem:
+        i = 1
+    elif s[-2] & 0xf8 == mov_rm_reg and s[-1] & 0xc7 == 0x05:
+        i = 2
+    elif s[-3] == 0x0f and s[-2] & 0xfe == x0f_movups and s[-1] & 0xc7 == 0x05:
+        i = 3
+        return i  # prefix is not allowed here
 
     if s[-1-i] == Prefix.operand_size:
         i += 1
