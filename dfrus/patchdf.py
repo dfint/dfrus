@@ -581,8 +581,8 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
     # * > 0  - not empty: a value of the specific size is stored in the register
     regs = regs or [None for _ in range(8)]
 
-    def is_empty(reg_state):
-        return reg_state is None or reg_state == 0
+    def is_empty(reg: Reg):
+        return regs[reg] is None or regs[reg] == 0
 
     deleted_relocs = set()
     added_relocs = set()
@@ -608,7 +608,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
                 # mov reg, [...]
-                if (not is_empty(regs[left_operand.reg]) and
+                if (not is_empty(left_operand.reg) and
                         left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
                     warn('%s register is already marked as occupied. String address: 0x%x' %
                          (left_operand, original_string_address), stacklevel=2)
