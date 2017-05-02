@@ -191,20 +191,6 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
 
 
 def get_start(s):
-    """
-    >>> get_start([nop, mov_acc_mem])
-    1
-    >>> get_start([Prefix.operand_size, mov_acc_mem])
-    2
-    >>> get_start([nop, mov_rm_reg, 0x05])
-    2
-    >>> get_start([Prefix.operand_size, mov_rm_reg, 0x05])
-    3
-    >>> get_start(bytes.fromhex('0f 10 05'))  # movups xmm0, [...]
-    3
-    >>> True  # Check pipelines
-    False
-    """
     i = None
     if s[-1] & 0xfe == mov_acc_mem:
         i = 1
