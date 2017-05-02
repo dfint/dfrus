@@ -202,7 +202,7 @@ def get_start(s):
     3
     >>> get_start(bytes.fromhex('0f 10 05'))  # movups xmm0, [...]
     3
-    >>> True
+    >>> True  # Check pipelines
     False
     """
     i = None
