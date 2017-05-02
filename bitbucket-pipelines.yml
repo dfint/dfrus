@@ -14,10 +14,10 @@ pipelines:
           script:
             - pip install -e .
             - pip install -r requirements_test.txt
-            - py.test --doctest-modules --cov-config .coveragerc --cov
+            - py.test --cov-config .coveragerc --cov dfrus
     sse:
       - step:
           script:
             - pip install -e .
             - pip install -r requirements_test.txt
-            - py.test --doctest-modules --cov-config .coveragerc --cov
+            - py.test --cov-config .coveragerc --cov dfrus
