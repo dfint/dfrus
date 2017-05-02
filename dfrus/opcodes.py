@@ -1,4 +1,5 @@
-from enum import IntEnum
+from enum import IntEnum, Enum
+from collections import namedtuple
 
 
 class Cond(IntEnum):
@@ -20,6 +21,23 @@ class Cond(IntEnum):
     nge = l
     ge = nl
     nle = g
+
+
+class RegType(Enum):
+    general, segment, xmm = range(3)
+
+
+class RegData(namedtuple("RegData", "code,type,size")):
+    def __int__(self):
+        return self.code
+
+
+class RegNew(Enum):
+    al, cl, dl, bl, ah, ch, dh, bh = (RegData(i, RegType.general, 1) for i in range(8))
+    ax, cx, dx, bx, sp, bp, si, di = (RegData(i, RegType.general, 2) for i in range(8))
+    eax, ecx, edx, ebx, esp, ebp, esi, edi = (RegData(i, RegType.general, 4) for i in range(8))
+    es, cs, ss, ds, fs, gs = (RegData(i, RegType.segment, 2) for i in range(6))
+    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7 = (RegData(i, RegType.xmm, 16) for i in range(8))
 
 
 class Reg(IntEnum):
