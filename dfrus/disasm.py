@@ -298,8 +298,6 @@ op_FE_width_acc_imm = {add_acc_imm: 'add', sub_acc_imm: 'sub', or_acc_imm: 'or',
                        cmp_acc_imm: 'cmp', test_acc_imm: 'test', adc_acc_imm: 'adc', sbb_acc_imm: 'sbb'}
 op_shifts_rolls = ("rol", "ror", "rcl", "rcr", "shl", "shr", "sal", "sar")
 
-conditions = ("o", "no", "b", "nb", "z", "nz", "na", "a", "s", "ns", "p", "np", "l", "nl", "ng", "g")
-
 
 def asmhex(n):
     assert(n >= 0)
@@ -388,7 +386,7 @@ def disasm(s, start_address=0):
             if s[i] == jmp_short:
                 mnemonic = "jmp short"
             else:
-                mnemonic = 'j%s short' % conditions[s[i] & 0x0F]
+                mnemonic = 'j%s short' % Cond(s[i] & 0x0F).name
             line = DisasmLine(start_address+j, data=s[i:i+2], mnemonic=mnemonic,
                               operands=[Operand(value=immediate)])
             i += 2
@@ -573,13 +571,13 @@ def disasm(s, start_address=0):
             i += 1
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
                 condition = s[i] & 0x0F
-                mnemonic = "set%s" % conditions[condition]
+                mnemonic = "set%s" % Cond(condition).name
                 reg = Operand(reg=s[i+1] & 7, data_size=0)
                 i += 2
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[reg])
             elif s[i] & 0xF0 == x0f_jcc_near:
                 condition = s[i] & 0x0F
-                mnemonic = "j%s near" % conditions[condition]
+                mnemonic = "j%s near" % Cond(condition).name
                 i += 1
                 immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 i += 4

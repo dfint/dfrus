@@ -3,42 +3,22 @@ from enum import IntEnum
 
 class Cond(IntEnum):
     """Condition codes"""
+    (o, no, b, nb, e, ne, be, a, s, ns, p, np, l, nl, le, g) = range(16)
 
-    (overflow, not_overflow, below, not_below, equal, not_equal, below_equal, above, sign, not_sign, parity,
-        not_parity, less, not_less, less_equal, greater) = range(16)
-
-    o = overflow
-    no = not_overflow
-
-    b = below
     nae = b
     not_above_equal = nae
     c = b
-    carry = c
-
-    nb = not_below
     ae = nb
-    above_equal = ae
     nc = nb
-    e = equal
     z = e
     zero = z
-    ne = not_equal
     nz = ne
     not_zero = nz
-    be = below_equal
     na = be
-    s = sign
-    ns = not_sign
-    p = parity
     pe = p
-    np = not_parity
     po = np
-    l = less
     nge = l
-    nl = not_less
     ge = nl
-    g = greater
     nle = g
 
 
