@@ -1,10 +1,10 @@
 import pytest
 
-from opcodes import RegNew, RegType
+from opcodes import Reg, RegType
 
 
 def test_reg_new_parent():
-    for item in RegNew:
+    for item in Reg:
         if item.type != RegType.general or item.size == 4:
             assert item.parent is item
         elif item.size == 2:
@@ -17,4 +17,4 @@ def test_reg_new_parent():
 
 def test_reg_new():
     size = 2
-    assert RegNew((RegType.general, 0, 1 << size)) is RegNew.eax
+    assert Reg((RegType.general, 0, 1 << size)) is Reg.eax

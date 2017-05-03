@@ -30,7 +30,7 @@ class RegType(Enum):
 RegData = namedtuple("RegData", "type,code,size")
 
 
-class RegNew(Enum):
+class Reg(Enum):
     eax, ecx, edx, ebx, esp, ebp, esi, edi = ((RegType.general, i, 4) for i in range(8))
     ax, cx, dx, bx, sp, bp, si, di = ((RegType.general, i, 2) for i in range(8))
     al, cl, dl, bl, ah, ch, dh, bh = ((RegType.general, i, 1) for i in range(8))
@@ -55,13 +55,8 @@ class RegNew(Enum):
         else:
             self.parent = self
 
-
-class Reg(IntEnum):
-    """"Register codes"""
-    al, cl, dl, bl, ah, ch, dh, bh = range(8)
-    ax, cx, dx, bx, sp, bp, si, di = range(8)
-    eax, ecx, edx, ebx, esp, ebp, esi, edi = range(8)
-    es, cs, ss, ds, fs, gs = range(6)
+    def __int__(self):
+        return self.code
 
 
 class Prefix(IntEnum):

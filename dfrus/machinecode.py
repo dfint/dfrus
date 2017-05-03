@@ -173,19 +173,19 @@ def mach_strlen(code_chunk):
         pop ecx
     """
     return MachineCode(
-        push_reg | Reg.ecx,  # push ecx
+        push_reg | Reg.ecx.code,  # push ecx
         xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
         '@@:',
         cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
         jcc_short | Cond.z, Reference.relative('success', size=1),  # jz success
         cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), to_dword(MAX_LEN),  # cmp ecx, MAX_LEN
         jcc_short | Cond.g, Reference.relative('skip', size=1),  # jg skip
-        inc_reg | Reg.ecx,  # inc ecx
+        inc_reg | Reg.ecx.code,  # inc ecx
         jmp_short, Reference.relative('@@', size=1),  # jmp @b
         'success:',
         code_chunk,
         'skip:',
-        pop_reg | Reg.ecx,  # pop ecx
+        pop_reg | Reg.ecx.code,  # pop ecx
     )
 
 
@@ -208,9 +208,9 @@ def mach_memcpy(src, dest: Operand, length: int):
             [mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)] if dest.disp == 0 else
             mach_lea(Reg.edi, dest)
         ),
-        mov_reg_imm | 8 | Reg.esi, Reference.absolute('src'),  # mov esi, src
+        mov_reg_imm | 8 | Reg.esi.code, Reference.absolute('src'),  # mov esi, src
         xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
-        mov_reg_imm | Reg.cl, (length+3)//4,  # mov cl, (length+3)//4
+        mov_reg_imm | Reg.cl.code, (length+3)//4,  # mov cl, (length+3)//4
         Prefix.rep, movsd,  # rep movsd
         popad,
         src=src
@@ -236,7 +236,7 @@ def test_machinecode():
     code = MachineCode(
         (mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov dword [esi+14h], 0fh
         call_near, Reference.relative(name='func', size=4),  # call near func
-        mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
+        mov_reg_imm | 8 | Reg.edi.code, to_dword(0xf),  # mov edi, 0fh
         jmp_near, Reference.relative(name='return_addr', size=4)  # jmp near return_addr
     )
 
