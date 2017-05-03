@@ -76,7 +76,7 @@ def analyse_modrm(s, i):
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 result['disp'] = disp
                 i += 4
-            elif sib and sib.base_reg == Reg.ebp:
+            elif sib and sib.base_reg == Reg.ebp.code:
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 result['disp'] = disp
                 i += 4
@@ -107,10 +107,13 @@ class Operand:
     def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=None,
                  seg_prefix=None):
         self.value = value
+        assert reg is None or isinstance(reg, Reg)
         self.reg = reg
+        assert base_reg is None or isinstance(base_reg, Reg)
         self.base_reg = base_reg
         assert(data_size is None or 0 <= data_size <= 2)
         self._data_size = data_size
+        assert index_reg is None or isinstance(index_reg, Reg)
         self.index_reg = index_reg
         self.scale = scale
         self.disp = disp
@@ -218,9 +221,9 @@ def mach_lea(dest, src: Operand):
     return mach
 
 
-def unify_operands(x):
+def unify_operands(x, size=None):
     modrm = x['modrm']
-    op1 = Operand(reg=modrm.reg)
+    op1 = modrm.reg
     if modrm.mode == 3:
         # Register addressing
         op2 = Operand(reg=modrm.regmem)
@@ -231,15 +234,17 @@ def unify_operands(x):
         else:
             if modrm.regmem != 4:
                 # Without SIB-byte
-                op2 = Operand(base_reg=modrm.regmem)
+                op2 = Operand(base_reg=Reg((RegType.general, modrm.regmem, 4)))
             else:
                 # Use the SIB, Luke
                 sib = x['sib']
                 
-                base = sib.base_reg if not (sib.base_reg == Reg.ebp and modrm.mode == 0) else None
-                index = sib.index_reg if sib.index_reg != 4 else None
+                base_reg = sib.base_reg if not (sib.base_reg == Reg.ebp.code and modrm.mode == 0) else None
+                index_reg = sib.index_reg if sib.index_reg != 4 else None
                 
-                op2 = Operand(scale=sib.scale, index_reg=index, base_reg=base)
+                op2 = Operand(scale=sib.scale,
+                              index_reg=Reg((RegType.general, index_reg, 4)),
+                              base_reg=None if base_reg is None else Reg((RegType.general, base_reg, 4)))
 
             op2.disp = x.get('disp', 0)
 
@@ -431,9 +436,9 @@ def disasm(s, start_address=0):
             dir_flag = s[i] & 2
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
-            op1, op2 = unify_operands(x)
+            reg_code, op2 = unify_operands(x)
             size = flag_size*2-size_prefix
-            op1.data_size = size
+            op1 = Reg((RegType.general, reg_code, 1 << size))
             if op2.reg is not None:
                 op2.data_size = size
             if seg_prefix is not None:  # redundant check
@@ -483,8 +488,8 @@ def disasm(s, start_address=0):
         elif s[i] & 0xFD == mov_rm_seg:
             dir_flag = s[i] & 2
             x, i = analyse_modrm(s, i+1)
-            op1, op2 = unify_operands(x)
-            op1.reg_type = 'seg'
+            reg_code, op2 = unify_operands(x)
+            op1 = Reg((RegType.segment, reg_code, 2))
             if not dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
@@ -590,7 +595,7 @@ def disasm(s, start_address=0):
                 dir_flag = s[i] & 1
                 x, i = analyse_modrm(s, i+1)
                 op1, op2 = unify_operands(x)
-                op1.reg_type = 'xmm'
+                op1 = Reg['xmm' + str(op1)]
                 if dir_flag:
                     op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])

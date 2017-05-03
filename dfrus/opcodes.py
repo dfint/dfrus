@@ -58,6 +58,9 @@ class Reg(Enum):
     def __int__(self):
         return self.code
 
+    def __str__(self):
+        return self.name
+
 
 class Prefix(IntEnum):
     """Prefix codes"""
