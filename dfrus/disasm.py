@@ -438,7 +438,7 @@ def disasm(s, start_address=0):
             x, i = analyse_modrm(s, i+1)
             reg_code, op2 = unify_operands(x)
             size = flag_size*2-size_prefix
-            op1 = Reg((RegType.general, reg_code, 1 << size))
+            op1 = Operand(reg=Reg((RegType.general, reg_code, 1 << size)))
             if op2.reg is not None:
                 op2.data_size = size
             if seg_prefix is not None:  # redundant check
@@ -489,7 +489,7 @@ def disasm(s, start_address=0):
             dir_flag = s[i] & 2
             x, i = analyse_modrm(s, i+1)
             reg_code, op2 = unify_operands(x)
-            op1 = Reg((RegType.segment, reg_code, 2))
+            op1 = Operand(reg=Reg((RegType.segment, reg_code, 2)))
             if not dir_flag:
                 op1, op2 = op2, op1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
@@ -595,7 +595,7 @@ def disasm(s, start_address=0):
                 dir_flag = s[i] & 1
                 x, i = analyse_modrm(s, i+1)
                 op1, op2 = unify_operands(x)
-                op1 = Reg['xmm' + str(op1)]
+                op1 = Operand(reg=Reg['xmm' + str(op1)])
                 if dir_flag:
                     op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
