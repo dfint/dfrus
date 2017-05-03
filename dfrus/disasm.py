@@ -104,16 +104,20 @@ op_sizes = ("byte", "word", "dword")
 
 
 class Operand:
-    def __init__(self, value=None, reg: Reg=None, base_reg: Reg=None, index_reg: Reg=None, scale=0, disp=0,
+    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=None,
                  seg_prefix=None):
         self.value = value
         self.reg = reg
         self.base_reg = base_reg
+        assert(data_size is None or 0 <= data_size <= 2)
+        self._data_size = data_size
         self.index_reg = index_reg
         self.scale = scale
         self.disp = disp
         self.seg_prefix = seg_prefix
-    
+        if self.data_size is None and self.reg is not None:
+            self.data_size = 2
+
     @property
     def type(self):
         if self.value is not None:
@@ -129,6 +133,15 @@ class Operand:
             return 'ref abs'  # absolute memory reference
         else:
             return 'ref rel'  # relative memory reference
+
+    @property
+    def data_size(self):
+        return self._data_size
+
+    @data_size.setter
+    def data_size(self, value):
+        assert(value is None or 0 <= value <= 2)
+        self._data_size = value
 
     def __str__(self):
         if self.value is not None:
@@ -168,8 +181,8 @@ class Operand:
             else:
                 result = "%s:[%s]" % (seg_regs[self.seg_prefix], result)
 
-            if self._data_size is not None:
-                result = op_sizes[self._data_size] + ' ' + result
+            if self.data_size is not None:
+                result = op_sizes[self.data_size] + ' ' + result
 
             return result
 
