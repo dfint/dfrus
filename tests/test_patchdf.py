@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus.patchdf import get_length, mach_memcpy, get_start
+from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32
 from dfrus.disasm import Operand, disasm
 from dfrus.opcodes import *
 
@@ -467,3 +467,8 @@ def test_get_length_tribesman_peasant_intersection():
 ])
 def test_get_start(test_data, expected):
     assert get_start(test_data) == expected
+
+
+def test_match_mov_reg_imm32():
+    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx, 0x0a)
+    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', RegNew.ecx.code, 0x0a)

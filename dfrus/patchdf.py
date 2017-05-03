@@ -806,10 +806,3 @@ def add_to_new_section(fn, dest, s, alignment=4, padding_byte=b'\0'):
     s = pad_tail(s, aligned, padding_byte)
     fpoke(fn, dest, s)
     return dest + aligned
-
-
-if __name__ == '__main__':
-    # from binio import TestFileObject
-    # patch_unicode_table(TestFileObject(), 0)
-    # print(load_trans_file(['|12\\t3|as\\rd|', '|dfg|345y|', ' ', '|||']))
-    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx, 0x0a)
