@@ -470,5 +470,4 @@ def test_get_start(test_data, expected):
 
 
 def test_match_mov_reg_imm32():
-    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx, 0x0a)
-    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', RegNew.ecx.code, 0x0a)
+    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx.code, 0x0a)

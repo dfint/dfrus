@@ -17,7 +17,7 @@ def join_byte(*parts):
     s = 0
     for x in parts:
         s <<= 3
-        s |= x
+        s |= int(x)
     return s
 
 
@@ -104,45 +104,31 @@ op_sizes = ("byte", "word", "dword")
 
 
 class Operand:
-    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=None,
-                 seg_prefix=None, reg_type=None):
+    def __init__(self, value=None, reg: Reg=None, base_reg: Reg=None, index_reg: Reg=None, scale=0, disp=0,
+                 seg_prefix=None):
         self.value = value
         self.reg = reg
-        self.reg_type = reg_type
         self.base_reg = base_reg
-        assert(data_size is None or 0 <= data_size <= 2)
-        self._data_size = data_size
         self.index_reg = index_reg
         self.scale = scale
         self.disp = disp
         self.seg_prefix = seg_prefix
-        if self.data_size is None and self.reg is not None:
-            self.data_size = 2
     
     @property
     def type(self):
         if self.value is not None:
             return 'imm'  # immediate value
         elif self.reg is not None:
-            if not self.reg_type:
+            if self.reg.type == RegType.general:
                 return 'reg gen'  # general purpose register
-            elif self.reg_type == 'xmm':
+            elif self.reg.type == RegType.xmm:
                 return 'reg xmm'  # xmm register
-            elif self.reg_type == 'seg':
+            elif self.reg.type == RegType.seg:
                 return 'reg seg'  # segment register
         elif self.base_reg is None and self.index_reg is None:
             return 'ref abs'  # absolute memory reference
         else:
             return 'ref rel'  # relative memory reference
-    
-    @property
-    def data_size(self):
-        return self._data_size
-
-    @data_size.setter
-    def data_size(self, value):
-        assert(value is None or 0 <= value <= 2)
-        self._data_size = value
 
     def __str__(self):
         if self.value is not None:
@@ -151,19 +137,14 @@ class Operand:
             else:
                 return '-' + asmhex(-self.value)
         elif self.reg is not None:
-            if self.reg_type is None:
-                return regs[self.reg][self.data_size]
-            elif self.reg_type == 'xmm':
-                return 'xmm%d' % self.reg
-            elif self.reg_type == 'seg':
-                return seg_regs[self.reg]
+            return self.reg.name
         else:
             if self.base_reg is None and self.index_reg is None:
                 result = asmhex(self.disp)
             else:
                 result = ""
                 if self.base_reg is not None:
-                    result = regs[self.base_reg][2]  # Currently only 32-bit addressing supported
+                    result = self.base_reg.name
                     if self.index_reg is not None:
                         result += "+"
 
@@ -171,7 +152,7 @@ class Operand:
                     if self.scale > 0:
                         result += "%d*" % (1 << self.scale)
 
-                    result += regs[self.index_reg][2]
+                    result += self.index_reg.name
 
                 if self.disp or not result:
                     if self.disp >= 0:
@@ -451,7 +432,7 @@ def disasm(s, start_address=0):
             mnemonic = op_F8_reg[s[i] & 0xF8]
             reg = s[i] & 7
             size = 2 - size_prefix
-            op = Operand(reg=reg, data_size=size)
+            op = Operand(reg=Reg((RegType.general, reg, 1 << size)))
             i += 1
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op])
         elif s[i] & 0xFE == 0xFE:
@@ -479,7 +460,7 @@ def disasm(s, start_address=0):
             imm_size = 4  # 4 bytes in 32-bit mode
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
-            op1 = Operand(reg=Reg.eax, data_size=size)
+            op1 = Operand(reg=Reg((RegType.general, Reg.eax.code, 2 << size)))
             op2 = Operand(disp=immediate)
             if seg_prefix:
                 op2.seg_prefix = seg_prefix
@@ -517,7 +498,7 @@ def disasm(s, start_address=0):
             imm_size = 1 << size
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
-            op1 = Operand(reg=Reg.eax, data_size=size)
+            op1 = Operand(reg=Reg((RegType.general, Reg.eax.code, 2 << size)))
             op2 = Operand(value=immediate)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
         elif s[i] & 0xF0 == mov_reg_imm:
@@ -528,7 +509,7 @@ def disasm(s, start_address=0):
             imm_size = 1 << size
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
-            op1 = Operand(reg=reg, data_size=size)
+            op1 = Operand(reg=Reg((RegType.general, reg, 1 << size)))
             op2 = Operand(value=immediate)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2])
         elif s[i] & 0xFE in {shift_op_rm_1, shift_op_rm_cl, shift_op_rm_imm8}:
@@ -541,7 +522,7 @@ def disasm(s, start_address=0):
             if opcode == shift_op_rm_1:
                 op2 = Operand(value=1)
             elif opcode == shift_op_rm_cl:
-                op2 = Operand(reg=Reg.cl, data_size=0)
+                op2 = Operand(reg=Reg.cl)
             else:
                 immediate = s[i]
                 i += 1
@@ -572,7 +553,7 @@ def disasm(s, start_address=0):
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
                 condition = s[i] & 0x0F
                 mnemonic = "set%s" % Cond(condition).name
-                reg = Operand(reg=s[i+1] & 7, data_size=0)
+                reg = Operand(reg=Reg((RegType.general, s[i+1] & 7, 1)))
                 i += 2
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[reg])
             elif s[i] & 0xF0 == x0f_jcc_near:
