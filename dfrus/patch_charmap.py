@@ -42,7 +42,8 @@ def get_codepages():
                 _codepages['cp%d' % i] = generate_charmap_table_patch('cp437', 'cp%d' % i)
             except LookupError:
                 pass
-            _codepages.update(_additional_codepages)
+        
+        _codepages.update(_additional_codepages)
 
     return _codepages
 
