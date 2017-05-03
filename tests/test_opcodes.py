@@ -13,3 +13,8 @@ def test_reg_new_parent():
         elif item.size == 1:
             # eg. ebx is parent for bh and bl
             assert str(item)[-1] in 'hl' and str(item)[-2] == str(item.parent)[-2] and str(item.parent)[-3] == 'e'
+
+
+def test_reg_new():
+    size = 2
+    assert RegNew((RegType.general, 0, 1 << size)) is RegNew.eax
