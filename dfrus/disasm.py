@@ -243,7 +243,7 @@ def unify_operands(x, size=None):
                 index_reg = sib.index_reg if sib.index_reg != 4 else None
                 
                 op2 = Operand(scale=sib.scale,
-                              index_reg=Reg((RegType.general, index_reg, 4)),
+                              index_reg=None if index_reg is None else Reg((RegType.general, index_reg, 4)),
                               base_reg=None if base_reg is None else Reg((RegType.general, base_reg, 4)))
 
             op2.disp = x.get('disp', 0)
