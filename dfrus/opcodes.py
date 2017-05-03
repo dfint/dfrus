@@ -31,31 +31,29 @@ RegData = namedtuple("RegData", "type,code,size")
 
 
 class RegNew(Enum):
-    eax, ecx, edx, ebx, esp, ebp, esi, edi = (RegData(RegType.general, i, 4) for i in range(8))
-    ax, cx, dx, bx, sp, bp, si, di = (RegData(RegType.general, i, 2) for i in range(8))
-    al, cl, dl, bl, ah, ch, dh, bh = (RegData(RegType.general, i, 1) for i in range(8))
-    es, cs, ss, ds, fs, gs = (RegData(RegType.segment, i, 2) for i in range(6))
-    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7 = (RegData(RegType.xmm, i, 8) for i in range(8))
+    eax, ecx, edx, ebx, esp, ebp, esi, edi = ((RegType.general, i, 4) for i in range(8))
+    ax, cx, dx, bx, sp, bp, si, di = ((RegType.general, i, 2) for i in range(8))
+    al, cl, dl, bl, ah, ch, dh, bh = ((RegType.general, i, 1) for i in range(8))
+    es, cs, ss, ds, fs, gs = ((RegType.segment, i, 2) for i in range(6))
+    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7 = ((RegType.xmm, i, 8) for i in range(8))
 
     def __init__(self, *reg_data):
         reg_data = RegData(*reg_data)
-        if reg_data.type == RegType.general:
-            assert reg_data.size <= 4, 'Fix me!'
-            if reg_data.size == 4:  # TODO: fix this when 64-bit general purpose registers will be added
-                self.parent = self
-            elif reg_data.size == 2:
-                self.parent = type(self)(RegData(RegType.general, self.value.code, 4))
-            elif reg_data.size == 1:
-                self.parent = type(self)(RegData(RegType.general, self.value.code % 4, 4))
-        else:
-            self.parent = self
 
         self.type = reg_data.type
         self.code = reg_data.code
         self.size = reg_data.size
 
-    def __int__(self):
-        return self.value.code
+        if reg_data.type == RegType.general:
+            assert reg_data.size <= 4, 'Fix me!'
+            if reg_data.size == 4:  # TODO: fix this when 64-bit general purpose registers will be added
+                self.parent = self
+            elif reg_data.size == 2:
+                self.parent = type(self)(RegData(RegType.general, self.code, 4))
+            elif reg_data.size == 1:
+                self.parent = type(self)(RegData(RegType.general, self.code % 4, 4))
+        else:
+            self.parent = self
 
 
 class Reg(IntEnum):
