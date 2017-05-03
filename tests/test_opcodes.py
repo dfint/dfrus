@@ -1,6 +1,6 @@
 import pytest
 
-from opcodes import Reg, RegType
+from dfrus.opcodes import Reg, RegType
 
 
 def test_reg_new_parent():
