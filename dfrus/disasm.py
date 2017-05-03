@@ -223,7 +223,12 @@ def mach_lea(dest, src: Operand):
 
 def unify_operands(x, size=None):
     modrm = x['modrm']
-    op1 = modrm.reg
+
+    if size is None:
+        op1 = modrm.reg
+    else:
+        op1 = Operand(reg=Reg((RegType.general, modrm.reg, size)))
+
     if modrm.mode == 3:
         # Register addressing
         op2 = Operand(reg=Reg((RegType.general, modrm.regmem, 4)))
@@ -316,7 +321,7 @@ class DisasmLine:
         self.address = address
         self.data = data
         self.mnemonic = mnemonic
-        assert operands is None or isinstance(operands, Sequence)
+        assert operands is None or all(isinstance(op, Operand) for op in operands)
         self.operands = operands
         self.__str = None
 
@@ -394,7 +399,7 @@ def disasm(s, start_address=0):
                 yield BytesLine(start_address+j, data=s[j:i])
                 j = i
             x, i = analyse_modrm(s, i+1)
-            operands = unify_operands(x)
+            operands = unify_operands(x, size=4)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='lea', operands=operands)
         elif (s[i] & 0xFC) == op_rm_imm and (s[i] & 3) != 2:
             flags = s[i] & 3
