@@ -226,7 +226,7 @@ def unify_operands(x, size=None):
     op1 = modrm.reg
     if modrm.mode == 3:
         # Register addressing
-        op2 = Operand(reg=modrm.regmem)
+        op2 = Operand(reg=Reg((RegType.general, modrm.regmem, 4)))
     else:
         if modrm.mode == 0 and modrm.regmem == 5:
             # Direct addressing
