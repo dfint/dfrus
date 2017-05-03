@@ -617,7 +617,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                     # mov reg, [mem]
                     local_offset = line.data.index(to_dword(right_operand.disp))
                     if belongs_to_the_string(right_operand.disp):
-                        regs[left_operand.reg.parent] = 1 << left_operand.data_size
+                        regs[left_operand.reg.parent] = left_operand.data_size
                         deleted_relocs.add(offset + local_offset)
                         if not_moveable_after is not None:
                             nops[offset] = len(line.data)
@@ -658,7 +658,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                         if left_operand.type == 'ref abs':
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
 
-                        copied_len += 1 << right_operand.data_size
+                        copied_len += right_operand.data_size
 
                         if not is_moveable(not_moveable_after):
                             nops[offset] = len(line.data)

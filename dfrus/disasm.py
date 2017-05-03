@@ -119,7 +119,7 @@ class Operand:
         self.disp = disp
         self.seg_prefix = seg_prefix
         if self.data_size is None and self.reg is not None:
-            self.data_size = 2
+            self.data_size = self.reg.size
 
     @property
     def type(self):
@@ -143,7 +143,7 @@ class Operand:
 
     @data_size.setter
     def data_size(self, value):
-        assert(value is None or 0 <= value <= 2)
+        assert(value is None or 1 <= value <= 4)
         self._data_size = value
 
     def __str__(self):
@@ -408,7 +408,7 @@ def disasm(s, start_address=0):
             mnemonic = mnemonics[x['modrm'][1]]
             _, op = unify_operands(x)
             if op.reg is None:
-                op.data_size = 2*bool(flags)-size_prefix
+                op.data_size = 1 << (2*bool(flags)-size_prefix)
             if flags == 1:
                 immediate = int.from_bytes(s[i:i+4], byteorder='little')
                 i += 4
@@ -427,7 +427,7 @@ def disasm(s, start_address=0):
             reg_code, op2 = unify_operands(x)
             if (si & 0xFE) == mov_rm_imm:
                 op = op2
-                op.data_size = flag_size*2-size_prefix
+                op.data_size = 1 << (flag_size*2-size_prefix)
                 imm_size = 1 << op.data_size
                 immediate = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
                 i += imm_size
@@ -442,8 +442,8 @@ def disasm(s, start_address=0):
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
             reg_code, op2 = unify_operands(x)
-            size = flag_size*2-size_prefix
-            op1 = Operand(reg=Reg((RegType.general, reg_code, 1 << size)))
+            size = 1 << (flag_size*2-size_prefix)
+            op1 = Operand(reg=Reg((RegType.general, reg_code, size)))
             if op2.reg is not None:
                 op2.data_size = size
             if seg_prefix is not None:  # redundant check
@@ -469,7 +469,7 @@ def disasm(s, start_address=0):
                 _, op1 = unify_operands(x)
                 if op < 2:
                     size = flag_size*2-size_prefix
-                    op1.data_size = size
+                    op1.data_size = 1 << size
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1])
                 elif flag_size:
                     if seg_prefix:
@@ -501,7 +501,7 @@ def disasm(s, start_address=0):
         elif s[i] == pop_rm:
             x, i = analyse_modrm(s, i+1)
             _, op = unify_operands(x)
-            op.data_size = 2-size_prefix
+            op.data_size = 1 << (2-size_prefix)
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='pop', operands=[op])
         elif s[i] & 0xFD == push_imm32:
             size_flag = s[i] & 2
@@ -541,7 +541,7 @@ def disasm(s, start_address=0):
             x, i = analyse_modrm(s, i+1)
             mnemonic = op_shifts_rolls[x['modrm'][1]]
             _, op1 = unify_operands(x)
-            op1.data_size = flag_size*2 - size_prefix
+            op1.data_size = 1 << (flag_size*2 - size_prefix)
             if opcode == shift_op_rm_1:
                 op2 = Operand(value=1)
             elif opcode == shift_op_rm_cl:
@@ -558,7 +558,7 @@ def disasm(s, start_address=0):
             if modrm1 != 1:
                 _, op1 = unify_operands(x)
                 size = flag_size*2 - size_prefix
-                op1.data_size = size
+                op1.data_size = 1 << size
                 if modrm1 >= 2:
                     # unary operations: not, neg, mul, imul etc.
                     mnemonics = ("not", "neg", "mul", "imul", "div", "idiv")
@@ -592,7 +592,7 @@ def disasm(s, start_address=0):
                 flag_size = s[i] & 1
                 x, i = analyse_modrm(s, i+1)
                 dest, src = unify_operands(x, size=1 << (flag_size+1))
-                src.data_size = flag_size
+                src.data_size = 1 << flag_size
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[dest, src])
             elif s[i] & 0xFE == x0f_movups:
                 mnemonic = 'movups'
