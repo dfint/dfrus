@@ -780,14 +780,14 @@ def mach_memcpy(src, dest: Operand, count):
             mach += bytes((mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)))
         elif dest.base_reg is None:
             # mov edi, imm32
-            mach.append(mov_reg_imm | 8 | Reg.edi)  # mov edi, ...
+            mach.append(mov_reg_imm | 8 | Reg.edi.code)  # mov edi, ...
             new_references.add(len(mach))
             mach += to_dword(dest.disp)  # imm32
         else:
             # lea edi, [reg+imm]
             mach += mach_lea(Reg.edi, dest)
 
-    mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
+    mach.append(mov_reg_imm | 8 | Reg.esi.code)  # mov esi, ...
     new_references.add(len(mach))
     mach += to_dword(src)  # imm32
 
