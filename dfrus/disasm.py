@@ -478,7 +478,7 @@ def disasm(s, start_address=0):
             imm_size = 4  # 4 bytes in 32-bit mode
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
-            op1 = Operand(reg=Reg((RegType.general, Reg.eax.code, 2 << size)))
+            op1 = Operand(reg=Reg((RegType.general, Reg.eax.code, 1 << size)))
             op2 = Operand(disp=immediate)
             if seg_prefix:
                 op2.seg_prefix = seg_prefix
