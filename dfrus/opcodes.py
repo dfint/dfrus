@@ -27,9 +27,7 @@ class RegType(Enum):
     general, segment, xmm = range(3)
 
 
-class RegData(namedtuple("RegData", "type,code,size")):
-    def __int__(self):
-        return self.code
+RegData = namedtuple("RegData", "type,code,size")
 
 
 class RegNew(Enum):
