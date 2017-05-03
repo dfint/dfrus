@@ -10,10 +10,11 @@ from .opcodes import *
 
 
 def load_trans_file(fn):
-    unescape = lambda x: x.replace('\\r', '\r').replace('\\t', '\t')
-    
+    def unescape(x):
+        return x.replace('\\r', '\r').replace('\\t', '\t')
+
     dialect = 'unix'
-    
+
     fn.seek(0)
     reader = csv.reader(fn, dialect)
     for parts in reader:
@@ -42,21 +43,8 @@ def get_cross_references(fn, relocs, sections, image_base):
             obj_off = sections.rva_to_offset(obj_rva)
             if obj_off is not None:
                 xrefs[obj_off].append(reloc_off)
-    
+
     return xrefs
-
-
-def get_start(s):
-    i = 0
-    if s[-1-i] & 0xfe == mov_acc_mem:
-        i += 1
-    elif s[-1-i-1] & 0xf8 == mov_rm_reg and s[-1-i] & 0xc7 == 0x05:
-        i += 2
-
-    if s[-1-i] == Prefix.operand_size:
-        i += 1
-
-    return i
 
 
 MAX_LEN = 0x80
@@ -149,12 +137,12 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
     x = get_length_info
 
     added_relocs = x['added_relocs']
-    
+
     mach, new_refs = mach_memcpy(string_address, x['dest'], newlen + 1)
     if x['saved_mach']:
         mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
         new_refs = {item + len(x['saved_mach']) for item in new_refs}
-    
+
     added_relocs.update(new_refs)
 
     proc = None
@@ -162,17 +150,17 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
         # if memcpy code is to long, try to write it into the new section and make call to it
         if isinstance(mach, bytes):
             mach = bytearray(mach)
-        
+
         mach.append(ret_near)
         proc = mach
-        
+
         mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
         if len(mach) > x['length']:
             # Too tight here, even for a procedure call
             meta['fixed'] = 'no'
             meta['cause'] = 'to tight to call'
             return meta
-    
+
     # Write replacement code
     mach = pad_tail(mach, x['length'], nop)
     pokes = {0: mach}
@@ -196,10 +184,26 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
             added_relocs=added_relocs,
             pokes=pokes,
         )
-    
+
     meta['fixed'] = 'yes'
     retvalue.update(meta)
     return retvalue
+
+
+def get_start(s):
+    i = None
+    if s[-1] & 0xfe == mov_acc_mem:
+        i = 1
+    elif s[-2] & 0xf8 == mov_rm_reg and s[-1] & 0xc7 == 0x05:
+        i = 2
+    elif s[-3] == 0x0f and s[-2] & 0xfe == x0f_movups and s[-1] & 0xc7 == 0x05:
+        i = 3
+        return i  # prefix is not allowed here
+
+    if s[-1-i] == Prefix.operand_size:
+        i += 1
+
+    return i
 
 
 count_before = 0x20
@@ -223,7 +227,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         return func
 
     next_off = offset+4
-    
+
     pre = fpeek(fn, offset-count_before, count_before)
     aft = fpeek(fn, next_off, count_after)
     jmp = None
@@ -251,16 +255,17 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         # mov reg32, offset str
         reg = pre[-1] & 7
 
-        stop_func = lambda line: line.operands and (
-            (line.operands[0].type == 'reg gen' and line.operands[0].reg == reg) or
-            (len(line.operands) > 1 and line.operands[1].type == 'ref rel' and line.operands[1].base_reg == reg)
-        )
+        def stop_func(line):
+            return line.operands and (
+                (line.operands[0].type == 'reg gen' and line.operands[0].reg == reg) or
+                (len(line.operands) > 1 and line.operands[1].type == 'ref rel' and line.operands[1].base_reg == reg)
+            )
 
         func = which_func(oldnext, stop_cond=stop_func)
-        
+
         if isinstance(func, tuple):
             meta['func'] = func
-        
+
         if reg == Reg.eax:
             # mov eax, offset str
             meta['str'] = 'eax'
@@ -280,9 +285,9 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                         # mov dword ptr [esp+50h], 0
                         # mov byte ptr [esp+40h], 0
                         # call sub_40f650
-                        
+
                         mov_esp_edi = False
-                        
+
                         for line in disasm(aft, next_off):
                             assert(line.mnemonic != 'db')
                             if str(line).startswith('mov [esp') and str(line).endswith('], edi'):
@@ -298,12 +303,12 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                                 # call sub_40f650 ; or whatever the function was
                                 # mov edi, oldlen
                                 # jmp near return_addr
-                                
+
                                 # Restore the cap length value of stl-string if needed
                                 # mov dword [esi+14h], oldlen
                                 fix_cap = (MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14, to_dword(oldlen))
                                             if mov_esp_edi else None)
-                                
+
                                 new_code = MachineCode(
                                     fix_cap,
                                     call_near, Reference.relative(name='func'),  # call near func
@@ -464,13 +469,13 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                         elif data[0] == jmp_near:
                             next_off_2 = line.operands[0].value
                             aft = fpeek(fn, offset, count_after)
-                            
+
                             skip = None
                             if match_mov_reg_imm32(aft[:5], Reg.ecx, dword_count):
                                 skip = 5
                             elif aft[0] == lea and aft[1] & 0xf8 == mod_1_ecx_0 and aft[2] == dword_count:
                                 skip = 3
-                            
+
                             if skip is not None:
                                 meta['len'] = 'ecx*4'
                                 retvalue = dict(
@@ -480,7 +485,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                                 )
                                 retvalue.update(meta)
                                 return retvalue
-                            
+
                             meta['fixed'] = 'no'
                             return meta
                         elif len(data) == 5 and match_mov_reg_imm32(data, Reg.ecx, dword_count):
@@ -561,13 +566,13 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
     def belongs_to_the_string(value):
         osa = original_string_address
         return osa is None or 0 <= value - osa < oldlen
-    
+
     def valid_reference(value):
         return 0x400000 <= value < 0x80000000
-    
+
     copied_len = 0
     oldlen += 1
-    
+
     # A list to store states of registers
     # Possible states:
     # * None - unknown or empty: state unknown or freed by an instruction not related to the string copying
@@ -575,16 +580,20 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
     # * 0    - empty: freed by string copying instruction
     # * > 0  - not empty: a value of the specific size is stored in the register
     regs = regs or [None for _ in range(8)]
-    
-    is_empty = lambda reg_state: reg_state is None or reg_state == 0
-    
+
+    def is_empty(reg: Reg):
+        return regs[reg] is None or regs[reg] == 0
+
     deleted_relocs = set()
     added_relocs = set()
     saved_mach = bytes()
     not_moveable_after = None
-    is_moveable = lambda x: x is None
+
+    def is_moveable(x):
+        return x is None
+
     pokes=dict()
-    
+
     nops = dict()
     length = None
     for line in disasm(s):
@@ -599,11 +608,11 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
             left_operand, right_operand = line.operands
             if left_operand.type == 'reg gen':
                 # mov reg, [...]
-                if (not is_empty(regs[left_operand.reg]) and 
+                if (not is_empty(left_operand.reg) and
                         left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
                     warn('%s register is already marked as occupied. String address: 0x%x' %
                          (left_operand, original_string_address), stacklevel=2)
-                
+
                 if right_operand.type == 'ref abs':
                     # mov reg, [mem]
                     local_offset = line.data.index(to_dword(right_operand.disp))
@@ -637,26 +646,26 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                         regs[right_operand.reg] = None  # Mark the register as free
                     else:
                         assert left_operand.index_reg is None
-                        
+
                         if regs[right_operand.reg] == 0:
                             raise ValueError('Copying of a string to several diferent locations not supported.')
-                        
+
                         if (dest is None or dest.type == left_operand.type and
                                             dest.base_reg == left_operand.base_reg and
                                             dest.disp > left_operand.disp):
                             dest = left_operand
-                        
+
                         if left_operand.type == 'ref abs':
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
-                        
+
                         copied_len += 1 << right_operand.data_size
-                        
+
                         if not is_moveable(not_moveable_after):
                             nops[offset] = len(line.data)
-                        
+
                         regs[right_operand.reg] = 0  # Mark the register as freed
                 elif is_moveable(not_moveable_after):
-                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and 
+                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and
                             valid_reference(right_operand.value)):
                         # TODO: check if this actually a reference. Until then just skip
                         not_moveable_after = not_moveable_after or offset
@@ -665,13 +674,13 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                         # local_offset = line.data.rindex(to_dword(value))  # use rindex() to find the second operand
                         # deleted_relocs.add(offset + local_offset)
                         # added_relocs.add(len(saved_mach) + local_offset)
-                    
+
                     if left_operand.type == 'ref abs':
                         value = left_operand.disp
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
                         added_relocs.add(len(saved_mach) + local_offset)
-                    
+
                     saved_mach += line.data
             else:
                 # Segment register etc.
@@ -719,23 +728,23 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                 regs[line.operands[0].reg] = -1
             elif line.mnemonic.startswith('call'):
                 not_moveable_after = not_moveable_after or offset
-            
+
             if not_moveable_after is None:
                 if line.operands:
                     abs_refs = [operand for operand in line.operands if operand.type in {'ref abs', 'imm'}]
-                    
+
                     for ref in abs_refs:
                         value = ref.disp if ref.type == 'ref abs' else ref.value
-                        
+
                         if ref.type == 'imm' and not valid_reference(value):
                             continue
-                        
+
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
                         added_relocs.add(len(saved_mach) + local_offset)
-                
+
                 saved_mach += line.data
-    
+
     if not length and copied_len == oldlen:
         length = len(s)
     if not_moveable_after is not None:
@@ -744,7 +753,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
         raise ValueError('Length of the copying code not recognized.')
     if dest is None:
         raise ValueError('Destination not recognized.')
-    
+
     result = dict(
         length=length,
         dest=dest,
@@ -781,12 +790,12 @@ def mach_memcpy(src, dest: Operand, count):
     mach.append(mov_reg_imm | 8 | Reg.esi)  # mov esi, ...
     new_references.add(len(mach))
     mach += to_dword(src)  # imm32
-    
+
     mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
     mach += bytes((mov_reg_imm | Reg.cl, (count+3)//4))  # mov cl, (count+3)//4
-    
+
     mach += bytes((Prefix.rep, movsd))  # rep movsd
-    
+
     mach.append(popad)  # popad
 
     return mach, new_references

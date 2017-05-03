@@ -21,3 +21,12 @@ def test_mov_4ecx_imm():
     d = next(disasm(data))
     assert str(d) == 'mov ecx, [4*ecx+0AD0EEC0h]'
     assert d.data == data
+
+
+def test_movups():
+    data = bytes.fromhex('0f 10 05 2c dd eb 00')
+    d = next(disasm(data))
+    assert str(d) == 'movups xmm0, [0EBDD2Ch]'
+    data = bytes.fromhex('0f 11 02')
+    d = next(disasm(data))
+    assert str(d) == 'movups [edx], xmm0'

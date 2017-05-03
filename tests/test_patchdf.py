@@ -1,8 +1,8 @@
 import pytest
 
-from dfrus.patchdf import get_length, mach_memcpy
+from dfrus.patchdf import get_length, mach_memcpy, get_start
 from dfrus.disasm import Operand, disasm
-from dfrus.opcodes import Reg
+from dfrus.opcodes import *
 
 
 # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
@@ -456,3 +456,14 @@ def test_get_length_tribesman_peasant_intersection():
         saved_mach=bytes(),
         pokes={23: 0x0C+6},
     )
+
+
+@pytest.mark.parametrize("test_data,expected", [
+    ([nop, mov_acc_mem], 1),
+    ([Prefix.operand_size, mov_acc_mem], 2),
+    ([nop, mov_rm_reg, 0x05], 2),
+    ([Prefix.operand_size, mov_rm_reg, 0x05], 3),
+    (bytes.fromhex('0f 10 05'), 3),  # movups xmm0, [...]
+])
+def test_get_start(test_data, expected):
+    assert get_start(test_data) == expected
