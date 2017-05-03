@@ -1,47 +1,46 @@
+from enum import IntEnum, Enum
+from collections import namedtuple
 
 
-class Cond:
+class Cond(IntEnum):
     """Condition codes"""
+    (o, no, b, nb, e, ne, be, a, s, ns, p, np, l, nl, le, g) = range(16)
 
-    (overflow, not_overflow, below, not_below, equal, not_equal, below_equal, above, sign, not_sign, parity,
-        not_parity, less, not_less, less_equal, greater) = range(16)
-
-    o = overflow
-    no = not_overflow
-
-    b = below
     nae = b
     not_above_equal = nae
     c = b
-    carry = c
-
-    nb = not_below
     ae = nb
-    above_equal = ae
     nc = nb
-    e = equal
     z = e
     zero = z
-    ne = not_equal
     nz = ne
     not_zero = nz
-    be = below_equal
     na = be
-    s = sign
-    ns = not_sign
-    p = parity
     pe = p
-    np = not_parity
     po = np
-    l = less
     nge = l
-    nl = not_less
     ge = nl
-    g = greater
     nle = g
 
 
-class Reg:
+class RegType(Enum):
+    general, segment, xmm = range(3)
+
+
+class RegData(namedtuple("RegData", "code,type,size")):
+    def __int__(self):
+        return self.code
+
+
+class RegNew(Enum):
+    al, cl, dl, bl, ah, ch, dh, bh = (RegData(i, RegType.general, 1) for i in range(8))
+    ax, cx, dx, bx, sp, bp, si, di = (RegData(i, RegType.general, 2) for i in range(8))
+    eax, ecx, edx, ebx, esp, ebp, esi, edi = (RegData(i, RegType.general, 4) for i in range(8))
+    es, cs, ss, ds, fs, gs = (RegData(i, RegType.segment, 2) for i in range(6))
+    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7 = (RegData(i, RegType.xmm, 16) for i in range(8))
+
+
+class Reg(IntEnum):
     """"Register codes"""
     al, cl, dl, bl, ah, ch, dh, bh = range(8)
     ax, cx, dx, bx, sp, bp, si, di = range(8)
@@ -49,7 +48,7 @@ class Reg:
     es, cs, ss, ds, fs, gs = range(6)
 
 
-class Prefix:
+class Prefix(IntEnum):
     """Prefix codes"""
     rep = 0xf3
     repe = rep
@@ -154,6 +153,7 @@ x0f_setcc = 0x90
 x0f_movzx = 0xB6
 x0f_movsx = 0xBE
 x0f_jcc_near = 0x80
+x0f_movups = 0x10  # + dir
 
 shift_op_rm_1 = 0xd0  # + width
 shift_op_rm_cl = 0xd2  # + width
