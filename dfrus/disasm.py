@@ -424,7 +424,7 @@ def disasm(s, start_address=0):
             mnemonic = op_FE_width_REG_RM.get(si & 0xFE, 'mov')
             flag_size = si & 1
             x, i = analyse_modrm(s, i+1)
-            op1, op2 = unify_operands(x)
+            reg_code, op2 = unify_operands(x)
             if (si & 0xFE) == mov_rm_imm:
                 op = op2
                 op.data_size = flag_size*2-size_prefix
@@ -433,7 +433,7 @@ def disasm(s, start_address=0):
                 i += imm_size
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])
             else:
-                op1.data_size = flag_size*2-size_prefix
+                op1 = Operand(reg=Reg((RegType.general, reg_code, 1 << (flag_size*2-size_prefix))))
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2])
         elif (s[i] & 0xFC) in op_FC_dir_width_REG_RM:
             # Operation between a register and register/memory with direction flag
