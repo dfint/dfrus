@@ -143,7 +143,7 @@ class Operand:
 
     @data_size.setter
     def data_size(self, value):
-        assert(value is None or 1 <= value <= 4)
+        assert(value is None or 1 <= value)
         self._data_size = value
 
     def __str__(self):
