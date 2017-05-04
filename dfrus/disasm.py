@@ -100,7 +100,7 @@ seg_prefixes = {Prefix.seg_es: Reg.es, Prefix.seg_cs: Reg.cs, Prefix.seg_ss: Reg
                 Prefix.seg_fs: Reg.fs, Prefix.seg_gs: Reg.gs}
 
 
-op_sizes = ("byte", "word", "dword")
+op_sizes = {1: "byte", 2: "word", 4: "dword"}
 
 
 class Operand:
@@ -439,7 +439,7 @@ def disasm(s, start_address=0):
             if (si & 0xFE) == mov_rm_imm:
                 op = op2
                 op.data_size = 1 << (flag_size*2-size_prefix)
-                imm_size = 1 << op.data_size
+                imm_size = op.data_size
                 immediate = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
                 i += imm_size
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, immediate])

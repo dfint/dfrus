@@ -39,3 +39,10 @@ def test_analyse_modrm():
                   sib=Sib(scale=2, index_reg=1, base_reg=5),
                   disp=0x0AD0EEC0),
              len(data)))
+
+
+def test_mov_byte_addr_0x1():
+    data = bytes.fromhex('c605c2a3890101')
+    d = next(disasm(data))
+    assert str(d) == 'mov byte [189A3C2h], 1'
+    assert d.data == data
