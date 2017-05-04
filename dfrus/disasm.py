@@ -104,7 +104,7 @@ op_sizes = ("byte", "word", "dword")
 
 
 class Operand:
-    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=0, disp=0, data_size=None,
+    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=None, disp=0, data_size=None,
                  seg_prefix=None):
         self.value = value
         assert reg is None or isinstance(reg, Reg)
@@ -165,7 +165,7 @@ class Operand:
                         result += "+"
 
                 if self.index_reg is not None:
-                    if self.scale > 0:
+                    if self.scale:
                         result += "%d*" % (1 << self.scale)
 
                     result += self.index_reg.name
@@ -188,6 +188,14 @@ class Operand:
                 result = op_sizes[self.data_size] + ' ' + result
 
             return result
+
+    def __repr__(self):
+        args_list = [
+            ('0x{:x}', 'value'), ('{}', 'reg'), ('{}', 'base_reg'), ('{}', 'index_reg'), ('{}', 'scale'),
+            ('0x{:x}', 'disp'), ('{}', 'data_size'), ('{!r}', 'seg_prefix')
+        ]
+        return 'Operand({})'.format(', '.join(('{}=' + fmt).format(argname, getattr(self, argname))
+                                              for fmt, argname in args_list if getattr(self, argname) is not None))
 
     def __int__(self):
         if (self.value is None or self.reg is not None or
@@ -333,6 +341,9 @@ class DisasmLine:
                 self.__str = self.mnemonic + ' ' + ', '.join(str(item) for item in self.operands)
         
         return self.__str
+
+    def __repr__(self):
+        return 'DisasmLine(0x{self.address:x}, {self.data}, {self.mnemonic!r}, {self.operands})'.format(self=self)
 
 
 class BytesLine(DisasmLine):
