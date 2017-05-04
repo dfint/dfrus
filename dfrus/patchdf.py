@@ -579,7 +579,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
     # * -1   - not empty: a value which is not related to the string copying is stored here
     # * 0    - empty: freed by string copying instruction
     # * > 0  - not empty: a value of the specific size is stored in the register
-    regs = regs or {reg.parent: None for reg in Reg}
+    regs = regs or {reg.parent: None for reg in Reg if reg.type is not RegType.segment}
 
     def is_empty(reg: Reg):
         return regs[reg.parent] is None or regs[reg.parent] == 0
