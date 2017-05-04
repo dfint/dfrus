@@ -100,7 +100,7 @@ seg_prefixes = {Prefix.seg_es: Reg.es, Prefix.seg_cs: Reg.cs, Prefix.seg_ss: Reg
                 Prefix.seg_fs: Reg.fs, Prefix.seg_gs: Reg.gs}
 
 
-op_sizes = {1: "byte", 2: "word", 4: "dword"}
+op_sizes = {1: "byte", 2: "word", 4: "dword", 8: "qword", 16: "dqword"}
 
 
 class Operand:
