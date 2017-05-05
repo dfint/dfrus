@@ -175,7 +175,7 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
             # src_off=next_off + 1,
             new_code=proc,
             deleted_relocs=x['deleted_relocs'],
-            added_relocs=added_relocs,  # These relocs belongs to proc, not to the current code block
+            added_relocs=added_relocs,  # These relocs belong to proc, not to the current code block
             pokes=pokes,
         )
     else:
