@@ -316,10 +316,7 @@ def asmhex(n):
     if n < 0xA:
         return str(n)
     else:
-        h = ('%02x' % n).upper() + 'h'
-        if 'A' <= h[0] <= 'F':
-            h = '0' + h
-        return h
+        return '0x{:X}'.format(n)
 
 
 class DisasmLine:
