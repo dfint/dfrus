@@ -255,10 +255,11 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         # mov reg32, offset str
         reg = pre[-1] & 7
 
-        def stop_func(line):
-            return line.operands and (
-                (line.operands[0].type == 'reg gen' and line.operands[0].reg == reg) or
-                (len(line.operands) > 1 and line.operands[1].type == 'ref rel' and line.operands[1].base_reg == reg)
+        def stop_func(disasm_line: DisasmLine):
+            return disasm_line.operands and (
+                (disasm_line.operands[0].type == 'reg gen' and disasm_line.operands[0].reg == reg) or
+                (len(disasm_line.operands) > 1 and disasm_line.operands[1].type == 'ref rel' and
+                 disasm_line.operands[1].base_reg == reg)
             )
 
         func = which_func(oldnext, stop_cond=stop_func)
@@ -307,13 +308,13 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                                 # Restore the cap length value of stl-string if needed
                                 # mov dword [esi+14h], oldlen
                                 fix_cap = (MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14, to_dword(oldlen))
-                                            if mov_esp_edi else None)
+                                           if mov_esp_edi else None)
 
                                 new_code = MachineCode(
                                     fix_cap,
                                     call_near, Reference.relative(name='func'),  # call near func
                                     # Restore original edi value for the case if it is used further in the code:
-                                    mov_reg_imm | 8 | Reg.edi.code, to_dword(oldlen),  # mov edi, oldlen ; restore edi value
+                                    mov_reg_imm | 8 | Reg.edi.code, to_dword(oldlen),  # mov edi, oldlen
                                     jmp_near, Reference.relative(name='return_addr'),  # jmp near return_addr
                                     func=line.operands[0].value,
                                     return_addr=line.address + 5
@@ -352,7 +353,9 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                         disp = from_dword(aft[i+1:i+5], signed=True)
                         retvalue = dict(
                             src_off=next_off+i+1,
-                            new_code=mach_strlen((mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)),  # mov [ESP+8], ECX
+                            new_code=mach_strlen(
+                                (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
+                            ),  # mov [ESP+8], ECX
                             dest_off=next_off+i+5+disp
                         )
                         retvalue.update(meta)
@@ -461,12 +464,12 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                         if line.mnemonic != 'db':
                             break
                         offset = line.address
-                        data = line.data
-                        if data[0] == Prefix.rep:
+                        line_data = line.data
+                        if line_data[0] == Prefix.rep:
                             meta['len'] = 'ecx*4'
                             meta['fixed'] = 'no'
                             return meta
-                        elif data[0] == jmp_near:
+                        elif line_data[0] == jmp_near:
                             next_off_2 = line.operands[0].value
                             aft = fpeek(fn, offset, count_after)
 
@@ -488,12 +491,12 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
 
                             meta['fixed'] = 'no'
                             return meta
-                        elif len(data) == 5 and match_mov_reg_imm32(data, Reg.ecx, dword_count):
+                        elif len(line_data) == 5 and match_mov_reg_imm32(line_data, Reg.ecx, dword_count):
                             fpoke4(fn, line.address + 1, new_dword_count)
                             meta['len'] = 'ecx*4'
                             meta['fixed'] = 'yes'
                             return meta
-                        elif data[0] == lea and data[1] & 0xf8 == mod_1_ecx_0 and data[2] == dword_count:
+                        elif line_data[0] == lea and line_data[1] & 0xf8 == mod_1_ecx_0 and line_data[2] == dword_count:
                             fpoke(fn, line.address + 2, new_dword_count)
                             meta['len'] = 'ecx*4'
                             meta['fixed'] = 'yes'
@@ -589,10 +592,10 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
     saved_mach = bytes()
     not_moveable_after = None
 
-    def is_moveable(x):
-        return x is None
+    def is_moveable():
+        return not_moveable_after is None
 
-    pokes=dict()
+    pokes = dict()
 
     nops = dict()
     length = None
@@ -619,7 +622,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                     if belongs_to_the_string(right_operand.disp):
                         regs[left_operand.reg.parent] = left_operand.data_size
                         deleted_relocs.add(offset + local_offset)
-                        if not_moveable_after is not None:
+                        if not is_moveable():
                             nops[offset] = len(line.data)
                     else:
                         regs[left_operand.reg.parent] = -1
@@ -630,7 +633,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                 else:
                     # `mov reg1, [reg2+disp]` or `mov reg, imm`
                     regs[left_operand.reg.parent] = -1
-                    if is_moveable(not_moveable_after):
+                    if is_moveable():
                         if valid_reference(right_operand.disp):
                             value = right_operand.disp
                             local_offset = line.data.rindex(to_dword(value))
@@ -650,9 +653,9 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                         if regs[right_operand.reg.parent] == 0:
                             raise ValueError('Copying of a string to several diferent locations not supported.')
 
-                        if (dest is None or dest.type == left_operand.type and
-                                            dest.base_reg == left_operand.base_reg and
-                                            dest.disp > left_operand.disp):
+                        if (dest is None or (dest.type == left_operand.type and
+                                             dest.base_reg == left_operand.base_reg and
+                                             dest.disp > left_operand.disp)):
                             dest = left_operand
 
                         if left_operand.type == 'ref abs':
@@ -660,11 +663,11 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
 
                         copied_len += right_operand.data_size
 
-                        if not is_moveable(not_moveable_after):
+                        if not is_moveable():
                             nops[offset] = len(line.data)
 
                         regs[right_operand.reg.parent] = 0  # Mark the register as freed
-                elif is_moveable(not_moveable_after):
+                elif is_moveable():
                     if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and
                             valid_reference(right_operand.value)):
                         # TODO: check if this actually a reference. Until then just skip
@@ -684,7 +687,8 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
                     saved_mach += line.data
             else:
                 # Segment register etc.
-                raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' % (left_operand, left_operand.type, str(line)))
+                raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' %
+                                 (left_operand, left_operand.type, str(line)))
         elif line.mnemonic == 'lea':
             left_operand, right_operand = line.operands
             regs[left_operand.reg.parent] = -1
@@ -729,7 +733,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
             elif line.mnemonic.startswith('call'):
                 not_moveable_after = not_moveable_after or offset
 
-            if not_moveable_after is None:
+            if is_moveable():
                 if line.operands:
                     abs_refs = [operand for operand in line.operands if operand.type in {'ref abs', 'imm'}]
 
@@ -747,7 +751,7 @@ def get_length(s, oldlen, original_string_address=None, regs=None, dest=None):
 
     if not length and copied_len == oldlen:
         length = len(s)
-    if not_moveable_after is not None:
+    if not is_moveable():
         length = not_moveable_after  # return length of code which can be moved harmlessly
     if length is None:
         raise ValueError('Length of the copying code not recognized.')
