@@ -1,7 +1,7 @@
 import pytest
 
 from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32
-from dfrus.disasm import Operand, disasm
+from dfrus.disasm import disasm
 from dfrus.opcodes import *
 
 
