@@ -67,6 +67,9 @@ class Reg(Enum):
         else:
             return self is other
 
+    def __hash__(self):
+        return hash(self.value)
+
 
 class Prefix(IntEnum):
     """Prefix codes"""
