@@ -31,9 +31,7 @@ def test_machinecode_1():
     code.fields['func'] = 0x222222
     code.fields['return_addr'] = 0x777777
 
-    assert bytes(code) == bytes(
-        int(item, base=16) for item in 'C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00'.split()
-    )
+    assert bytes(code) == bytes.fromhex('C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00')
 
 
 def test_machinecode_2():
@@ -58,5 +56,4 @@ def test_machinecode_2():
 def test_mach_strlen():
     # Test the new mach_strlen:
     code = mach_strlen(nop)
-    sample = '51 31 C9 80 3C 08 00 74 0B 81 F9 00 01 00 00 7F 04 41 EB EF 90 59'
-    assert bytes(code) == bytes(int(item, base=16) for item in sample.split())
+    assert bytes(code) == bytes.fromhex('51 31 C9 80 3C 08 00 74 0B 81 F9 00 01 00 00 7F 04 41 EB EF 90 59')
