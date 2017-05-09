@@ -374,15 +374,16 @@ def disasm(s, start_address=0):
             size_prefix = True
             i += 1
 
-        if s[i] in {Prefix.rep, Prefix.repne, Prefix.lock}:
+        if s[i] in {Prefix.rep.value, Prefix.repne.value, Prefix.lock.value}:
             rep_prefix = Prefix(s[i])
+            i += 1
 
         if s[i] in op_1byte_nomask_noargs:
             mnemonic = op_1byte_nomask_noargs[s[i]]
             if i > j:  # Are there any prefixes?
                 if size_prefix and mnemonic == 'movsd':
                     mnemonic = 'movsw'
-                else:
+                elif rep_prefix is None:
                     yield BytesLine(start_address+j, data=s[j:i])
                     j = i
             line = DisasmLine(start_address+j, data=s[j:i+1], mnemonic=mnemonic, prefix=rep_prefix)

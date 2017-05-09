@@ -217,7 +217,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         if disasm_line is None:
             result = ('not reached',)
         elif str(disasm_line).startswith('rep'):
-            result = (disasm_line.mnemonic,)
+            result = (str(disasm_line),)
         elif disasm_line.mnemonic.startswith('call'):
             try:
                 result = (disasm_line.mnemonic, disasm_line.address, int(disasm_line.operands[0]))

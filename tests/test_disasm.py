@@ -15,6 +15,7 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
     ('0f10 05 2cddeb00', 'movups xmm0, [0xEBDD2C]'),
     ('0f11 02', 'movups [edx], xmm0'),
     ('0f28 05 a021f400', 'movaps xmm0, [0xF421A0]'),
+    ('F3 A5', 'rep movsd'),
 ])
 def test_disasm(hex_data, disasm_str):
     test_data = bytes.fromhex(hex_data)
