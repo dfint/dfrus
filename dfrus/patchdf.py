@@ -212,11 +212,11 @@ count_after = 0x100
 
 def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address):
     def which_func(offset, stop_cond=lambda _: False):
-        disasm_line = trace_code(fn, offset, stop_cond=lambda cur_line: cur_line.mnemonic.startswith('rep') or
+        disasm_line = trace_code(fn, offset, stop_cond=lambda cur_line: str(cur_line).startswith('rep') or
                                                                         stop_cond(cur_line))
         if disasm_line is None:
             result = ('not reached',)
-        elif disasm_line.mnemonic.startswith('rep'):
+        elif str(disasm_line).startswith('rep'):
             result = (disasm_line.mnemonic,)
         elif disasm_line.mnemonic.startswith('call'):
             try:
@@ -292,7 +292,8 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
 
                         for line in disasm(aft, next_off):
                             assert(line.mnemonic != 'db')
-                            if str(line).startswith('mov [esp') and str(line).endswith('], edi'):
+                            str_line = str(line)
+                            if str_line.startswith('mov [esp') and str_line.endswith('], edi'):
                                 # Check if the value of edi is used in 'mov [esp+N], edi'
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
@@ -714,7 +715,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
             else:
                 raise ValueError('Conditional jump encountered at offset 0x%02x' % line.address)
         else:
-            if line.mnemonic.startswith('rep'):
+            if str(line).startswith('rep'):
                 reg_state[Reg.ecx] = None  # Mark ecx as unoccupied
             elif line.mnemonic.startswith('movs'):
                 reg_state[Reg.esi] = None
