@@ -506,7 +506,8 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         else:
             meta['str'] = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
         return meta
-    elif pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and pre[-1] & 0xC7 == join_byte(0, 0, 5)):
+    elif (pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and pre[-1] & 0xC7 == join_byte(0, 0, 5)) or  # mov
+          pre[-3] == 0x0F and pre[-2] in {x0f_movups, x0f_movaps} and pre[-1] & 0xC7 == join_byte(0, 0, 5)):  # movups or movaps
         # mov eax, [addr] or mov reg, [addr]
         meta['str'] = 'mov'
 
