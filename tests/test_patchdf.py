@@ -486,6 +486,24 @@ def test_get_length_has_arrived():
     )
 
 
+test_data_select_item = bytes.fromhex(
+    '0f100544f9ea00'                 # movups      xmm0, [00eaf944]
+    '0f11832c050000'                 # movups      [ebx+0x52c], xmm0
+)
+
+
+def test_get_length_select_item():
+    result = get_length(test_data_select_item, len('  Select Item: '), 0x00EAF944)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        length=len(test_data_select_item),
+        deleted_relocs={3},
+        dest='[ebx+0x52C]',
+        saved_mach=bytes(),
+        added_relocs=set(),
+    )
+
+
 @pytest.mark.parametrize("test_data,expected", [
     ([nop, mov_acc_mem], 1),
     ([Prefix.operand_size, mov_acc_mem], 2),
