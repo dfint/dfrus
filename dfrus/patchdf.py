@@ -589,14 +589,14 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
         return reg_state[reg.parent] is None or reg_state[reg.parent] == 0
 
     deleted_relocs = set()
-    added_relocs = set()
+    added_relocs = set()  # Added relocs offsets are relative to the start of saved_mach
     saved_mach = bytes()
     not_moveable_after = None
 
     def is_moveable():
         return not_moveable_after is None
 
-    pokes = dict()
+    pokes = dict()  # eg. fixes of jumps
 
     nops = dict()
     length = None
@@ -610,7 +610,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
             raise ValueError('Unknown instruction encountered.')
         if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
             left_operand, right_operand = line.operands
-            if left_operand.type == 'reg gen':
+            if left_operand.type in {'reg gen', 'reg xmm'}:
                 # mov reg, [...]
                 if (not is_empty(left_operand.reg) and
                         left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
@@ -627,6 +627,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
                             nops[offset] = len(line.data)
                     else:
                         reg_state[left_operand.reg.parent] = -1
+                        # This may be a reference to another string, thus it is not moveable
                         not_moveable_after = not_moveable_after or offset
                 elif right_operand.type == 'imm' and valid_reference(right_operand.value):
                     # This may be a reference to another string

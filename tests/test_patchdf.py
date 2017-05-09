@@ -458,6 +458,34 @@ def test_get_length_tribesman_peasant_intersection():
     )
 
 
+test_data_has_arrived = bytes.fromhex(
+    'a1 002ff100'                     # mov         eax, [00f12f00]  ; +4
+    
+    '0f2805 a021f400'                 # movaps      xmm0, [00f421a0]  ; address doesn't belong to the string
+    
+    '8901'                            # mov         [ecx], eax  ; -4
+    'a1 042ff100'                     # mov         eax, [00f12f04]  ; +4
+    '894104'                          # mov         [ecx+0x4], eax  ; -4
+    'a1 082ff100'                     # mov         eax, [00f12f08]  ; +4
+    '894108'                          # mov         [ecx+0x8], eax  ; -4
+    '66a1 0c2ff100'                   # mov         ax, [00f12f0c]  ; +2
+    '6689410c'                        # mov         [ecx+0xc], ax  ; -2 - in total 14 bytes copied
+)
+
+
+def test_get_length_has_arrived():
+    result = get_length(test_data_has_arrived, len(' has arrived.'), 0x00F12F00)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        length=5,
+        dest='[ecx]',
+        nops={12: 2, 14: 5, 19: 3, 22: 5, 27: 3, 30: 6, 36: 4},
+        deleted_relocs={1, 15, 23, 32},
+        saved_mach=bytes(),
+        added_relocs=set(),
+    )
+
+
 @pytest.mark.parametrize("test_data,expected", [
     ([nop, mov_acc_mem], 1),
     ([Prefix.operand_size, mov_acc_mem], 2),
