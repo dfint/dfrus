@@ -334,6 +334,7 @@ class DisasmLine:
         self.mnemonic = mnemonic
         assert operands is None or all(isinstance(op, Operand) for op in operands)
         self.operands = operands
+        self.prefix = prefix
         self.__str = None
 
     def __str__(self):
