@@ -118,8 +118,8 @@ class Operand:
         self.scale = scale
         self.disp = disp
         self.seg_prefix = seg_prefix
-        if self.data_size is None and self.reg is not None:
-            self.data_size = self.reg.size
+        if self.reg is not None:
+            self._data_size = self.reg.size
 
     @property
     def type(self):
@@ -142,9 +142,15 @@ class Operand:
         return self._data_size
 
     @data_size.setter
-    def data_size(self, value):
-        assert(value is None or 1 <= value)
-        self._data_size = value
+    def data_size(self, new_size):
+        assert new_size is None or 1 <= new_size
+
+        if self.reg is not None:
+            assert self.reg.type == RegType.general, 'Do not change non-general register size explicitly'
+            self.reg = Reg((RegType.general, self.reg.code, new_size))
+
+        self._data_size = new_size
+
 
     def __str__(self):
         if self.value is not None:
