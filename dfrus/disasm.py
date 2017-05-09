@@ -602,8 +602,9 @@ def disasm(s, start_address=0):
                 dest, src = unify_operands(x, size=1 << (flag_size+1))
                 src.data_size = 1 << flag_size
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[dest, src])
-            elif s[i] & 0xFE == x0f_movups:
-                mnemonic = 'movups'
+            elif s[i] & 0xFE in {x0f_movups, x0f_movaps}:
+                op = s[i] & 0xFE
+                mnemonic = 'movups' if op == x0f_movups else 'movaps'
                 dir_flag = s[i] & 1
                 x, i = analyse_modrm(s, i+1)
                 op1, op2 = unify_operands(x)
