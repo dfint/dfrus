@@ -270,7 +270,7 @@ def test_mach_memcpy_stimulant():
         'mov esi, 0x%X' % string_addr,
         'xor ecx, ecx',
         'mov cl, %d' % ((count+3)//4),
-        'repz', 'movsd',
+        'rep movsd',
         'popad',
     ]
     assert new_refs == {2, 7}
