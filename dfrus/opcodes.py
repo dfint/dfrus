@@ -1,55 +1,77 @@
+from enum import IntEnum, Enum
+from collections import namedtuple
 
 
-class Cond:
+class Cond(IntEnum):
     """Condition codes"""
+    (o, no, b, nb, e, ne, be, a, s, ns, p, np, l, nl, le, g) = range(16)
 
-    (overflow, not_overflow, below, not_below, equal, not_equal, below_equal, above, sign, not_sign, parity,
-        not_parity, less, not_less, less_equal, greater) = range(16)
-
-    o = overflow
-    no = not_overflow
-
-    b = below
     nae = b
     not_above_equal = nae
     c = b
-    carry = c
-
-    nb = not_below
     ae = nb
-    above_equal = ae
     nc = nb
-    e = equal
     z = e
     zero = z
-    ne = not_equal
     nz = ne
     not_zero = nz
-    be = below_equal
     na = be
-    s = sign
-    ns = not_sign
-    p = parity
     pe = p
-    np = not_parity
     po = np
-    l = less
     nge = l
-    nl = not_less
     ge = nl
-    g = greater
     nle = g
 
 
-class Reg:
-    """"Register codes"""
-    al, cl, dl, bl, ah, ch, dh, bh = range(8)
-    ax, cx, dx, bx, sp, bp, si, di = range(8)
-    eax, ecx, edx, ebx, esp, ebp, esi, edi = range(8)
-    es, cs, ss, ds, fs, gs = range(6)
+class RegType(Enum):
+    general, segment, xmm = range(3)
 
 
-class Prefix:
+RegData = namedtuple("RegData", "type,code,size")
+
+
+class Reg(Enum):
+    eax, ecx, edx, ebx, esp, ebp, esi, edi = ((RegType.general, i, 4) for i in range(8))
+    ax, cx, dx, bx, sp, bp, si, di = ((RegType.general, i, 2) for i in range(8))
+    al, cl, dl, bl, ah, ch, dh, bh = ((RegType.general, i, 1) for i in range(8))
+    es, cs, ss, ds, fs, gs = ((RegType.segment, i, 2) for i in range(6))
+    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7 = ((RegType.xmm, i, 8) for i in range(8))
+
+    def __init__(self, *reg_data):
+        reg_data = RegData(*reg_data)
+
+        self.type = reg_data.type
+        self.code = reg_data.code
+        self.size = reg_data.size
+
+        if reg_data.type == RegType.general:
+            assert reg_data.size <= 4, 'Fix me!'
+            if reg_data.size == 4:  # TODO: fix this when 64-bit general purpose registers will be added
+                self.parent = self
+            elif reg_data.size == 2:
+                self.parent = type(self)(RegData(RegType.general, self.code, 4))
+            elif reg_data.size == 1:
+                self.parent = type(self)(RegData(RegType.general, self.code % 4, 4))
+        else:
+            self.parent = self
+
+    def __int__(self):
+        return self.code
+
+    def __str__(self):
+        return self.name
+
+    def __eq__(self, other):
+        if isinstance(other, int):
+            return self.code == other
+        else:
+            return self is other
+
+    def __hash__(self):
+        return hash(self.value)
+
+
+class Prefix(IntEnum):
     """Prefix codes"""
     rep = 0xf3
     repe = rep
@@ -154,6 +176,7 @@ x0f_setcc = 0x90
 x0f_movzx = 0xB6
 x0f_movsx = 0xBE
 x0f_jcc_near = 0x80
+x0f_movups = 0x10  # + dir
 
 shift_op_rm_1 = 0xd0  # + width
 shift_op_rm_cl = 0xd2  # + width

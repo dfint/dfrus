@@ -9,11 +9,11 @@ from shutil import copy
 from collections import defaultdict, OrderedDict
 
 from .extract_strings import extract_strings
-from .binio import write_string, to_dword, fpeek, fpoke4, fpoke
+from .binio import to_dword, fpeek, fpoke4, fpoke
 from .peclasses import PortableExecutable, Section, RelocationTable
 from . import patchdf as pd
 from .patch_charmap import patch_unicode_table
-from .patchdf import code, data
+from .patchdf import code
 from .opcodes import *
 from .machinecode import MachineCode
 from .disasm import align, join_byte
@@ -182,7 +182,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         if 0 < len(strings) <= 16:
             print('All remaining strings:')
             for item in strings:
-                print("0x%x : %r" % tuple(item[:2]))
+                print("0x{:x} : {!r}".format(*item[:2]))
 
     fixes = dict()
     metadata = OrderedDict()
@@ -337,6 +337,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         for ref, (string, info) in sorted(status_unknown.items(), key=lambda x: x[0]):
             print('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), info)
 
+    hook_off = None
+
     # Delayed fix
     for fix in fixes.values():
         src_off = fix['src_off']
@@ -383,11 +385,12 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         fpoke(fn, src_off, to_dword(disp, signed=True))
 
     def int_list_to_hex_str(s):
-        return ', '.join(hex(item) for item in sorted(s))
+        return ', '.join(hex(x) for x in sorted(s))
 
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
-        assert not (relocs_to_remove - relocs), int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs))
+        assert not (relocs_to_remove - relocs),\
+            int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs))
 
         relocs -= relocs_to_remove
         relocs |= relocs_to_add
@@ -491,7 +494,8 @@ def slice_translation(trans_table, bounds):
     return dict(trans_table)
 
 
-def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp437', dict_slice=None, debug=False, stdout=None):
+def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp437',
+        dict_slice=None, debug=False, stdout=None):
     if not debug:
         warnings.simplefilter('ignore')
     

@@ -1,7 +1,8 @@
 from collections import Iterable, Sequence
-from .opcodes import *
-from .disasm import join_byte, Operand, mach_lea
+
 from .binio import to_dword
+from .disasm import join_byte, Operand, mach_lea
+from .opcodes import *
 
 '''
 # Concept:
@@ -173,19 +174,19 @@ def mach_strlen(code_chunk):
         pop ecx
     """
     return MachineCode(
-        push_reg | Reg.ecx,  # push ecx
+        push_reg | Reg.ecx.code,  # push ecx
         xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
         '@@:',
         cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
         jcc_short | Cond.z, Reference.relative('success', size=1),  # jz success
         cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), to_dword(MAX_LEN),  # cmp ecx, MAX_LEN
         jcc_short | Cond.g, Reference.relative('skip', size=1),  # jg skip
-        inc_reg | Reg.ecx,  # inc ecx
+        inc_reg | Reg.ecx.code,  # inc ecx
         jmp_short, Reference.relative('@@', size=1),  # jmp @b
         'success:',
         code_chunk,
         'skip:',
-        pop_reg | Reg.ecx,  # pop ecx
+        pop_reg | Reg.ecx.code,  # pop ecx
     )
 
 
@@ -208,68 +209,11 @@ def mach_memcpy(src, dest: Operand, length: int):
             [mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)] if dest.disp == 0 else
             mach_lea(Reg.edi, dest)
         ),
-        mov_reg_imm | 8 | Reg.esi, Reference.absolute('src'),  # mov esi, src
+        mov_reg_imm | 8 | Reg.esi.code, Reference.absolute('src'),  # mov esi, src
         xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
-        mov_reg_imm | Reg.cl, (length+3)//4,  # mov cl, (length+3)//4
+        mov_reg_imm | Reg.cl.code, (length+3)//4,  # mov cl, (length+3)//4
         Prefix.rep, movsd,  # rep movsd
         popad,
         src=src
     )
 
-
-def test_machinecode():
-    """
-    # Sample code:
-    use32
-
-    func = 222222h
-    return_addr = 777777h
-
-    org 123456h
-
-    mov dword [esi+14h], 0fh
-    call near func
-    mov edi, 0fh
-    jmp near return_addr
-    """
-
-    code = MachineCode(
-        (mov_rm_imm | 1), join_byte(1, 0, Reg.esi), 0x14, to_dword(0xf),  # mov dword [esi+14h], 0fh
-        call_near, Reference.relative(name='func', size=4),  # call near func
-        mov_reg_imm | 8 | Reg.edi, to_dword(0xf),  # mov edi, 0fh
-        jmp_near, Reference.relative(name='return_addr', size=4)  # jmp near return_addr
-    )
-
-    code.origin_address = 0x123456
-    code.fields['func'] = 0x222222
-    code.fields['return_addr'] = 0x777777
-
-    assert bytes(code) == bytes(
-        int(item, base=16) for item in 'C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00'.split()
-    )
-    
-    # Test getting addresses of absolute references
-    code = MachineCode(
-        bytes(123),
-        Reference.absolute(name='b', size=4),
-        bytes(12345),
-        Reference.absolute(name='a', size=4),
-        bytes(10)
-    )
-    
-    code.origin_address = 0
-    code.fields['a'] = 0xDEAD
-    code.fields['b'] = 0xBEEF
-    
-    b = bytes(code)
-    found_refs = sorted(b.index(to_dword(code.fields[ref_name])) for ref_name in 'ab')
-    assert found_refs == list(code.absolute_references)
-    
-    # Test the new mach_strlen:
-    code = mach_strlen(nop)
-    sample = '51 31 C9 80 3C 08 00 74 0B 81 F9 00 01 00 00 7F 04 41 EB EF 90 59'
-    assert bytes(code) == bytes(int(item, base=16) for item in sample.split())
-
-
-if __name__ == '__main__':
-    test_machinecode()

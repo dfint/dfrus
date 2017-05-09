@@ -1,6 +1,5 @@
 #! python3
 
-import sys
 from .peclasses import PortableExecutable
 from .patchdf import get_cross_references
 from collections import Counter
