@@ -1,8 +1,8 @@
 import pytest
 
-from dfrus.patchdf import get_length, mach_memcpy
-from dfrus.disasm import Operand, disasm
-from dfrus.opcodes import Reg
+from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32
+from dfrus.disasm import disasm
+from dfrus.opcodes import *
 
 
 # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
@@ -22,7 +22,7 @@ def test_get_length():
     assert result == dict(
         deleted_relocs={2, 9},
         added_relocs=set(),
-        dest='[esp+20h]',
+        dest='[esp+0x20]',
         length=21,
         saved_mach=b'\x8b\xf0'  # mov esi, eax
     )
@@ -90,7 +90,7 @@ def test_get_length_abs_ref():
     assert result == dict(
         deleted_relocs={2, 7, 13, 19, 25, 30, 36, 42, 48},
         added_relocs={2},
-        dest='[617990h]',
+        dest='[0x617990]',
         length=52,
         saved_mach=bytes.fromhex('2B 0D E0 82 D6 0A ')  # sub ecx, [0ad682e0h]
     )
@@ -117,7 +117,7 @@ def test_get_length_abs_ref_simple():
     assert result == dict(
         deleted_relocs={1, 8, 14, 19, 26, 32},
         added_relocs=set(),
-        dest='[0AE19178h]',
+        dest='[0xAE19178]',
         length=36,
         saved_mach=bytes()
     )
@@ -155,7 +155,7 @@ def test_get_length_nausea():
     assert result == dict(
         deleted_relocs={3, 45, 52, 59, 65, 72},
         added_relocs=set(),
-        dest='[62BC5Ch]',
+        dest='[0x62BC5C]',
         length=12,
         saved_mach=saved,
         nops={43: 6, 50: 6, 56: 7, 63: 6, 69: 7}
@@ -186,7 +186,7 @@ def test_get_length_whimper_gnaw_intersection():
     assert result == dict(
         deleted_relocs={2, 9, 17, 35},
         added_relocs=set(),
-        dest='[68FF258h]',
+        dest='[0x68FF258]',
         length=21,
         saved_mach=saved,
         nops={33: 6},
@@ -221,7 +221,7 @@ def test_get_length_tanning_tan_intersection():
     assert result == dict(
         deleted_relocs={2, 13},
         added_relocs=set(),
-        dest='[esp+0D40h]',
+        dest='[esp+0xD40]',
         length=6,
         saved_mach=saved,
         nops={11: 6, 36: 7, 54: 7},
@@ -250,7 +250,7 @@ def test_get_length_stimulant():
     assert result == dict(
         deleted_relocs={2, 25, 31, 38, 44, 51},
         added_relocs=set(),
-        dest='[62C927h]',
+        dest='[0x62C927]',
         length=11,
         saved_mach=saved,
         nops={23: 6, 29: 6, 35: 7, 42: 6, 48: 7},
@@ -266,8 +266,8 @@ def test_mach_memcpy_stimulant():
     mach, new_refs = mach_memcpy(string_addr, dest, newlen + 1)
     assert [str(line) for line in disasm(mach)] == [
         'pushad',
-        'mov edi, %Xh' % dest.disp,
-        'mov esi, %Xh' % string_addr,
+        'mov edi, 0x%X' % dest.disp,
+        'mov esi, 0x%X' % string_addr,
         'xor ecx, ecx',
         'mov cl, %d' % ((count+3)//4),
         'repz', 'movsd',
@@ -296,7 +296,7 @@ def test_get_length_linen_apron():
     assert result == dict(
         deleted_relocs={2, 8, 13, 19, 25, 47},
         added_relocs=set(),
-        dest='[6702DC9h]',
+        dest='[0x6702DC9]',
         length=29,
         saved_mach=bytes(),
         nops={46: 5},
@@ -327,7 +327,7 @@ def test_get_length_smoked():
     assert result == dict(
         deleted_relocs={2, 7, 14, 60, 65, 72},
         added_relocs=set(),
-        dest='[189A325h]',
+        dest='[0x189A325]',
         length=18,
         saved_mach=bytes(),
         nops={58: 6, 64: 5, 69: 7}
@@ -387,7 +387,7 @@ def test_get_length_mild_low_pressure():
     assert result == dict(
         deleted_relocs={2, 8, 14, 33, 39, 58, 64, 83, 90, 288},
         added_relocs=set(),
-        dest='[0AE1AABEh]',
+        dest='[0xAE1AABE]',
         length=18,
         saved_mach=bytes(),
         nops={31: 6, 37: 6, 56: 6, 62: 6, 81: 6, 87: 7, 285: 7}
@@ -451,8 +451,23 @@ def test_get_length_tribesman_peasant_intersection():
     assert result == dict(
         deleted_relocs={2, 8, 14},
         added_relocs=set(),
-        dest='[ebp-70h]',
+        dest='[ebp-0x70]',
         length=22,
         saved_mach=bytes(),
         pokes={23: 0x0C+6},
     )
+
+
+@pytest.mark.parametrize("test_data,expected", [
+    ([nop, mov_acc_mem], 1),
+    ([Prefix.operand_size, mov_acc_mem], 2),
+    ([nop, mov_rm_reg, 0x05], 2),
+    ([Prefix.operand_size, mov_rm_reg, 0x05], 3),
+    (bytes.fromhex('0f 10 05'), 3),  # movups xmm0, [...]
+])
+def test_get_start(test_data, expected):
+    assert get_start(test_data) == expected
+
+
+def test_match_mov_reg_imm32():
+    assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx.code, 0x0a)

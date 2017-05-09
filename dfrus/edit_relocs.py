@@ -65,8 +65,8 @@ else:
                     print('"-*" operation needs 2 arguments. Operation skipped.')
                     continue
                 elif len(items) > 2:
-                    print('"-*" operation needs only 2 arguments. Using only two of them: 0x%x, 0x%x.' %
-                          tuple(items[:2]))
+                    print('"-*" operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}.'.format(
+                        *items[:2]))
                 lower_bound, upper_bound = items[:2]
                 relocs_in_range = list(filter(lambda x: lower_bound <= x <= upper_bound, relocs))
                 if not relocs_in_range:
