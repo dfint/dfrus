@@ -6,7 +6,7 @@ import textwrap
 import warnings
 
 from shutil import copy
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from .extract_strings import extract_strings
 from .binio import write_string, to_dword, fpeek, fpoke4, fpoke
@@ -185,7 +185,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 print("0x%x : %r" % tuple(item[:2]))
 
     fixes = dict()
-    metadata = dict()
+    metadata = OrderedDict()
     delayed_pokes = dict()
     
     encoding = codepage if codepage else 'cp437'
