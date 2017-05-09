@@ -10,9 +10,11 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
     ('66 A5', 'movsw'),
     ('6A FF', 'push 0xFFFFFFFF'),
     ('8b0c8dc0eed00a', 'mov ecx, [4*ecx+0xAD0EEC0]'),
-    ('0f 10 05 2c dd eb 00', 'movups xmm0, [0xEBDD2C]'),
-    ('0f 11 02', 'movups [edx], xmm0'),
-    ('c605c2a3890101', 'mov byte [0x189A3C2], 1')
+    ('c605c2a3890101', 'mov byte [0x189A3C2], 1'),
+    # SSE
+    ('0f10 05 2cddeb00', 'movups xmm0, [0xEBDD2C]'),
+    ('0f11 02', 'movups [edx], xmm0'),
+    ('0f28 05 a021f400', 'movaps xmm0, [0xF421A0]'),
 ])
 def test_disasm(hex_data, disasm_str):
     test_data = bytes.fromhex(hex_data)
