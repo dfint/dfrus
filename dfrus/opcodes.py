@@ -35,7 +35,7 @@ class Reg(Enum):
     ax, cx, dx, bx, sp, bp, si, di = ((RegType.general, i, 2) for i in range(8))
     al, cl, dl, bl, ah, ch, dh, bh = ((RegType.general, i, 1) for i in range(8))
     es, cs, ss, ds, fs, gs = ((RegType.segment, i, 2) for i in range(6))
-    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7 = ((RegType.xmm, i, 8) for i in range(8))
+    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7 = ((RegType.xmm, i, 16) for i in range(8))
 
     def __init__(self, *reg_data):
         reg_data = RegData(*reg_data)
