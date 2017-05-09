@@ -73,22 +73,23 @@ def myrepr(s):
     return text
 
 
-def find_earliest_midrefs(off, refs, xref_table, length):
+def find_earliest_midrefs(offset, xref_table, length):
     increment = 4
     k = increment
-    while off + k in xref_table and k < length + 1:
-        for j, ref in enumerate(refs):
-            mid_refs = xref_table[off + k]
+    references = xref_table[offset]
+    while offset + k in xref_table and k < length + 1:
+        for j, ref in enumerate(references):
+            mid_refs = xref_table[offset + k]
             for mid_ref in reversed(sorted(mid_refs)):
                 if mid_ref < ref and ref - mid_ref < 70:  # Empyrically picked number
-                    refs[j] = mid_ref
+                    references[j] = mid_ref
                     break
         
         while k + increment >= length + 1 and increment > 1:
             increment /= 2
         
         k += increment
-    return refs
+    return references
 
 
 def search_charmap(fn, sections, xref_table):
@@ -198,10 +199,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 continue
             
             if off in xref_table:
-                refs = xref_table[off]
-
                 # Find the earliest reference to the string (even if it is a reference to the middle of the string)
-                refs = find_earliest_midrefs(off, refs, xref_table, len(string))
+                refs = find_earliest_midrefs(off, xref_table, len(string))
             else:
                 refs = []
 
