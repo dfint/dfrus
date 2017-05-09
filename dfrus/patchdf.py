@@ -645,7 +645,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
                         saved_mach += line.data
             elif left_operand.type in {'ref rel', 'ref abs'}:
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
-                if right_operand.type == 'reg gen':
+                if right_operand.type in {'reg gen', 'reg xmm'}:
                     if reg_state[right_operand.reg.parent] is None or reg_state[right_operand.reg.parent] < 0:
                         # It can be a part of a copying code of another string. Leave it as is.
                         not_moveable_after = not_moveable_after or offset
