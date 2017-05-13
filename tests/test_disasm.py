@@ -20,6 +20,7 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
     ('0f6e 05 f017ec00', 'movd mm0, [0xEC17F0]'),
     ('0f7f 05 f017ec00', 'movq [0xEC17F0], mm0'),
     ('0f7e 05 f017ec00', 'movd [0xEC17F0], mm0'),
+    ('f30f7e 05 f017ec00', 'movq xmm0, [0xEC17F0]'),
 ])
 def test_disasm(hex_data, disasm_str):
     test_data = bytes.fromhex(hex_data)
