@@ -648,7 +648,9 @@ def disasm(s, start_address=0):
                     mnemonic = 'movq'
                     op1 = Operand(reg=Reg['xmm' + str(op1)])
                     rep_prefix = None
+                    op2.data_size = 8  # qword
                 else:
+                    op2.data_size = 4 << size_flag
                     op1 = Operand(reg=Reg['mm' + str(op1)])
                     if dir_flag:
                         op1, op2 = op2, op1
@@ -659,6 +661,7 @@ def disasm(s, start_address=0):
                 x, i = analyse_modrm(s, i + 1)
                 op1, op2 = unify_operands(x)
                 op1 = Operand(reg=Reg['xmm' + str(op1)])
+                op2.data_size = 8  # qword
                 op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
                                   operands=[op1, op2], prefix=rep_prefix)

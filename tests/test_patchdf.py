@@ -504,6 +504,32 @@ def test_get_length_select_item():
     )
 
 
+test_data_dnwwap = bytes.fromhex(
+    '0f100544ddeb00'                 # movups      xmm0, [00ebdd44] ; +16
+    '8d9610010000'                   # lea         edx, [esi+0x110] ; saved
+    '8bca'                           # mov         ecx, edx ; saved
+    '0f1102'                         # movups      [edx], xmm0 ; -16
+    '0f100554ddeb00'                 # movups      xmm0, [00ebdd54] ; +16
+    '0f114210'                       # movups      [edx+0x10], xmm0 ; -16
+    'f30f7e0564ddeb00'               # movq        xmm0, [00ebdd64] ; +8
+    '660fd64220'                     # movq        [edx+0x20], xmm0 ; -8
+    '66a16cddeb00'                   # mov         ax, [00ebdd6c] ; +2
+    '66894228'                       # mov         [edx+0x28], ax ; -2
+)
+
+
+def test_dnwwap():
+    result = get_length(test_data_dnwwap, len('Design New World with Advanced Parameters'), 0x0EBDD44)
+    result['dest'] = str(result['dest'])
+    assert result == dict(
+        length=len(test_data_dnwwap),
+        dest='[edx]',
+        deleted_relocs={3, 21, 33, 44},
+        saved_mach=bytes.fromhex('8d9610010000 8bca'),
+        added_relocs=set(),
+    )
+
+
 @pytest.mark.parametrize("test_data,expected", [
     ([nop, mov_acc_mem], 1),
     ([Prefix.operand_size, mov_acc_mem], 2),

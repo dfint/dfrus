@@ -665,7 +665,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
                         if left_operand.type == 'ref abs':
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
 
-                        copied_len += right_operand.data_size
+                        copied_len += left_operand.data_size or right_operand.data_size
 
                         if not is_moveable():
                             nops[offset] = len(line.data)
