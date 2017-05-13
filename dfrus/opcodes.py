@@ -183,6 +183,7 @@ x0f_jcc_near = 0x80
 x0f_movups = 0x10  # + dir
 x0f_movaps = 0x28  # + dir
 x0f_movd_mm = 0x6e  # + dir << 4 + size_flag
+x0f_movq_rm_xmm = 0xd6
 
 shift_op_rm_1 = 0xd0  # + width
 shift_op_rm_cl = 0xd2  # + width

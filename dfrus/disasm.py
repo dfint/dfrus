@@ -654,6 +654,14 @@ def disasm(s, start_address=0):
                         op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
                                   operands=[op1, op2], prefix=rep_prefix)
+            elif s[i] == x0f_movq_rm_xmm and size_prefix:
+                mnemonic = 'movq'
+                x, i = analyse_modrm(s, i + 1)
+                op1, op2 = unify_operands(x)
+                op1 = Operand(reg=Reg['xmm' + str(op1)])
+                op1, op2 = op2, op1
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
+                                  operands=[op1, op2], prefix=rep_prefix)
 
         if not line:
             i += 1
