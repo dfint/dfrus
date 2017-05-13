@@ -637,9 +637,10 @@ def disasm(s, start_address=0):
                     op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
                                   operands=[op1, op2], prefix=rep_prefix)
-            elif s[i] & 0xEF == x0f_movq_mm:
-                mnemonic = 'movq'
+            elif s[i] & 0xEE == x0f_movd_mm:
+                size_flag = s[i] & 0x01
                 dir_flag = s[i] & 0x10
+                mnemonic = 'movq' if size_flag else 'movd'
                 x, i = analyse_modrm(s, i + 1)
                 op1, op2 = unify_operands(x)
                 op1 = Operand(reg=Reg['mm' + str(op1)])
