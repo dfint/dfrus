@@ -16,12 +16,12 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
     ('0f10 05 2cddeb00', 'movups xmm0, [0xEBDD2C]'),
     ('0f11 02', 'movups [edx], xmm0'),
     ('0f28 05 a021f400', 'movaps xmm0, [0xF421A0]'),
-    ('0f6f 05 f017ec00', 'movq mm0, [0xEC17F0]'),
-    ('0f6e 05 f017ec00', 'movd mm0, [0xEC17F0]'),
-    ('0f7f 05 f017ec00', 'movq [0xEC17F0], mm0'),
-    ('0f7e 05 f017ec00', 'movd [0xEC17F0], mm0'),
-    ('f30f7e 05 f017ec00', 'movq xmm0, [0xEC17F0]'),
-    ('660fd6 05 f017ec00', 'movq [0xEC17F0], xmm0'),
+    ('0f6f 05 f017ec00', 'movq mm0, qword [0xEC17F0]'),
+    ('0f6e 05 f017ec00', 'movd mm0, dword [0xEC17F0]'),
+    ('0f7f 05 f017ec00', 'movq qword [0xEC17F0], mm0'),
+    ('0f7e 05 f017ec00', 'movd dword [0xEC17F0], mm0'),
+    ('f30f7e 05 f017ec00', 'movq xmm0, qword [0xEC17F0]'),
+    ('660fd6 05 f017ec00', 'movq qword [0xEC17F0], xmm0'),
 ])
 def test_disasm(hex_data, disasm_str):
     test_data = bytes.fromhex(hex_data)
