@@ -151,7 +151,6 @@ class Operand:
 
         self._data_size = new_size
 
-
     def __str__(self):
         if self.value is not None:
             if self.value >= 0:
@@ -395,7 +394,8 @@ def disasm(s, start_address=0):
             i += 1
             immediate = int.from_bytes(bytes(s[i:i+2]), byteorder='little')
             i += 2
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='retn', operands=[Operand(value=immediate)], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='retn',
+                              operands=[Operand(value=immediate)], prefix=rep_prefix)
         elif s[i] in {call_near, jmp_near}:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
