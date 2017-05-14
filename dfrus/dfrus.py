@@ -390,8 +390,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
-        assert not (relocs_to_remove - relocs),\
-            int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs))
+        if relocs_to_remove - relocs:
+            warnings.warn("Trying to remove some relocations which weren't in the original list: " +
+                          int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs)))
 
         relocs -= relocs_to_remove
         relocs |= relocs_to_add
