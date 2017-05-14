@@ -3,6 +3,7 @@ import csv
 from collections import defaultdict
 from warnings import warn
 from contextlib import suppress
+from binascii import hexlify
 
 from .binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from .disasm import *
@@ -571,7 +572,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
     return meta
 
 
-def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=None):
+def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, dest=None):
     def belongs_to_the_string(ref_value):
         osa = original_string_address
         return osa is None or 0 <= ref_value - osa < oldlen
@@ -612,7 +613,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
             length = offset
             break
         if line.mnemonic == 'db':
-            raise ValueError('Unknown instruction encountered.')
+            raise ValueError('Unknown instruction encountered: ' + hexlify(s[line.address:line.address+8]).decode())
         if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
             left_operand, right_operand = line.operands
             if left_operand.type in {'reg gen', 'reg xmm'}:
@@ -745,6 +746,8 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
                 reg_state[line.operands[0].reg.parent] = -1
             elif line.mnemonic.startswith('call'):
                 not_moveable_after = not_moveable_after or offset
+            elif line.mnemonic.startswith('ret'):
+                break
 
             if is_moveable():
                 if line.operands:
