@@ -5,6 +5,16 @@ from dfrus.disasm import disasm
 from dfrus.opcodes import *
 
 
+def convert_test_data_from_copypaste(s: str):
+    test_data = bytes()
+
+    for line in s.strip().splitlines():
+        line = line.split()
+        test_data += bytes.fromhex(line[1])
+
+    return test_data
+
+
 # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
 # 4c1da0     mov         esi, eax
 # 4c1da2     mov         eax, [524b4ch] ; [aFainted]
