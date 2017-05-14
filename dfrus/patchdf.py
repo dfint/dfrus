@@ -579,7 +579,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
     copied_len = 0
     oldlen += 1
 
-    # A list to store states of registers
+    # A dict to store states of registers
     # Possible states:
     # * None - unknown or empty: state unknown or freed by an instruction not related to the string copying
     # * -1   - not empty: a value which is not related to the string copying is stored here
