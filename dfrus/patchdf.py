@@ -208,6 +208,7 @@ def get_start(s):
 
 count_before = 0x20
 count_after = 0x100
+count_after_for_get_length = 0x2000
 
 
 def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address):
@@ -513,7 +514,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         meta['str'] = 'mov'
 
         next_off = offset - get_start(pre)
-        aft = fpeek(fn, next_off, count_after)
+        aft = fpeek(fn, next_off, count_after_for_get_length)
         try:
             x = get_length(aft, oldlen, original_string_address)
         except (ValueError, IndexError) as err:
