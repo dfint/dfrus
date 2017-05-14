@@ -460,11 +460,6 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         pe.file_header.rewrite()
         pe.optional_header.rewrite()
 
-    if debug:
-        with open('metadata.txt', 'w') as meta:
-            for key, value in metadata.items():
-                print(key, ':', value, file=meta)
-
     print('Done.')
 
 
