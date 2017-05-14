@@ -717,7 +717,7 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
         else:
             if str(line).startswith('rep'):
                 reg_state[Reg.ecx] = None  # Mark ecx as unoccupied
-            elif line.mnemonic.startswith('movs'):
+            if line.mnemonic.startswith('movs'):
                 reg_state[Reg.esi] = None
                 reg_state[Reg.edi] = None
             elif line.mnemonic.startswith('set'):
