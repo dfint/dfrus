@@ -130,7 +130,7 @@ class Operand:
                 return 'reg gen'  # general purpose register
             elif self.reg.type == RegType.xmm:
                 return 'reg xmm'  # xmm register
-            elif self.reg.type == RegType.seg:
+            elif self.reg.type == RegType.segment:
                 return 'reg seg'  # segment register
         elif self.base_reg is None and self.index_reg is None:
             return 'ref abs'  # absolute memory reference
