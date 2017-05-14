@@ -110,6 +110,10 @@ def search_charmap(fn, sections, xref_table):
     return None
 
 
+def int_list_to_hex_str(s):
+    return ', '.join(hex(x) for x in sorted(s))
+
+
 def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     print("Finding cross-references...")
     
@@ -382,9 +386,6 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         src_rva = sections[code].offset_to_rva(src_off)
         disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
         fpoke(fn, src_off, to_dword(disp, signed=True))
-
-    def int_list_to_hex_str(s):
-        return ', '.join(hex(x) for x in sorted(s))
 
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
