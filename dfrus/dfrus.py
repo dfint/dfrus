@@ -78,12 +78,13 @@ def find_earliest_midrefs(offset, xref_table, length):
     k = increment
     references = xref_table[offset]
     while k < length + 1:
-        for j, ref in enumerate(references):
-            mid_refs = xref_table[offset + k]
-            for mid_ref in reversed(sorted(mid_refs)):
-                if mid_ref < ref and ref - mid_ref < 70:  # Empyrically picked number
-                    references[j] = mid_ref
-                    break
+        if offset + k in xref_table:
+            for j, ref in enumerate(references):
+                mid_refs = xref_table[offset + k]
+                for mid_ref in reversed(sorted(mid_refs)):
+                    if mid_ref < ref and ref - mid_ref < 70:  # Empyrically picked number
+                        references[j] = mid_ref
+                        break
         
         while k + increment >= length + 1 and increment > 1:
             increment /= 2
@@ -458,7 +459,12 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
         pe.file_header.rewrite()
         pe.optional_header.rewrite()
-    
+
+    if debug:
+        with open('metadata.txt', 'w') as meta:
+            for key, value in metadata.items():
+                print(key, ':', value, file=meta)
+
     print('Done.')
 
 
