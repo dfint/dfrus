@@ -12,6 +12,7 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
     ('8b0c8dc0eed00a', 'mov ecx, [4*ecx+0xAD0EEC0]'),
     ('c605c2a3890101', 'mov byte [0x189A3C2], 1'),
     ('F3 A5', 'rep movsd'),
+    ('0f4ff8', 'cmovg edi, eax'),
     # MMX/SSE
     ('0f10 05 2cddeb00', 'movups xmm0, [0xEBDD2C]'),
     ('0f11 02', 'movups [edx], xmm0'),
