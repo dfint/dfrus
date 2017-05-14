@@ -77,7 +77,7 @@ def find_earliest_midrefs(offset, xref_table, length):
     increment = 4
     k = increment
     references = xref_table[offset]
-    while offset + k in xref_table and k < length + 1:
+    while k < length + 1:
         for j, ref in enumerate(references):
             mid_refs = xref_table[offset + k]
             for mid_ref in reversed(sorted(mid_refs)):
