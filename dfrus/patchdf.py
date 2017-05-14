@@ -702,7 +702,12 @@ def get_length(s, oldlen, original_string_address=None, reg_state=None, dest=Non
         elif line.mnemonic.startswith('j'):
             if line.mnemonic.startswith('jmp'):
                 not_moveable_after = not_moveable_after or offset
-                x = get_length(s[line.operands[0].value:], oldlen - copied_len - 1,
+
+                data_after_jump = s[line.operands[0].value:]
+                if not data_after_jump:
+                    raise ValueError('Cannot jump: jump destination not included in the passed machinecode.')
+
+                x = get_length(data_after_jump, oldlen - copied_len - 1,
                                original_string_address, reg_state, dest)
                 dest = x['dest']
                 if 'short' in line.mnemonic:
