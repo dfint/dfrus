@@ -2,6 +2,7 @@
 import csv
 from collections import defaultdict
 from warnings import warn
+from contextlib import suppress
 
 from .binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from .disasm import *
@@ -85,46 +86,47 @@ class Trace:
 
 def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
     s = fpeek(fn, offset, count_after)
-    for line in disasm(s, offset):
-        # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
-        if line.mnemonic == 'db':
-            return None
-        elif stop_cond(line):  # Stop when the stop_cond returns True
-            return line
-        elif line.mnemonic.startswith('jmp'):
-            if trace_jmp == Trace.not_follow:
-                pass
-            elif trace_jmp == Trace.follow:
-                return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-            elif trace_jmp == Trace.stop:
+    with suppress(IndexError):
+        for line in disasm(s, offset):
+            # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
+            if line.mnemonic == 'db':
+                return None
+            elif stop_cond(line):  # Stop when the stop_cond returns True
                 return line
-            elif trace_jmp == Trace.forward_only:
-                if int(line.operands[0]) > line.address:
+            elif line.mnemonic.startswith('jmp'):
+                if trace_jmp == Trace.not_follow:
+                    pass
+                elif trace_jmp == Trace.follow:
                     return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-        elif line.mnemonic.startswith('j'):
-            if trace_jcc == Trace.not_follow:
-                pass
-            elif trace_jcc == Trace.follow:
-                return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-            elif trace_jcc == Trace.stop:
+                elif trace_jmp == Trace.stop:
+                    return line
+                elif trace_jmp == Trace.forward_only:
+                    if int(line.operands[0]) > line.address:
+                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
+            elif line.mnemonic.startswith('j'):
+                if trace_jcc == Trace.not_follow:
+                    pass
+                elif trace_jcc == Trace.follow:
+                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
+                elif trace_jcc == Trace.stop:
+                    return line
+                elif trace_jcc == Trace.forward_only:
+                    if int(line.operands[0]) > line.address:
+                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
+            elif line.mnemonic.startswith('call'):
+                if trace_call == Trace.not_follow:
+                    pass
+                elif trace_call == Trace.follow:
+                    returned = trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
+                    if returned is None or not returned.mnemonic.startswith('ret'):
+                        return returned
+                elif trace_call == Trace.stop:
+                    return line
+                elif trace_call == Trace.forward_only:
+                    if int(line.operands[0]) > line.address:
+                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
+            elif line.mnemonic.startswith('ret'):
                 return line
-            elif trace_jcc == Trace.forward_only:
-                if int(line.operands[0]) > line.address:
-                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-        elif line.mnemonic.startswith('call'):
-            if trace_call == Trace.not_follow:
-                pass
-            elif trace_call == Trace.follow:
-                returned = trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-                if returned is None or not returned.mnemonic.startswith('ret'):
-                    return returned
-            elif trace_call == Trace.stop:
-                return line
-            elif trace_call == Trace.forward_only:
-                if int(line.operands[0]) > line.address:
-                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-        elif line.mnemonic.startswith('ret'):
-            return line
     return None
 
 
