@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 
 setup(name='dfrus',
-      version='0.0.1',
+      version='0.0.2',
       # description='',
       url='http://bitbucket.org/dfint/dfrus-py',
       author='insolor',
       author_email='insolor@gmail.com',
-      # license='MIT',
+      license='MIT',
       packages=find_packages(),
       zip_safe=False)
