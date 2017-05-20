@@ -259,7 +259,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
             meta['len'] = 'push before'
             meta['fixed'] = 'yes'
         
-        meta['func'] = which_func(oldnext)1
+        meta['func'] = which_func(oldnext)
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
         reg = pre[-1] & 7

@@ -309,6 +309,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     
     # Add strlen before call of functions for strings which length was not fixed
     for string, info in metadata.items():
+        # if string[0] == 'Press ':
+            # print(info)
+        
         if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
             func = info.get('func', None)
             if func is not None and func[0] == 'call near':
@@ -326,11 +329,17 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                         new_code = pd.mach_strlen(code_chunk)
                         fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
                         add_fix(fixes, src_off, fix)
-            elif debug:
-                if 'fixed' in info and info['fixed'] == 'no':
-                    not_fixed[string[1]] = (string[0], info)
+                        info['fixed'] = 'yes'
+                    else:
+                        info['fixed'] = 'no'
                 else:
+                    info['fixed'] = 'not needed'
+            
+            if debug:
+                if 'fixed' not in info:
                     status_unknown[string[1]] = (string[0], info)
+                elif info['fixed'] == 'no':
+                    not_fixed[string[1]] = (string[0], info)
     
     if debug:
         for ref, (string, info) in sorted(not_fixed.items(), key=lambda x: x[0]):
