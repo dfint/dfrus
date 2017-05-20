@@ -309,9 +309,6 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     
     # Add strlen before call of functions for strings which length was not fixed
     for string, info in metadata.items():
-        # if string[0] == 'Press ':
-            # print(info)
-        
         if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
             func = info.get('func', None)
             if func is not None and func[0] == 'call near':
