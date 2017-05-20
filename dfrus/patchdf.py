@@ -252,10 +252,14 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
     meta = dict()
     if pre[-1] == push_imm32:
         # push offset str
-        meta['func'] = which_func(oldnext)
         meta['str'] = 'push'
-        meta['fixed'] = 'not needed'
-        return meta  # No need fixing
+        
+        if pre[-3] == push_imm8 and pre[-2] == oldlen:
+            fpoke(fn, offset-2, newlen)
+            meta['len'] = 'push before'
+            meta['fixed'] = 'yes'
+        
+        meta['func'] = which_func(oldnext)1
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
         # mov reg32, offset str
         reg = pre[-1] & 7
