@@ -1,4 +1,4 @@
-from .binio import fpoke4
+from .binio import fpoke4, to_dword, fpeek
 
 
 def ord_utf16(c):
@@ -52,3 +52,21 @@ def patch_unicode_table(fn, off, codepage):
     cp = get_codepages()[codepage]
     for item in cp:
         fpoke4(fn, off + item*4, cp[item])
+
+
+def search_charmap(fn, sections, xref_table):
+    unicode_table_start = b''.join(
+        to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
+    )
+
+    offset = sections[1].physical_offset
+    size = sum(section.physical_size for section in sections[1:])
+    data_block = fpeek(fn, offset, size)
+    for obj_off in xref_table:
+        off = obj_off - offset
+        if 0 <= off < size:
+            buf = data_block[off:off+len(unicode_table_start)]
+            if buf == unicode_table_start:
+                return obj_off
+
+    return None

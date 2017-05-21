@@ -1,22 +1,21 @@
-import os.path
 import argparse
 import io
+import os.path
 import sys
 import textwrap
 import warnings
-
-from shutil import copy
 from collections import defaultdict, OrderedDict
+from shutil import copy
 
-from .extract_strings import extract_strings
-from .binio import to_dword, fpeek, fpoke4, fpoke
-from .peclasses import PortableExecutable, Section, RelocationTable
 from . import patchdf as pd
-from .patch_charmap import patch_unicode_table
-from .patchdf import code
-from .opcodes import *
-from .machinecode import MachineCode
+from .binio import to_dword, fpoke4, fpoke
 from .disasm import align, join_byte
+from .extract_strings import extract_strings
+from .machinecode import MachineCode
+from .opcodes import *
+from .patch_charmap import search_charmap, patch_unicode_table
+from .patchdf import code
+from .peclasses import PortableExecutable, Section, RelocationTable
 
 
 def init_argparser():
@@ -91,24 +90,6 @@ def find_earliest_midrefs(offset, xref_table, length):
         
         k += increment
     return references
-
-
-def search_charmap(fn, sections, xref_table):
-    unicode_table_start = b''.join(
-        to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
-    )
-    
-    offset = sections[1].physical_offset
-    size = sum(section.physical_size for section in sections[1:])
-    data_block = fpeek(fn, offset, size)
-    for obj_off in xref_table:
-        off = obj_off - offset
-        if 0 <= off < size:
-            buf = data_block[off:off+len(unicode_table_start)]
-            if buf == unicode_table_start:
-                return obj_off
-    
-    return None
 
 
 def int_list_to_hex_str(s):
