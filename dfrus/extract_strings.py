@@ -152,7 +152,7 @@ if __name__ == "__main__":
                             assert cap_len >= len(s)
                             s = s.replace('\r', '\\r')
                             s = s.replace('\t', '\\t')
-                            print(hex(offset), myrepr(s), cap_len)
+                            print(hex(offset), myrepr(s), cap_len, xrefs[offset])
                             print(s, file=dump)
                             count[s] = 0
         except OSError:
