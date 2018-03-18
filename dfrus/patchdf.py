@@ -136,6 +136,29 @@ def match_mov_reg_imm32(b, reg, imm):
     return b[0] == mov_reg_imm | 8 | int(reg) and from_dword(b[1:]) == imm
 
 
+class Fix:
+    def __init__(self, new_code, pokes=None, src_off=None):
+        self.new_code = new_code
+        self.pokes = pokes
+        self.src_off = src_off
+
+    def __or__(self, other: 'Fix'):
+        old_code = self.new_code
+        new_code = other.new_code
+        if bytes(new_code) not in bytes(old_code):
+            if isinstance(old_code, MachineCode):
+                assert not isinstance(new_code, MachineCode)
+                new_code = new_code + old_code
+                if self.pokes and not other.pokes:
+                    other.pokes = self.pokes
+            else:
+                new_code = old_code + new_code
+            other.new_code = new_code
+            return other
+        else:
+            return self  # Fix is already added, do nothing
+
+
 def get_fix_for_moves(get_length_info, newlen, string_address, meta):
     x = get_length_info
 
@@ -176,10 +199,9 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta):
     if proc:
         retvalue = dict(
             # src_off=next_off + 1,
-            new_code=proc,
+            fix=Fix(new_code=proc, pokes=pokes),
             deleted_relocs=x['deleted_relocs'],
             added_relocs=added_relocs,  # These relocs belong to proc, not to the current code block
-            pokes=pokes,
         )
     else:
         retvalue = dict(
@@ -543,8 +565,8 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                 # Make deleted relocs offsets relative to the given offset
                 fix['deleted_relocs'] = [next_off + ref - offset for ref in fix['deleted_relocs']]
 
-                if 'new_code' in fix:
-                    fix['src_off'] = next_off + 1
+                if 'fix' in fix:
+                    fix['fix'].src_off = next_off + 1
                 else:
                     # Make new relocations relative to the given offset (only if they not belong to a procedure)
                     fix['added_relocs'] = [next_off + ref - offset for ref in fix['added_relocs']]

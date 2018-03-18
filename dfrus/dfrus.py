@@ -14,7 +14,7 @@ from .extract_strings import extract_strings
 from .machinecode import MachineCode
 from .opcodes import *
 from .patch_charmap import search_charmap, patch_unicode_table
-from .patchdf import code
+from .patchdf import code, Fix
 from .peclasses import PortableExecutable, Section, RelocationTable
 
 
