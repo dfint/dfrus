@@ -143,7 +143,7 @@ class Fix:
         self.src_off = src_off
         self.added_relocs = added_relocs
 
-    def __or__(self, other: 'Fix'):
+    def add_fix(self, other: 'Fix'):
         old_code = self.new_code
         new_code = other.new_code
         if bytes(new_code) not in bytes(old_code):
