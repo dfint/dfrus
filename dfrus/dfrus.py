@@ -41,6 +41,7 @@ def init_argparser():
     return parser
 
 
+# moved into patchdf.Fix
 def add_fix(fixes, offset, fix):
     new_code = fix['new_code']
     if offset in fixes:

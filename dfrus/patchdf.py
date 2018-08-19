@@ -137,10 +137,11 @@ def match_mov_reg_imm32(b, reg, imm):
 
 
 class Fix:
-    def __init__(self, new_code, pokes=None, src_off=None):
+    def __init__(self, new_code, pokes=None, src_off=None, added_relocs=None):
         self.new_code = new_code
         self.pokes = pokes
         self.src_off = src_off
+        self.added_relocs = added_relocs
 
     def __or__(self, other: 'Fix'):
         old_code = self.new_code
