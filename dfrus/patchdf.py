@@ -136,28 +136,54 @@ def match_mov_reg_imm32(b, reg, imm):
     return b[0] == mov_reg_imm | 8 | int(reg) and from_dword(b[1:]) == imm
 
 
+class Fixes:
+    def __init__(self, d):
+        if not d:
+            self.d = dict()
+
+    def items(self):
+        return self.d.items()
+
+    def values(self):
+        return self.d.values()
+
+    def keys(self):
+        return self.d.keys()
+
+    def __getitem__(self, item):
+        return self.d[item]
+
+    def __setitem__(self, key, value):
+        self.d[key] = value
+
+    def add_fix(self, offset, fix):
+        fixes = self
+        new_code = fix['new_code']
+        if offset in fixes:
+            old_fix = fixes[offset]
+            old_code = old_fix['new_code']
+            if bytes(new_code) not in bytes(old_code):
+                if isinstance(old_code, MachineCode):
+                    assert not isinstance(new_code, MachineCode)
+                    new_code = new_code + old_code
+                    if 'poke' in old_fix and 'poke' not in fix:
+                        fix['poke'] = old_fix['poke']
+                else:
+                    new_code = old_code + new_code
+                fix['new_code'] = new_code
+                fixes[offset] = fix
+            else:
+                pass  # Fix is already added, do nothing
+        else:
+            fixes[offset] = fix
+
+
 class Fix:
     def __init__(self, new_code, pokes=None, src_off=None, added_relocs=None):
         self.new_code = new_code
         self.pokes = pokes
         self.src_off = src_off
         self.added_relocs = added_relocs
-
-    def add_fix(self, other: 'Fix'):
-        old_code = self.new_code
-        new_code = other.new_code
-        if bytes(new_code) not in bytes(old_code):
-            if isinstance(old_code, MachineCode):
-                assert not isinstance(new_code, MachineCode)
-                new_code = new_code + old_code
-                if self.pokes and not other.pokes:
-                    other.pokes = self.pokes
-            else:
-                new_code = old_code + new_code
-            other.new_code = new_code
-            return other
-        else:
-            return self  # Fix is already added, do nothing
 
 
 def get_fix_for_moves(get_length_info, newlen, string_address, meta):
