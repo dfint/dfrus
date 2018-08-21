@@ -181,11 +181,27 @@ class Fixes:
 
 
 class Fix:
-    def __init__(self, new_code, pokes=None, src_off=None, added_relocs=None):
+    _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'added_relocs'}
+
+    def __init__(self, new_code, pokes=None, poke=None, src_off=None, added_relocs=None):
         self.new_code = new_code
         self.pokes = pokes
+        self.poke = poke
         self.src_off = src_off
         self.added_relocs = added_relocs
+
+    # Some crutches to make Fix compatible with plain dict
+    def __getitem__(self, item):
+        return self.__getattribute__(item)
+
+    def __setitem__(self, key, value):
+        if key in self._allowed_fields:
+            self.__setattr__(key, value)
+        else:
+            raise IndexError('{!r} key is not allowed'.format(key))
+
+    def __contains__(self, item):
+        return self.__getattribute__(item) is not None
 
 
 def get_fix_for_moves(get_length_info, newlen, string_address, meta):
