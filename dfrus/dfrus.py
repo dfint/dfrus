@@ -42,7 +42,7 @@ def init_argparser():
 
 
 # moved into patchdf.Fix
-def add_fix(fixes, offset, fix):
+def add_fix(fixes: dict, offset, fix):
     new_code = fix['new_code']
     if offset in fixes:
         old_fix = fixes[offset]
