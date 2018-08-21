@@ -137,9 +137,11 @@ def match_mov_reg_imm32(b, reg, imm):
 
 
 class Fixes:
-    def __init__(self, d):
+    def __init__(self, d: dict=None):
         if not d:
-            self.d = dict()
+            d = dict()
+
+        self.d = d
 
     def items(self):
         return self.d.items()
