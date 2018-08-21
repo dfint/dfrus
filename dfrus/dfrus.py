@@ -14,7 +14,7 @@ from .extract_strings import extract_strings
 from .machinecode import MachineCode
 from .opcodes import *
 from .patch_charmap import search_charmap, patch_unicode_table
-from .patchdf import code, Fix
+from .patchdf import code, Fix, Fixes
 from .peclasses import PortableExecutable, Section, RelocationTable
 
 
@@ -39,30 +39,6 @@ def init_argparser():
                         type=lambda s: tuple(int(x) for x in s.split(':')))
 
     return parser
-
-
-# moved into patchdf.Fix
-def add_fix(fixes: dict, offset, fix):
-    new_code = fix['new_code']
-    if offset in fixes:
-        old_fix = fixes[offset]
-        old_code = old_fix['new_code']
-        if bytes(new_code) not in bytes(old_code):
-            if isinstance(old_code, MachineCode):
-                assert not isinstance(new_code, MachineCode)
-                new_code = new_code + old_code
-                if 'poke' in old_fix and 'poke' not in fix:
-                    fix['poke'] = old_fix['poke']
-            else:
-                new_code = old_code + new_code
-            fix['new_code'] = new_code
-            fixes[offset] = fix
-        else:
-            pass  # Fix is already added, do nothing
-    else:
-        fixes[offset] = fix
-
-    return fixes
 
 
 def myrepr(s):
@@ -172,7 +148,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             for item in strings:
                 print("0x{:x} : {!r}".format(*item[:2]))
 
-    fixes = dict()
+    fixes = Fixes()
     metadata = OrderedDict()
     delayed_pokes = dict()
     
@@ -235,8 +211,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     new_code = fix['new_code']
                     assert isinstance(new_code, (bytes, bytearray, MachineCode))
                     src_off = fix['src_off']
-                
-                    add_fix(fixes, src_off, fix)
+
+                    fixes.add_fix(src_off, fix)
                 else:
                     if 'added_relocs' in fix:
                         # Add relocations of new references of moved items
@@ -307,7 +283,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     if code_chunk:
                         new_code = pd.mach_strlen(code_chunk)
                         fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
-                        add_fix(fixes, src_off, fix)
+                        fixes.add_fix(src_off, fix)
                         info['fixed'] = 'yes'
                     else:
                         info['fixed'] = 'no'
