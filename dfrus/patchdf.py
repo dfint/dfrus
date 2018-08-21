@@ -136,50 +136,6 @@ def match_mov_reg_imm32(b, reg, imm):
     return b[0] == mov_reg_imm | 8 | int(reg) and from_dword(b[1:]) == imm
 
 
-class Fixes:
-    def __init__(self, d: dict=None):
-        if not d:
-            d = dict()
-
-        self.d = d
-
-    def items(self):
-        return self.d.items()
-
-    def values(self):
-        return self.d.values()
-
-    def keys(self):
-        return self.d.keys()
-
-    def __getitem__(self, item):
-        return self.d[item]
-
-    def __setitem__(self, key, value):
-        self.d[key] = value
-
-    def add_fix(self, offset, fix):
-        fixes = self
-        new_code = fix['new_code']
-        if offset in fixes:
-            old_fix = fixes[offset]
-            old_code = old_fix['new_code']
-            if bytes(new_code) not in bytes(old_code):
-                if isinstance(old_code, MachineCode):
-                    assert not isinstance(new_code, MachineCode)
-                    new_code = new_code + old_code
-                    if 'poke' in old_fix and 'poke' not in fix:
-                        fix['poke'] = old_fix['poke']
-                else:
-                    new_code = old_code + new_code
-                fix['new_code'] = new_code
-                fixes[offset] = fix
-            else:
-                pass  # Fix is already added, do nothing
-        else:
-            fixes[offset] = fix
-
-
 class Fix:
     _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'added_relocs'}
 
@@ -202,6 +158,50 @@ class Fix:
 
     def __contains__(self, item):
         return self.__getattribute__(item) is not None
+
+
+class Fixes:
+    def __init__(self, d: dict=None):
+        if not d:
+            d = dict()
+
+        self.d = d
+
+    def items(self):
+        return self.d.items()
+
+    def values(self):
+        return self.d.values()
+
+    def keys(self):
+        return self.d.keys()
+
+    def __getitem__(self, item):
+        return self.d[item]
+
+    def __setitem__(self, key, value):
+        self.d[key] = value
+
+    def add_fix(self, offset, fix: Fix):
+        fixes = self
+        new_code = fix['new_code']
+        if offset in fixes:
+            old_fix = fixes[offset]
+            old_code = old_fix['new_code']
+            if bytes(new_code) not in bytes(old_code):
+                if isinstance(old_code, MachineCode):
+                    assert not isinstance(new_code, MachineCode)
+                    new_code = new_code + old_code
+                    if 'poke' in old_fix and 'poke' not in fix:
+                        fix['poke'] = old_fix['poke']
+                else:
+                    new_code = old_code + new_code
+                fix['new_code'] = new_code
+                fixes[offset] = fix
+            else:
+                pass  # Fix is already added, do nothing
+        else:
+            fixes[offset] = fix
 
 
 def get_fix_for_moves(get_length_info, newlen, string_address, meta):
