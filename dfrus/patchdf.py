@@ -137,14 +137,18 @@ def match_mov_reg_imm32(b, reg, imm):
 
 
 class Fix:
-    _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'added_relocs'}
+    _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'dest_off', 'added_relocs'}
 
-    def __init__(self, new_code, pokes=None, poke=None, src_off=None, added_relocs=None):
+    def __init__(self, new_code=None, pokes=None, poke=None, src_off=None, dest_off=None, added_relocs=None, meta=None,
+                 op=None):
         self.new_code = new_code
         self.pokes = pokes
         self.poke = poke
         self.src_off = src_off
+        self.dest_off = dest_off
         self.added_relocs = added_relocs
+        self.meta = meta
+        self.op = op
 
     # Some crutches to make Fix compatible with plain dict
     def __getitem__(self, item):
@@ -281,7 +285,7 @@ count_after = 0x100
 count_after_for_get_length = 0x2000
 
 
-def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address):
+def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address) -> Fix:
     def which_func(offset, stop_cond=lambda _: False):
         disasm_line = trace_code(fn, offset, stop_cond=lambda cur_line: str(cur_line).startswith('rep') or
                                                                         stop_cond(cur_line))
@@ -396,46 +400,46 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                                     func=line.operands[0].value,
                                     return_addr=line.address + 5
                                 )
-                                retvalue = dict(
+                                retvalue = Fix(
                                     src_off=line.address + 1,
                                     new_code=new_code,
                                     pokes={line.address: jmp_near}  # Replace call with jump
                                 )
-                                retvalue.update(meta)
+                                retvalue.meta = meta
                                 return retvalue
-                return meta  # Length fixed successfully
+                return Fix(meta=meta)  # Length fixed successfully
             elif pre[-3] == push_imm8 and pre[-2] == oldlen:
                 # push len ; before
                 fpoke(fn, offset-2, newlen)
                 meta.update(dict(len='push', fixed='yes'))
-                return meta
+                return Fix(meta=meta)
             elif aft and aft[0] == push_imm8 and aft[1] == oldlen:
                 # push len ; after
                 meta['len'] = 'push'
                 if not jmp:
                     fpoke(fn, next_off+1, newlen)
                     meta['fixed'] = 'yes'
-                    return meta
+                    return Fix(meta=meta)
                 elif jmp == jmp_near:
-                    retvalue = dict(
+                    retvalue = Fix(
                         src_off=oldnext+1,
                         new_code=bytes((push_imm8, newlen)),
                         dest_off=next_off+2
                     )
-                    retvalue.update(meta)
+                    retvalue.meta = meta
                     return retvalue
                 else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         disp = from_dword(aft[i+1:i+5], signed=True)
-                        retvalue = dict(
+                        retvalue = Fix(
                             src_off=next_off+i+1,
                             new_code=mach_strlen(
                                 (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
                             ),  # mov [ESP+8], ECX
                             dest_off=next_off+i+5+disp
                         )
-                        retvalue.update(meta)
+                        retvalue.meta = meta
                         return retvalue
             elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
@@ -445,13 +449,13 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                 i = find_instruction(aft, call_near)
                 if i is not None:
                     disp = from_dword(aft[i+1:i+5], signed=True)
-                    retvalue = dict(
+                    retvalue = Fix(
                         src_off=next_off+i+1,
                         new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
                         dest_off=next_off+i+5+disp,
                         op=call_near
                     )
-                    retvalue.update(meta)
+                    retvalue.meta = meta
                     return retvalue
             elif aft and match_mov_reg_imm32(aft[:5], Reg.edi, oldlen):
                 # mov edi, len ; after
@@ -459,26 +463,26 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                 if not jmp:
                     fpoke4(fn, next_off+1, newlen)
                     meta['fixed'] = 'yes'
-                    return meta
+                    return Fix(meta=meta)
                 elif jmp == jmp_near:
-                    retvalue = dict(
+                    retvalue = Fix(
                         src_off=oldnext+1,
                         new_code=bytes((mov_reg_imm | 8 | Reg.edi.code,)) + to_dword(newlen),
                         dest_off=next_off+5
                     )
-                    retvalue.update(meta)
+                    retvalue.meta = meta
                     return retvalue
                 else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         disp = from_dword(aft[i+1:i+5], signed=True)
-                        retvalue = dict(
+                        retvalue = Fix(
                             src_off=next_off+i+1,
                             new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
                             dest_off=next_off+i+5+disp,
                             op=call_near
                         )
-                        retvalue.update(meta)
+                        retvalue.meta = meta
                         return retvalue
             elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
                 # Possible to be `lea edi, [reg+N]`
@@ -488,7 +492,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                     meta['len'] = 'edi'
                     fpoke(fn, offset-2, newlen)
                     meta['fixed'] = 'yes'
-                    return meta
+                    return Fix(meta=meta)
             elif (aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
                   aft[2] == push_imm8 and aft[3] == oldlen):
                 # mov ecx, reg; push imm8
@@ -496,14 +500,14 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                 if not jmp:
                     fpoke(fn, next_off+3, newlen)
                     meta['fixed'] = 'yes'
-                    return meta
+                    return Fix(meta=meta)
                 elif jmp == jmp_near:
                     # TODO: Handle this case
                     meta['fixed'] = 'not implemented'
-                    return meta
+                    return Fix(meta=meta)
                 else:
                     meta['fixed'] = 'no'
-                    return meta
+                    return Fix(meta=meta)
         elif reg == Reg.esi.code and isinstance(func, tuple) and func[0].startswith('rep'):
             # Sample code:
             # ; oldlen = 22
@@ -524,18 +528,18 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                 fpoke4(fn, offset-5, new_dword_count)
                 meta['len'] = 'ecx*4'
                 meta['fixed'] = 'yes'
-                return meta
+                return Fix(meta=meta)
             elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
                 fpoke(fn, offset-2, new_dword_count)
                 meta['len'] = 'ecx*4'
                 meta['fixed'] = 'yes'
-                return meta
+                return Fix(meta=meta)
             elif newlen > oldlen:
                 # ecx modification code was not found. TODO: handle this case properly.
                 if jmp:
                     meta['fixed'] = 'no'
-                    return meta
+                    return Fix(meta=meta)
                 elif aft:
                     for line in disasm(aft, start_address=next_off):
                         if line.mnemonic != 'db':
@@ -545,7 +549,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
                         if line_data[0] == Prefix.rep:
                             meta['len'] = 'ecx*4'
                             meta['fixed'] = 'no'
-                            return meta
+                            return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
                             next_off_2 = line.operands[0].value
                             aft = fpeek(fn, offset, count_after)
@@ -558,30 +562,30 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
 
                             if skip is not None:
                                 meta['len'] = 'ecx*4'
-                                retvalue = dict(
+                                retvalue = Fix(
                                     src_off=line.address+1,
                                     new_code=bytes((mov_reg_imm | 8 | Reg.ecx.code,)) + to_dword(dword_count),
                                     dest_off=next_off_2 + skip
                                 )
-                                retvalue.update(meta)
+                                retvalue.meta = meta
                                 return retvalue
 
                             meta['fixed'] = 'no'
-                            return meta
+                            return Fix(meta=meta)
                         elif len(line_data) == 5 and match_mov_reg_imm32(line_data, Reg.ecx, dword_count):
                             fpoke4(fn, line.address + 1, new_dword_count)
                             meta['len'] = 'ecx*4'
                             meta['fixed'] = 'yes'
-                            return meta
+                            return Fix(meta=meta)
                         elif line_data[0] == lea and line_data[1] & 0xf8 == mod_1_ecx_0 and line_data[2] == dword_count:
                             fpoke(fn, line.address + 2, new_dword_count)
                             meta['len'] = 'ecx*4'
                             meta['fixed'] = 'yes'
-                            return meta
-                    return meta
+                            return Fix(meta=meta)
+                    return Fix(meta=meta)
         else:
             meta['str'] = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
-        return meta
+        return Fix(meta=meta)
     elif (pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and pre[-1] & 0xC7 == join_byte(0, 0, 5)) or  # mov
           pre[-3] == 0x0F and pre[-2] in {x0f_movups, x0f_movaps} and pre[-1] & 0xC7 == join_byte(0, 0, 5)):  # movups or movaps
         # mov eax, [addr] or mov reg, [addr]
@@ -594,7 +598,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         except (ValueError, IndexError) as err:
             meta['fixed'] = 'no'
             meta['get_length_error'] = repr(err)
-            return meta
+            return Fix(meta=meta)
 
         if 'pokes' in x:
             for off, b in x['pokes'].items():
@@ -602,9 +606,9 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
 
         if newlen <= oldlen and 'pokes' not in x:
             meta['fixed'] = 'not needed'
-            return meta
+            return Fix(meta=meta)
         else:
-            fix = get_fix_for_moves(x, newlen, string_address, meta)
+            fix = Fix(**get_fix_for_moves(x, newlen, string_address, meta))
 
             if fix['fixed'] == 'yes':
                 # Make deleted relocs offsets relative to the given offset
@@ -625,13 +629,13 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         meta['func'] = 'strcpy'
         meta['str'] = 'mov byte'
         meta['fixed'] = 'not needed'
-        return meta  # No need fixing
+        return Fix(meta=meta)  # No need fixing
     elif pre[-1] == add_acc_imm | 1:
         # add reg, offset string
         meta['func'] = 'array'
         meta['str'] = 'add offset'
         meta['fixed'] = 'not needed'
-        return meta
+        return Fix(meta=meta)
     elif pre[-2] == op_rm_imm | 1 and pre[-1] & 0xF8 == 0xF8:
         # cmp reg, offset string
         meta['str'] = 'cmp reg'
@@ -640,7 +644,7 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         meta['str'] = 'mov var'
         meta['fixed'] = 'not needed'
     meta['prev_bytes'] = ' '.join('%02X' % x for x in pre[-4:])
-    return meta
+    return Fix(meta=meta)
 
 
 def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, dest=None):
