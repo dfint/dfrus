@@ -14,7 +14,7 @@ from .extract_strings import extract_strings
 from .machinecode import MachineCode
 from .opcodes import *
 from .patch_charmap import search_charmap, patch_unicode_table
-from .patchdf import code, Fix, Fixes
+from .patchdf import code, Fix, Fixes, Metadata
 from .peclasses import PortableExecutable, Section, RelocationTable
 
 
@@ -201,10 +201,10 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                               (sys.exc_info()[0], string, ref_rva + image_base))
                         raise
                 else:
-                    fix = dict(fixed='not needed')
+                    fix = Fix(meta=Metadata(fixed='not needed'))
 
-                assert isinstance(fix, dict)
-                if 'str' in fix and fix['str'] == 'cmp reg':
+                meta = fix.meta
+                if meta.str == 'cmp reg':
                     # This is probably a bound of an array, not a string reference
                     continue
                 elif 'new_code' in fix:
@@ -282,7 +282,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     
                     if code_chunk:
                         new_code = pd.mach_strlen(code_chunk)
-                        fix = dict(src_off=src_off, new_code=new_code, dest_off=dest_off)
+                        fix = Fix(src_off=src_off, new_code=new_code, dest_off=dest_off)
                         fixes.add_fix(src_off, fix)
                         info['fixed'] = 'yes'
                     else:
