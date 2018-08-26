@@ -137,7 +137,7 @@ def match_mov_reg_imm32(b, reg, imm):
 
 
 class Metadata:
-    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None, **kwargs):
+    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None):
         self.fixed = fixed
         self.cause = cause
         self.len = len_
@@ -606,21 +606,21 @@ def fix_len(fn, offset, oldlen, newlen, string_address, original_string_address)
         next_off = offset - get_start(pre)
         aft = fpeek(fn, next_off, count_after_for_get_length)
         try:
-            x = get_length(aft, oldlen, original_string_address)
+            get_length_info = get_length(aft, oldlen, original_string_address)
         except (ValueError, IndexError) as err:
             meta.fixed = 'no'
             meta.cause = repr(err)
             return Fix(meta=meta)
 
-        if 'pokes' in x:
-            for off, b in x['pokes'].items():
+        if 'pokes' in get_length_info:
+            for off, b in get_length_info['pokes'].items():
                 fpoke(fn, next_off + off, b)
 
-        if newlen <= oldlen and 'pokes' not in x:
+        if newlen <= oldlen and 'pokes' not in get_length_info:
             meta.fixed = 'not needed'
             return Fix(meta=meta)
         else:
-            fix = Fix(**get_fix_for_moves(x, newlen, string_address, meta))
+            fix = Fix(**get_fix_for_moves(get_length_info, newlen, string_address, meta))
 
             if fix['fixed'] == 'yes':
                 # Make deleted relocs offsets relative to the given offset
