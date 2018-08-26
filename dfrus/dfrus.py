@@ -145,11 +145,11 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         print("%d strings remaining." % len(strings))
         if 0 < len(strings) <= 16:
             print('All remaining strings:')
-            for item in strings:
-                print("0x{:x} : {!r}".format(*item[:2]))
+            for meta in strings:
+                print("0x{:x} : {!r}".format(*meta[:2]))
 
     fixes = Fixes()
-    metadata = OrderedDict()
+    metadata = OrderedDict()  # type: dict[tuple, Metadata]
     delayed_pokes = dict()
     
     encoding = codepage if codepage else 'cp437'
@@ -227,33 +227,34 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 elif is_long and string_address:
                     fpoke4(fn, ref, string_address)
 
-                metadata[(string, ref_rva+image_base)] = fix
+                metadata[(string, ref_rva+image_base)] = fix.meta
 
     for offset, b in delayed_pokes.items():
         fpoke(fn, offset, b)
 
     # Extract information of functions parameters
-    functions = defaultdict(dict)
-    for item in metadata.values():
-        if 'func' in item and item['func'][0] == 'call near':
-            offset = item['func'][2]
+    functions = defaultdict(Metadata)  # type: defaultdict[Metadata]
+    for meta in metadata.values():
+        assert isinstance(meta, Metadata)
+        if meta.func and meta.func[0] == 'call near':
+            offset = meta.func[2]
             address = sections[code].offset_to_rva(offset) + image_base
-            if 'str' in item:
-                str_param = item['str']
-                if 'str' not in functions[offset]:
-                    functions[offset]['str'] = {str_param}
-                elif str_param not in functions[offset]['str']:
+            if meta.str:
+                str_param = meta.str
+                if functions[offset].str is None:
+                    functions[offset].str = {str_param}
+                elif str_param not in functions[offset].str:
                     print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
-                          (address, str_param, functions[offset]['str']))
-                    functions[offset]['str'].add(str_param)
+                          (address, str_param, functions[offset].str))
+                    functions[offset].str.add(str_param)
 
-            if 'len' in item:
-                len_param = item['len']
-                if 'len' not in functions[offset]:
-                    functions[offset]['len'] = len_param
-                elif functions[offset]['len'] != len_param:
+            if meta.len is not None:
+                len_param = meta.len
+                if functions[offset].len is None:
+                    functions[offset].len = len_param
+                elif functions[offset].len != len_param:
                     raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
-                                     (address, functions[offset]['len'], len_param))
+                                     (address, functions[offset].len, len_param))
     
     if debug:
         print('\nGuessed function parameters:')
@@ -266,9 +267,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     not_fixed = dict()
     
     # Add strlen before call of functions for strings which length was not fixed
-    for string, info in metadata.items():
-        if ('fixed' not in info or info['fixed'] == 'no') and 'new_code' not in info:
-            func = info.get('func', None)
+    for string, meta in metadata.items():
+        if (meta.fixed is None or meta.fixed == 'no') and 'new_code' not in meta:
+            func = meta.func
             if func is not None and func[0] == 'call near':
                 if 'len' in functions[func[2]]:
                     _, src_off, dest_off = func
@@ -284,26 +285,26 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                         new_code = pd.mach_strlen(code_chunk)
                         fix = Fix(src_off=src_off, new_code=new_code, dest_off=dest_off)
                         fixes.add_fix(src_off, fix)
-                        info['fixed'] = 'yes'
+                        meta.fixed = 'yes'
                     else:
-                        info['fixed'] = 'no'
+                        meta.fixed = 'no'
                 else:
-                    info['fixed'] = 'not needed'
+                    meta.fixed = 'not needed'
             
             if debug:
-                if 'fixed' not in info:
-                    status_unknown[string[1]] = (string[0], info)
-                elif info['fixed'] == 'no':
-                    not_fixed[string[1]] = (string[0], info)
+                if meta.fixed is None:
+                    status_unknown[string[1]] = (string[0], meta)
+                elif meta.fixed == 'no':
+                    not_fixed[string[1]] = (string[0], meta)
     
     if debug:
-        for ref, (string, info) in sorted(not_fixed.items(), key=lambda x: x[0]):
-            print('Length not fixed: %s (reference from 0x%x)' % (myrepr(string), ref), info)
+        for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
+            print('Length not fixed: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
         
         print()
         
-        for ref, (string, info) in sorted(status_unknown.items(), key=lambda x: x[0]):
-            print('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), info)
+        for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
+            print('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
 
     hook_off = None
 
@@ -536,6 +537,7 @@ def _main():
         print('Error: "%s" file not found.' % args.dictionary)
     else:
         run(args.path, args.dest, trans_table, args.codepage, args.original_codepage, args.slice, args.debug)
+
 
 if __name__ == "__main__":
     _main()
