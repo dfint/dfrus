@@ -137,29 +137,39 @@ def match_mov_reg_imm32(b, reg, imm):
 
 
 class Metadata:
-    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None):
+    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None,
+                 new_code=None):
         self.fixed = fixed
         self.cause = cause
         self.len = len_
         self.str = str_
         self.func = func
         self.prev_bytes = prev_bytes
-        pass
+    
+    def __repr__(self):
+        return '{}({})'.format(type(self).__name__,
+                               ', '.join('{}={!r}'.format(key, self.__getattribute__(key))
+                                         for key in sorted(dir(self)) if key[0] != '_'))
 
 
 class Fix:
-    _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'dest_off', 'added_relocs'}
+    _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'dest_off', 'added_relocs',
+        'deleted_relocs', 'fixed', 'fix'}
 
-    def __init__(self, new_code=None, pokes=None, poke=None, src_off=None, dest_off=None, added_relocs=None,
-                 meta: Metadata=None, op=None):
+    def __init__(self, new_code=None, pokes=None, poke=None, src_off=None, dest_off=None,
+                 added_relocs=None, deleted_relocs=None, meta: Metadata=None, op=None, fixed=None,
+                 fix=None):
         self.new_code = new_code
         self.pokes = pokes
         self.poke = poke
         self.src_off = src_off
         self.dest_off = dest_off
         self.added_relocs = added_relocs
+        self.deleted_relocs = deleted_relocs
         self.meta = meta
         self.op = op
+        self.fixed = fixed
+        self.fix = fix
 
     # Some crutches to make Fix compatible with plain dict
     def __getitem__(self, item):
@@ -193,7 +203,10 @@ class Fixes:
 
     def __getitem__(self, item):
         return self.d[item]
-
+    
+    def __contains__(self, item):
+        return item in self.d
+    
     def __setitem__(self, key, value):
         self.d[key] = value
 
