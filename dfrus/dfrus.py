@@ -149,7 +149,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 print("0x{:x} : {!r}".format(*meta[:2]))
 
     fixes = Fixes()
-    metadata = OrderedDict()  # type: dict[tuple, Metadata]
+    metadata = OrderedDict()  # type: {tuple: Fix}
     delayed_pokes = dict()
     
     encoding = codepage if codepage else 'cp437'
@@ -227,14 +227,15 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 elif is_long and string_address:
                     fpoke4(fn, ref, string_address)
 
-                metadata[(string, ref_rva+image_base)] = fix.meta
+                metadata[(string, ref_rva+image_base)] = fix
 
     for offset, b in delayed_pokes.items():
         fpoke(fn, offset, b)
 
     # Extract information of functions parameters
     functions = defaultdict(Metadata)  # type: defaultdict[Metadata]
-    for meta in metadata.values():
+    for fix in metadata.values():
+        meta = fix.meta
         assert isinstance(meta, Metadata)
         if meta.func and meta.func[0] == 'call near':
             offset = meta.func[2]
@@ -267,11 +268,12 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     not_fixed = dict()
     
     # Add strlen before call of functions for strings which length was not fixed
-    for string, meta in metadata.items():
-        if (meta.fixed is None or meta.fixed == 'no') and 'new_code' not in meta:
+    for string, fix in metadata.items():
+        meta = fix.meta
+        if (meta.fixed is None or meta.fixed == 'no') and fix.new_code is None:
             func = meta.func
             if func is not None and func[0] == 'call near':
-                if 'len' in functions[func[2]]:
+                if functions[func[2]].len is not None:
                     _, src_off, dest_off = func
                     src_off += 1
                     code_chunk = None

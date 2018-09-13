@@ -174,6 +174,9 @@ class Fix:
     def __getitem__(self, item):
         return self.__getattribute__(item)
 
+    def get(self, key, d=None):
+        return self[key] if key in self._allowed_fields else d
+
     def __setitem__(self, key, value):
         if key in self._allowed_fields:
             self.__setattr__(key, value)
