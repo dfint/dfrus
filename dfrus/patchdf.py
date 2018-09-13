@@ -137,8 +137,7 @@ def match_mov_reg_imm32(b, reg, imm):
 
 
 class Metadata:
-    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None,
-                 new_code=None):
+    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None):
         self.fixed = fixed
         self.cause = cause
         self.len = len_
