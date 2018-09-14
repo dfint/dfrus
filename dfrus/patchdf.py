@@ -148,7 +148,8 @@ class Metadata:
     def __repr__(self):
         return '{}({})'.format(type(self).__name__,
                                ', '.join('{}={!r}'.format(key, self.__getattribute__(key))
-                                         for key in sorted(dir(self)) if key[0] != '_'))
+                                         for key in sorted(dir(self))
+                                         if key[0] != '_' and self.__getattribute__(key) is not None))
 
 
 class Fix:
