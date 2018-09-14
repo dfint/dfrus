@@ -187,52 +187,34 @@ class Fix:
     def __contains__(self, item):
         return self.__getattribute__(item) is not None
 
+    def __repr__(self):
+        return '{}({})'.format(type(self).__name__,
+                               ', '.join('{}={!r}'.format(key, self.__getattribute__(key))
+                                         for key in sorted(self._allowed_fields)
+                                         if key[0] != '_' and self.__getattribute__(key) is not None))
 
-class Fixes:
-    def __init__(self, d: dict=None):
-        if not d:
-            d = dict()
+    def __bool__(self):
+        return any(self.__getattribute__(attr) for attr in self._allowed_fields)
 
-        self.d = d
-
-    def items(self):
-        return self.d.items()
-
-    def values(self):
-        return self.d.values()
-
-    def keys(self):
-        return self.d.keys()
-
-    def __getitem__(self, item):
-        return self.d[item]
-    
-    def __contains__(self, item):
-        return item in self.d
-    
-    def __setitem__(self, key, value):
-        self.d[key] = value
-
-    def add_fix(self, offset, fix: Fix):
-        fixes = self
-        new_code = fix['new_code']
-        if offset in fixes:
-            old_fix = fixes[offset]
-            old_code = old_fix['new_code']
+    def add_fix(self, fix: "Fix"):
+        new_code = fix.new_code
+        old_fix = self
+        if self:
+            old_code = old_fix.new_code
             if bytes(new_code) not in bytes(old_code):
                 if isinstance(old_code, MachineCode):
                     assert not isinstance(new_code, MachineCode)
                     new_code = new_code + old_code
-                    if 'poke' in old_fix and 'poke' not in fix:
-                        fix['poke'] = old_fix['poke']
+                    if old_fix.poke and not fix.poke:
+                        fix.poke = old_fix.poke
                 else:
                     new_code = old_code + new_code
-                fix['new_code'] = new_code
-                fixes[offset] = fix
+                fix.new_code = new_code
+                return self
             else:
                 pass  # Fix is already added, do nothing
         else:
-            fixes[offset] = fix
+            return fix
 
 
 def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):

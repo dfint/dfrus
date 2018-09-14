@@ -14,7 +14,7 @@ from .extract_strings import extract_strings
 from .machinecode import MachineCode
 from .opcodes import *
 from .patch_charmap import search_charmap, patch_unicode_table
-from .patchdf import code, Fix, Fixes, Metadata
+from .patchdf import code, Fix, Metadata
 from .peclasses import PortableExecutable, Section, RelocationTable
 
 
@@ -148,7 +148,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             for meta in strings:
                 print("0x{:x} : {!r}".format(*meta[:2]))
 
-    fixes = Fixes()
+    fixes = defaultdict(Fix)
     metadata = OrderedDict()  # type: {tuple: Fix}
     delayed_pokes = dict()
     
@@ -212,7 +212,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     assert isinstance(new_code, (bytes, bytearray, MachineCode))
                     src_off = fix['src_off']
 
-                    fixes.add_fix(src_off, fix)
+                    fixes[src_off].add_fix(fix)
                 else:
                     if 'added_relocs' in fix:
                         # Add relocations of new references of moved items
@@ -286,7 +286,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     if code_chunk:
                         new_code = pd.mach_strlen(code_chunk)
                         fix = Fix(src_off=src_off, new_code=new_code, dest_off=dest_off)
-                        fixes.add_fix(src_off, fix)
+                        fixes[src_off].add_fix(fix)
                         meta.fixed = 'yes'
                     else:
                         meta.fixed = 'no'
