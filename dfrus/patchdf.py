@@ -196,12 +196,22 @@ class Fix:
     def __bool__(self):
         return any(self.__getattribute__(attr) for attr in self._allowed_fields)
 
+    def copy(self, other: "Fix"):
+        # TODO: Could be optimized
+        for field in self._allowed_fields:
+            assert self.__getattribute__(field) is None or self.__getattribute__(field) == other.__getattribute__(field)
+            self.__setattr__(field, other.__getattribute__(field))
+
     def add_fix(self, fix: "Fix"):
         new_code = fix.new_code
         old_fix = self
-        if self:
+        if not self:
+            self.copy(fix)
+        else:
             old_code = old_fix.new_code
-            if bytes(new_code) not in bytes(old_code):
+            if bytes(new_code) in bytes(old_code):
+                pass  # Fix is already added, do nothing
+            else:
                 if isinstance(old_code, MachineCode):
                     assert not isinstance(new_code, MachineCode)
                     new_code = new_code + old_code
@@ -210,11 +220,7 @@ class Fix:
                 else:
                     new_code = old_code + new_code
                 fix.new_code = new_code
-                return self
-            else:
-                pass  # Fix is already added, do nothing
-        else:
-            return fix
+                self.copy(fix)
 
 
 def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
