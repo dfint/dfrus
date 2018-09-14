@@ -233,7 +233,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         fpoke(fn, offset, b)
 
     # Extract information of functions parameters
-    functions = defaultdict(Metadata)  # type: defaultdict[Metadata]
+    functions = defaultdict(Metadata)
     for fix in metadata.values():
         meta = fix.meta
         assert isinstance(meta, Metadata)
