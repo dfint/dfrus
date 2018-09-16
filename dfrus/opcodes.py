@@ -61,7 +61,10 @@ class Reg(Enum):
 
     def __int__(self):
         return self.code
-
+    
+    def __index__(self):
+        return self.code
+    
     def __str__(self):
         return self.name
 
