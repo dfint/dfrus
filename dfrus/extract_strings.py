@@ -157,5 +157,5 @@ if __name__ == "__main__":
                             count[s] = 0
         except OSError:
             print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
-            input("Press Enter...", file=sys.stderr)
+            input("Press Enter...")
             sys.exit()
