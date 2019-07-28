@@ -108,7 +108,8 @@ class Structure:
 
 
 class ImageDosHeader(Structure):
-    _struct = struct.Struct('2s 13H 8x 2H 20x L')
+    _struct = struct.Struct('2s 13H 8x 2H 20x I')
+    assert _struct.size == 0x40
     _field_names = (
         'e_magic', 'e_cblp', 'e_cp', 'e_crlc', 'e_cparhdr', 'e_minalloc', 'e_maxalloc',
         'e_ss', 'e_sp', 'e_csum', 'e_ip', 'e_cs', 'e_lfarlc', 'e_ovno', 'e_oemid', 'e_oeminfo', 'e_lfanew'
@@ -122,7 +123,7 @@ class ImageDosHeader(Structure):
 
 
 class ImageFileHeader(Structure):
-    _struct = struct.Struct('2H 3L 2H')
+    _struct = struct.Struct('2H 3I 2H')
     _field_names = ('machine', 'number_of_sections', 'timedate_stamp', 'pointer_to_symbol_table',
                     'number_of_symbols', 'size_of_optional_header', 'characteristics')
     _formatters = '0x%x %d 0x%x 0x%x %d 0x%x 0x%x'.split()
@@ -130,7 +131,7 @@ class ImageFileHeader(Structure):
 
 class DataDirectoryEntry:
     __slots__ = ('virtual_address', 'size')
-    _struct = struct.Struct('2L')
+    _struct = struct.Struct('2I')
 
     @classmethod
     def sizeof(cls):
@@ -196,7 +197,7 @@ class DataDirectory(Structure):
 
 
 class ImageOptionalHeader(Structure):
-    _struct = struct.Struct('H B B 9L 6H 4L 2H 6L')
+    _struct = struct.Struct('H B B 9I 6H 4I 2H 6I')
     _field_names = (
         'magic', 'major_linker_version', 'minor_linker_version', 'size_of_code',
         'size_of_initialized_data', 'size_of_uninitialized_data', 'address_of_entry_point', 'base_of_code',
@@ -250,7 +251,7 @@ class Section(Structure):
     IMAGE_SCN_MEM_READ = 0x40000000
     IMAGE_SCN_MEM_WRITE = 0x80000000
 
-    _struct = struct.Struct('8s4L12xL')
+    _struct = struct.Struct('8s4I12xI')
     _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
     _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
     _wrap = False
@@ -285,7 +286,7 @@ class Section(Structure):
 
 
 class ImageSectionHeader(Structure):
-    _struct = struct.Struct('8s 6L 2H L')
+    _struct = struct.Struct('8s 6I 2H I')
 
     _field_names = (
         'name', 'physical_address', 'virtual_address', 'size_of_raw_data', 'pointer_to_raw_data',
@@ -428,7 +429,7 @@ class PortableExecutable:
         self.file = file
         self.file.seek(0)
         self.dos_header = ImageDosHeader.read(file)
-        assert self.dos_header.sizeof() == 0x40
+        # assert self.dos_header.sizeof() == 0x40
         self.nt_headers = ImageNTHeaders(file, self.dos_header.e_lfanew)
         self.file_header = self.nt_headers.file_header
         self.optional_header = self.nt_headers.optional_header
