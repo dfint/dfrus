@@ -134,9 +134,13 @@ def myrepr(s):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 3:
-        print('Usage:\nextract_strings.py "Dwarf Fortress.exe" output.txt [encoding]', file=sys.stderr)
+        print('Usage:\nextract_strings.py [--ascii] "Dwarf Fortress.exe" output.txt [encoding]', file=sys.stderr)
     else:
         try:
+            ascii_only = '--ascii' in sys.argv
+            if ascii_only:
+                sys.argv.remove('--ascii')
+            
             with open(sys.argv[1], "r+b") as fn:
                 pe = PortableExecutable(fn)
                 image_base = pe.optional_header.image_base
@@ -149,6 +153,10 @@ if __name__ == "__main__":
                 with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
                     for offset, s, cap_len in strings:
                         if count[s] >= 1:
+                            if ascii_only and any(ord(c)>=0x80 for c in s):
+                                # Skip non-ascii characters
+                                continue
+                            
                             assert cap_len >= len(s)
                             s = s.replace('\r', '\\r')
                             s = s.replace('\t', '\\t')
