@@ -5,6 +5,10 @@ def ord_utf16(c):
     return int.from_bytes(c.encode('utf-16')[2:], 'little')
 
 
+def chr_utf16(value):
+    return value.to_bytes(2, 'little').decode('utf-16')
+
+
 _additional_codepages = {
     'cp437': dict(),  # Stub entry, so that dfrus.py do not complain that cp437 is not implemented
     'cp1251': {
@@ -86,3 +90,33 @@ def search_charmap(fn, sections, xref_table):
                 return obj_off
 
     return None
+
+
+class Encoder:
+    def __init__(self, codepage_data):
+        self.lookup_table = dict()
+
+        for char_code, value in codepage_data.items():
+            if isinstance(value, int):
+                self.lookup_table[chr_utf16(value)] = char_code
+            else:
+                for i, char in enumerate(value):
+                    self.lookup_table[chr_utf16(char)] = char_code + i
+
+    def encode(self, input_string: str, errors=None) -> bytes:
+        array = []
+
+        for char in input_string:
+            if char in self.lookup_table:
+                array.append(self.lookup_table[char])
+            else:
+                array.append(char.encode('cp437', errors=errors))
+
+        return bytes(array)
+
+
+_encoders = {'viscii': Encoder(_additional_codepages['viscii'])}
+
+
+def get_encoder(encoding: str) -> Encoder:
+    return _encoders[encoding]
