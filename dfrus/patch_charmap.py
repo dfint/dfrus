@@ -22,6 +22,22 @@ _additional_codepages = {
         # 0xA1: ord_utf16('Ў'),
         0xA2: ord_utf16('ў'),
     },
+    # Vietnamese code page
+    'viscii': {
+        0x02: ord_utf16('Ẳ'),
+        0x05: [ord_utf16('Ẵ'), ord_utf16('Ẫ')],
+        0x14: ord_utf16('Ỷ'),
+        0x19: ord_utf16('Ỹ'),
+        0x1E: ord_utf16('Ỵ'),
+        0x80: map(ord_utf16, 'ẠẮẰẶẤẦẨẬẼẸẾỀỂỄỆỐ'),
+        0x90: map(ord_utf16, 'ỒỔỖỘỢỚỜỞỊỎỌỈỦŨỤỲ'),
+        0xA0: map(ord_utf16, 'Õắằặấầẩậẽẹếềểễệố'),
+        0xB0: map(ord_utf16, 'ồổỗỠƠộờởịỰỨỪỬơớƯ'),
+        0xC0: map(ord_utf16, 'ÀÁÂÃẢĂẳẵÈÉÊẺÌÍĨỳ'),
+        0xD0: map(ord_utf16, 'ĐứÒÓÔạỷừửÙÚỹỵÝỡư'),
+        0xE0: map(ord_utf16, 'àáâãảăữẫèéêẻìíĩỉ'),
+        0xF0: map(ord_utf16, 'đựòóôõỏọụùúũủýợỮ')
+    }
 }
 _codepages = dict()
 
