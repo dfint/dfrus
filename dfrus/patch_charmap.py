@@ -1,11 +1,11 @@
 from .binio import fpoke4, to_dword, fpeek
 
 
-def ord_utf16(c):
+def ord_utf16(c: str):
     return int.from_bytes(c.encode('utf-16')[2:], 'little')
 
 
-def chr_utf16(value):
+def chr_utf16(value: int):
     return value.to_bytes(2, 'little').decode('utf-16')
 
 
@@ -103,14 +103,14 @@ class Encoder:
                 for i, char in enumerate(value):
                     self.lookup_table[chr_utf16(char)] = char_code + i
 
-    def encode(self, input_string: str, errors=None) -> bytes:
+    def encode(self, input_string: str, errors='strict') -> bytes:
         array = []
 
         for char in input_string:
             if char in self.lookup_table:
                 array.append(self.lookup_table[char])
             else:
-                array.append(char.encode('cp437', errors=errors))
+                array.append(char.encode('cp437', errors=errors)[0])
 
         return bytes(array)
 
