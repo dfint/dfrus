@@ -127,27 +127,6 @@ def fpoke(file_object, off, x):
         file_object.write(bytes([to_unsigned(x, 8)]))
 
 
-class TestFileObject(object):
-    def __init__(self):
-        self.position = 0
-        
-    def read(self, n):
-        self.position += n
-        return bytes(int(random.random()*256) for _ in range(n))
-    
-    def write(self, s):
-        print('Writing %d bytes at position 0x%X:' % (len(s), self.position))
-        print(' '.join('0x%02X' % x for x in s))
-        self.position += len(s)
-    
-    def seek(self, n):
-        self.position = n
-        return n
-        
-    def tell(self):
-        return self.position
-
-
 def to_signed(x, width):
     pow2w = 2**width
     assert(x < pow2w)
@@ -171,15 +150,3 @@ def from_dword(b, signed=False, byteorder='little'):
 
 def to_dword(x, signed=False, byteorder='little'):
     return x.to_bytes(length=4, byteorder=byteorder, signed=signed)
-
-
-if __name__ == "__main__":
-    fn = TestFileObject()
-    # fn = open("test.bin","r+b")
-    put_integer32(fn, 0xDEADBEEF)
-    put_integer16(fn, 0xBAAD)
-    put_integer8(fn, 0xAB)
-    write_string(fn, "1234")
-    # fn.seek(0)
-    print(get_dwords(fn, 2))
-    print(get_words(fn, 3))
