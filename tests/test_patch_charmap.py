@@ -8,4 +8,4 @@ from dfrus.patch_charmap import Encoder, ord_utf16
 ])
 def test_encoder(codepage_data, input_string, expected):
     encoder = Encoder(codepage_data)
-    assert encoder.encode(input_string) == expected
+    assert encoder.encode(input_string) == (expected, len(expected))

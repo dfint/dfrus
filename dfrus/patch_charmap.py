@@ -103,7 +103,7 @@ class Encoder:
                 for i, char in enumerate(value):
                     self.lookup_table[chr_utf16(char)] = char_code + i
 
-    def encode(self, input_string: str, errors='strict') -> bytes:
+    def encode(self, input_string: str, errors='strict') -> (bytes, int):
         array = []
 
         for char in input_string:
@@ -112,7 +112,7 @@ class Encoder:
             else:
                 array.append(char.encode('cp437', errors=errors)[0])
 
-        return bytes(array)
+        return bytes(array), len(array)
 
 
 _encoders = {'viscii': Encoder(_additional_codepages['viscii'])}

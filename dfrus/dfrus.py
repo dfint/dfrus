@@ -180,9 +180,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             original_string_address = sections.offset_to_rva(off) + image_base
             
             try:
-                encoded_translation = encoder_function(translation) + b'\0'
+                encoded_translation = encoder_function(translation)[0] + b'\0'
             except UnicodeEncodeError:
-                encoded_translation = encoder_function(translation, errors='replace') + b'\0'
+                encoded_translation = encoder_function(translation, errors='replace')[0] + b'\0'
                 print("Warning: some of characters in a translation strings can't be represented in {}, "
                       "they will be replaced with ? marks.".format(encoding))
                 print("{!r}: {!r}".format(string, encoded_translation))
