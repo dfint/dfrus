@@ -118,5 +118,5 @@ class Encoder:
 _encoders = {'viscii': Encoder(_additional_codepages['viscii'])}
 
 
-def get_encoder(encoding: str) -> Encoder:
-    return _encoders[encoding]
+def get_encoder(encoding: str) -> 'text: str, errors: str -> bytes':
+    return lambda text, errors: _encoders[encoding].encode(text, errors=errors)
