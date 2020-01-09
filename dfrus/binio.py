@@ -119,6 +119,7 @@ def fpoke2(file_object, off, x):
 
 
 def fpoke(file_object, off, x):
+    assert off
     if isinstance(x, collections.Iterable):
         file_object.seek(off)
         file_object.write(bytes(to_unsigned(item, 8) for item in x))

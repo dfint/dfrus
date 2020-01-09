@@ -228,7 +228,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                         relocs_to_add.update(item + ref_rva for item in fix['added_relocs'])
 
                     if 'pokes' in fix:
-                        delayed_pokes.update(fix['pokes'])
+                        delayed_pokes.update({off + ref: val for off, val in fix['pokes'].items()})
 
                 # Remove relocations of the overwritten references
                 if 'deleted_relocs' in fix and fix['deleted_relocs']:
@@ -239,6 +239,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 metadata[(string, ref_rva+image_base)] = fix
 
     for offset, b in delayed_pokes.items():
+        print(hex(offset), b)
         fpoke(fn, offset, b)
 
     # Extract information of functions parameters
