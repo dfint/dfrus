@@ -4,8 +4,7 @@ import sys
 import warnings
 from shutil import copy
 
-from . import patchdf as pd
-from .patchdf import fix_df_exe
+from .patchdf import fix_df_exe, load_trans_file
 from .peclasses import PortableExecutable
 
 
@@ -135,7 +134,7 @@ def _main():
 
     try:
         with open(args.dictionary, encoding='utf-8') as trans:
-            trans_table = list(pd.load_trans_file(trans))
+            trans_table = list(load_trans_file(trans))
     except FileNotFoundError:
         print('Error: "%s" file not found.' % args.dictionary)
     else:

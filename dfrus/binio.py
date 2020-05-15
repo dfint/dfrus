@@ -1,6 +1,5 @@
 
 import collections
-import random
 
 
 def get_integer32(file_object):

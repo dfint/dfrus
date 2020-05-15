@@ -1,4 +1,3 @@
-#! python3
 import sys
 from .peclasses import PortableExecutable, RelocationTable
 

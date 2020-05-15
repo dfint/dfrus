@@ -1,4 +1,4 @@
-#! python3
+import sys
 
 from .peclasses import PortableExecutable
 from .patchdf import get_cross_references
@@ -110,7 +110,7 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
                 
                 string_array = list(check_string_array(buf, obj_off, encoding))
                 if not all(cap_len == string_array[0][2] for _, _, cap_len in string_array):
-                    cap_len = align(len(s) + 1)
+                    # cap_len = align(len(s) + 1)
                     s = buf[:s_len].decode(encoding=encoding)
                     cap_len = align(len(s) + 1)
                     current_string = (obj_off, s, cap_len)
@@ -131,8 +131,7 @@ def myrepr(s):
     return text
 
 
-if __name__ == "__main__":
-    import sys
+def main():
     if len(sys.argv) < 3:
         print('Usage:\nextract_strings.py [--ascii] "Dwarf Fortress.exe" output.txt [encoding]', file=sys.stderr)
     else:
@@ -147,13 +146,13 @@ if __name__ == "__main__":
                 sections = pe.section_table
                 relocs = pe.relocation_table
                 xrefs = get_cross_references(fn, relocs, sections, image_base)
-                encoding = 'cp437' if len(sys.argv)<=3 else sys.argv[3]
+                encoding = 'cp437' if len(sys.argv) <= 3 else sys.argv[3]
                 strings = list(extract_strings(fn, xrefs, encoding=encoding, arrays=True))
                 count = Counter(x[1] for x in strings)
                 with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
                     for offset, s, cap_len in strings:
                         if count[s] >= 1:
-                            if ascii_only and any(ord(c)>=0x80 for c in s):
+                            if ascii_only and any(ord(c) >= 0x80 for c in s):
                                 # Skip non-ascii characters
                                 continue
                             
@@ -167,3 +166,7 @@ if __name__ == "__main__":
             print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
             input("Press Enter...")
             sys.exit()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,8 +1,7 @@
 from setuptools import setup, find_packages
 
 install_requires = [
-      'pefile',
-      'click'
+      'pefile'
 ]
 
 test_requires = [
