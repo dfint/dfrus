@@ -10,6 +10,7 @@ from contextlib import suppress
 from binascii import hexlify
 
 from .binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
+from .cross_references import get_cross_references
 from .disasm import *
 from .machinecode import MachineCode, Reference
 from .opcodes import *
@@ -34,27 +35,6 @@ def load_trans_file(fn):
 
 
 code, rdata, data = range(3)
-
-
-def get_cross_references(fn, relocs, sections, image_base):
-    xrefs = defaultdict(list)
-    code_upper_bound = sections[code].rva + sections[code].virtual_size
-    # Read all the file sections:
-    base_offset = sections[code].physical_offset
-    size = sections[-1].physical_offset + sections[-1].physical_size - base_offset
-    buffer = fpeek(fn, base_offset, size)
-    for reloc in relocs:
-        reloc_off = sections.rva_to_offset(reloc)
-        local_off = reloc_off - base_offset
-        obj_rva = from_dword(buffer[local_off:local_off+4]) - image_base
-        reloc += sections[code].physical_offset
-        if code_upper_bound <= obj_rva:
-            obj_off = sections.rva_to_offset(obj_rva)
-            if obj_off is not None:
-                xrefs[obj_off].append(reloc_off)
-
-    return xrefs
-
 
 MAX_LEN = 0x80
 
