@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus import find_earliest_midrefs
+from dfrus.patchdf import find_earliest_midrefs
 
 
 def test_find_earliest_midrefs_beater():
