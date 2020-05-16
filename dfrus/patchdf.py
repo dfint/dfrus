@@ -1128,10 +1128,10 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     _, src_off, dest_off = func
                     src_off += 1
                     code_chunk = None
-                    if functions[dest_off]['len'] == 'push':
+                    if functions[dest_off].len == 'push':
                         # mov [esp+8], ecx
                         code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
-                    elif functions[dest_off]['len'] == 'edi':
+                    elif functions[dest_off].len == 'edi':
                         code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
 
                     if code_chunk:
