@@ -1,8 +1,8 @@
 from .binio import to_dword, from_dword
-from .disasm import join_byte, Operand, mach_lea
+from .disasm import join_byte, Operand
 from .machine_code import MachineCode, Reference
 from .opcodes import push_reg, Reg, xor_rm_reg, cmp_rm_imm, jcc_short, Cond, inc_reg, jmp_short, pop_reg, pushad, \
-    mov_rm_reg, mov_reg_imm, Prefix, movsd, popad, mov_acc_mem, x0f_movups
+    mov_rm_reg, mov_reg_imm, Prefix, movsd, popad, mov_acc_mem, x0f_movups, lea
 
 MAX_LEN = 0x100
 
@@ -92,3 +92,28 @@ def get_start(s):
         i += 1
 
     return i
+
+
+def mach_lea(dest, src: Operand):
+    mach = bytearray()
+    mach.append(lea)
+    assert src.index_reg is None, 'mach_lea(): right operand with index register not implemented'
+
+    if src.disp == 0 and src.base_reg != Reg.ebp:
+        mode = 0
+    elif -0x80 <= src.disp < 0x80:
+        mode = 1
+    else:
+        mode = 2
+
+    if src.base_reg == Reg.esp:
+        mach.append(join_byte(mode, dest, 4))  # mod r/m byte
+        mach.append(join_byte(0, 4, src.base_reg))  # sib byte
+    else:
+        mach.append(join_byte(mode, dest, src.base_reg))  # just mod r/m byte
+
+    if mode == 1:
+        mach += src.disp.to_bytes(1, byteorder='little', signed=True)
+    else:
+        mach += src.disp.to_bytes(4, byteorder='little', signed=True)
+    return mach

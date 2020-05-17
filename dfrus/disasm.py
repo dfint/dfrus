@@ -209,31 +209,6 @@ class Operand:
         return self.value
 
 
-def mach_lea(dest, src: Operand):
-    mach = bytearray()
-    mach.append(lea)
-    assert src.index_reg is None, 'mach_lea(): right operand with index register not implemented'
-    
-    if src.disp == 0 and src.base_reg != Reg.ebp:
-        mode = 0
-    elif -0x80 <= src.disp < 0x80:
-        mode = 1
-    else:
-        mode = 2
-
-    if src.base_reg == Reg.esp:
-        mach.append(join_byte(mode, dest, 4))  # mod r/m byte
-        mach.append(join_byte(0, 4, src.base_reg))  # sib byte
-    else:
-        mach.append(join_byte(mode, dest, src.base_reg))  # just mod r/m byte
-
-    if mode == 1:
-        mach += src.disp.to_bytes(1, byteorder='little', signed=True)
-    else:
-        mach += src.disp.to_bytes(4, byteorder='little', signed=True)
-    return mach
-
-
 def unify_operands(x, size=None):
     modrm = x['modrm']
 
