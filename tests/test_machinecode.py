@@ -1,7 +1,8 @@
 from dfrus.opcodes import mov_rm_imm, Reg, call_near, mov_reg_imm, jmp_near, nop
 from dfrus.disasm import join_byte
 from dfrus.binio import to_dword
-from dfrus.machinecode import MachineCode, Reference, mach_strlen
+from dfrus.machine_code import MachineCode, Reference
+from dfrus.machine_code_utils import mach_strlen
 
 
 def test_machinecode_1():

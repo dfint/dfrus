@@ -1,0 +1,94 @@
+from .binio import to_dword, from_dword
+from .disasm import join_byte, Operand, mach_lea
+from .machine_code import MachineCode, Reference
+from .opcodes import push_reg, Reg, xor_rm_reg, cmp_rm_imm, jcc_short, Cond, inc_reg, jmp_short, pop_reg, pushad, \
+    mov_rm_reg, mov_reg_imm, Prefix, movsd, popad, mov_acc_mem, x0f_movups
+
+MAX_LEN = 0x100
+
+
+def mach_strlen(code_chunk):
+    """
+        push ecx
+        xor ecx, ecx
+    @@:
+        cmp byte [eax+ecx], 0  ; assume that eax contains a string address
+        jz success
+        cmp ecx, 100h
+        jg skip
+        inc ecx
+        jmp @b
+    success:
+        <code_chunk>
+    skip:
+        pop ecx
+    """
+    return MachineCode(
+        push_reg | Reg.ecx.code,  # push ecx
+        xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
+        '@@:',
+        cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
+        jcc_short | Cond.z, Reference.relative('success', size=1),  # jz success
+        cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), to_dword(MAX_LEN),  # cmp ecx, MAX_LEN
+        jcc_short | Cond.g, Reference.relative('skip', size=1),  # jg skip
+        inc_reg | Reg.ecx.code,  # inc ecx
+        jmp_short, Reference.relative('@@', size=1),  # jmp @b
+        'success:',
+        code_chunk,
+        'skip:',
+        pop_reg | Reg.ecx.code,  # pop ecx
+    )
+
+
+def mach_memcpy(src, dest: Operand, count):
+    mach = bytearray()
+    mach.append(pushad)  # pushad
+    new_references = set()
+    assert dest.index_reg is None
+    # If the destination address is not in edi yet, put it there
+    if dest.base_reg != Reg.edi or dest.disp != 0:
+        if dest.disp == 0:
+            # mov edi, reg
+            mach += bytes((mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)))
+        elif dest.base_reg is None:
+            # mov edi, imm32
+            mach.append(mov_reg_imm | 8 | Reg.edi.code)  # mov edi, ...
+            new_references.add(len(mach))
+            mach += to_dword(dest.disp)  # imm32
+        else:
+            # lea edi, [reg+imm]
+            mach += mach_lea(Reg.edi, dest)
+
+    mach.append(mov_reg_imm | 8 | Reg.esi.code)  # mov esi, ...
+    new_references.add(len(mach))
+    mach += to_dword(src)  # imm32
+
+    mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
+    mach += bytes((mov_reg_imm | Reg.cl.code, (count + 3) // 4))  # mov cl, (count+3)//4
+
+    mach += bytes((Prefix.rep, movsd))  # rep movsd
+
+    mach.append(popad)  # popad
+
+    return mach, new_references
+
+
+def match_mov_reg_imm32(b, reg, imm):
+    assert len(b) == 5, b
+    return b[0] == mov_reg_imm | 8 | int(reg) and from_dword(b[1:]) == imm
+
+
+def get_start(s):
+    i = None
+    if s[-1] & 0xfe == mov_acc_mem:
+        i = 1
+    elif s[-2] & 0xf8 == mov_rm_reg and s[-1] & 0xc7 == 0x05:
+        i = 2
+    elif s[-3] == 0x0f and s[-2] & 0xfe == x0f_movups and s[-1] & 0xc7 == 0x05:
+        i = 3
+        return i  # prefix is not allowed here
+
+    if s[-1 - i] == Prefix.operand_size:
+        i += 1
+
+    return i

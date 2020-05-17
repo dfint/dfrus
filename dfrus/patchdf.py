@@ -3,21 +3,21 @@ import csv
 import io
 import sys
 import textwrap
-import warnings
 
 from collections import defaultdict, OrderedDict
 from warnings import warn
-from contextlib import suppress
 from binascii import hexlify
 
 from .binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from .cross_references import get_cross_references
 from .disasm import *
-from .machinecode import MachineCode, Reference
+from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
+from .machine_code import MachineCode, Reference
 from .opcodes import *
 from .extract_strings import extract_strings
 from .patch_charmap import search_charmap, patch_unicode_table, get_codepages, get_encoder
 from .peclasses import Section, RelocationTable
+from .trace_machine_code import which_func
 
 
 def load_trans_file(fn):
@@ -37,26 +37,6 @@ def load_trans_file(fn):
 
 code, rdata, data = range(3)
 
-MAX_LEN = 0x80
-
-
-def mach_strlen(code_chunk):
-    return (bytes((
-        push_reg | Reg.ecx.code,  # push ecx
-        xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
-        # @@:
-        cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
-        jcc_short | Cond.z, 0x0b,  # jz success
-        cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), MAX_LEN, 0x00, 0x00, 0x00,  # cmp ecx, MAX_LEN
-        jcc_short | Cond.g, 3 + len(code_chunk),  # jg skip
-        inc_reg | Reg.ecx.code,  # inc ecx
-        jmp_short, 0xef  # jmp @b
-    )) +
-            # success:
-            bytes(code_chunk) +
-            # skip:
-            bytes((pop_reg | Reg.ecx.code,)))
-
 
 def find_instruction(s, instruction):
     for line in disasm(s):
@@ -64,64 +44,6 @@ def find_instruction(s, instruction):
         if line.data[0] == instruction:
             return line.address
     return None
-
-
-class Trace:
-    not_follow = 0
-    follow = 1
-    stop = 2
-    forward_only = 3
-
-
-def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
-    s = fpeek(fn, offset, count_after)
-    with suppress(IndexError):
-        for line in disasm(s, offset):
-            # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
-            if line.mnemonic == 'db':
-                return None
-            elif stop_cond(line):  # Stop when the stop_cond returns True
-                return line
-            elif line.mnemonic.startswith('jmp'):
-                if trace_jmp == Trace.not_follow:
-                    pass
-                elif trace_jmp == Trace.follow:
-                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-                elif trace_jmp == Trace.stop:
-                    return line
-                elif trace_jmp == Trace.forward_only:
-                    if int(line.operands[0]) > line.address:
-                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-            elif line.mnemonic.startswith('j'):
-                if trace_jcc == Trace.not_follow:
-                    pass
-                elif trace_jcc == Trace.follow:
-                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-                elif trace_jcc == Trace.stop:
-                    return line
-                elif trace_jcc == Trace.forward_only:
-                    if int(line.operands[0]) > line.address:
-                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-            elif line.mnemonic.startswith('call'):
-                if trace_call == Trace.not_follow:
-                    pass
-                elif trace_call == Trace.follow:
-                    returned = trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-                    if returned is None or not returned.mnemonic.startswith('ret'):
-                        return returned
-                elif trace_call == Trace.stop:
-                    return line
-                elif trace_call == Trace.forward_only:
-                    if int(line.operands[0]) > line.address:
-                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-            elif line.mnemonic.startswith('ret'):
-                return line
-    return None
-
-
-def match_mov_reg_imm32(b, reg, imm):
-    assert len(b) == 5, b
-    return b[0] == mov_reg_imm | 8 | int(reg) and from_dword(b[1:]) == imm
 
 
 class Metadata:
@@ -267,44 +189,9 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
     return retvalue
 
 
-def get_start(s):
-    i = None
-    if s[-1] & 0xfe == mov_acc_mem:
-        i = 1
-    elif s[-2] & 0xf8 == mov_rm_reg and s[-1] & 0xc7 == 0x05:
-        i = 2
-    elif s[-3] == 0x0f and s[-2] & 0xfe == x0f_movups and s[-1] & 0xc7 == 0x05:
-        i = 3
-        return i  # prefix is not allowed here
-
-    if s[-1 - i] == Prefix.operand_size:
-        i += 1
-
-    return i
-
-
 count_before = 0x20
 count_after = 0x100
 count_after_for_get_length = 0x2000
-
-
-def which_func(fn, offset, stop_cond=lambda _: False):
-    def default_stop_condition(cur_line):
-        return str(cur_line).startswith('rep') or stop_cond(cur_line)
-
-    disasm_line = trace_code(fn, offset, stop_cond=default_stop_condition)
-    if disasm_line is None:
-        result = ('not reached',)
-    elif str(disasm_line).startswith('rep'):
-        result = (str(disasm_line),)
-    elif disasm_line.mnemonic.startswith('call'):
-        try:
-            result = (disasm_line.mnemonic, disasm_line.address, int(disasm_line.operands[0]))
-        except ValueError:
-            result = (disasm_line.mnemonic + ' indirect', disasm_line.address, str(disasm_line.operands[0]))
-    else:
-        result = ('not reached',)
-    return result
 
 
 def fix_len(fn, offset, old_len, new_len, string_address, original_string_address) -> Fix:
@@ -875,39 +762,6 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
     return result
 
 
-def mach_memcpy(src, dest: Operand, count):
-    mach = bytearray()
-    mach.append(pushad)  # pushad
-    new_references = set()
-    assert dest.index_reg is None
-    # If the destination address is not in edi yet, put it there
-    if dest.base_reg != Reg.edi or dest.disp != 0:
-        if dest.disp == 0:
-            # mov edi, reg
-            mach += bytes((mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)))
-        elif dest.base_reg is None:
-            # mov edi, imm32
-            mach.append(mov_reg_imm | 8 | Reg.edi.code)  # mov edi, ...
-            new_references.add(len(mach))
-            mach += to_dword(dest.disp)  # imm32
-        else:
-            # lea edi, [reg+imm]
-            mach += mach_lea(Reg.edi, dest)
-
-    mach.append(mov_reg_imm | 8 | Reg.esi.code)  # mov esi, ...
-    new_references.add(len(mach))
-    mach += to_dword(src)  # imm32
-
-    mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
-    mach += bytes((mov_reg_imm | Reg.cl.code, (count + 3) // 4))  # mov cl, (count+3)//4
-
-    mach += bytes((Prefix.rep, movsd))  # rep movsd
-
-    mach.append(popad)  # popad
-
-    return mach, new_references
-
-
 def add_to_new_section(fn, dest, s, alignment=4, padding_byte=b'\0'):
     aligned = align(len(s), alignment)
     s = pad_tail(s, aligned, padding_byte)
@@ -1209,8 +1063,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
         if relocs_to_remove - relocs:
-            warnings.warn("Trying to remove some relocations which weren't in the original list: " +
-                          int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs)))
+            warn("Trying to remove some relocations which weren't in the original list: " +
+                 int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs)))
 
         relocs -= relocs_to_remove
         relocs |= relocs_to_add
