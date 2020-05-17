@@ -6,7 +6,7 @@ def put_integer32(file_object, val):
     file_object.write(val.to_bytes(4, byteorder='little'))
 
 
-def fpeek(file_object, off, count=1):
+def read_bytes(file_object, off, count=1):
     if count == 1:
         file_object.seek(off)
         return file_object.read(1)[0]

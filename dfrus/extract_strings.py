@@ -46,7 +46,7 @@ def check_string_array(buf, offset, encoding='cp437'):
     for i, c in enumerate(buf):
         if c:
             if end:
-                yield (offset + start, buf[start:end], i - start - 1)
+                yield offset + start, buf[start:end], i - start - 1
                 start = None
                 end = None
             
@@ -62,7 +62,7 @@ def check_string_array(buf, offset, encoding='cp437'):
             end = i
     
     if end:
-        yield (offset + start, buf[start:end], len(buf) - start - 1)
+        yield offset + start, buf[start:end], len(buf) - start - 1
 
 
 def count_zeros(buf):

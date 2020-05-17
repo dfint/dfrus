@@ -1,6 +1,6 @@
 from contextlib import suppress
 
-from dfrus.binio import fpeek
+from dfrus.binio import read_bytes
 from dfrus.disasm import disasm
 
 count_after = 0x100
@@ -14,7 +14,7 @@ class Trace:
 
 
 def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
-    s = fpeek(fn, offset, count_after)
+    s = read_bytes(fn, offset, count_after)
     with suppress(IndexError):
         for line in disasm(s, offset):
             # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))

@@ -76,7 +76,8 @@ def main():
                     if not relocs_in_range:
                         print("No relocations in range.")
                     else:
-                        print("These relocations will be removed: %s" % ', '.join(hex(x) for x in sorted(relocs_in_range)))
+                        print("These relocations will be removed: %s" % ', '
+                              .join(hex(x)for x in sorted(relocs_in_range)))
                         relocs = set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
                 else:
                     print('Wrong operation: "%s". Skipped.' % cmd[2])

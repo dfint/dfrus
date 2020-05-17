@@ -302,7 +302,7 @@ def asmhex(n):
 class DisasmLine:
     __slots__ = ('address', 'data', 'mnemonic', 'operands', '__str', 'prefix')
 
-    def __init__(self, address, data, mnemonic, operands=None, prefix: Prefix=None):
+    def __init__(self, address, data, mnemonic, operands=None, prefix: Prefix = None):
         self.address = address
         self.data = data
         self.mnemonic = mnemonic
@@ -679,6 +679,7 @@ def _main(argv):
                 print("%08x\t%s" % (disasm_line.address, disasm_line))
                 if disasm_line.mnemonic == 'db':
                     break
+
 
 if __name__ == "__main__":
     import sys

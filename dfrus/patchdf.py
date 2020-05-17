@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 from warnings import warn
 from binascii import hexlify
 
-from .binio import fpeek, fpoke4, fpoke, pad_tail, from_dword, to_dword
+from .binio import read_bytes, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from .cross_references import get_cross_references
 from .disasm import *
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
@@ -197,8 +197,8 @@ count_after_for_get_length = 0x2000
 def fix_len(fn, offset, old_len, new_len, string_address, original_string_address) -> Fix:
     next_off = offset + 4
 
-    pre = fpeek(fn, offset - count_before, count_before)
-    aft = fpeek(fn, next_off, count_after)
+    pre = read_bytes(fn, offset - count_before, count_before)
+    aft = read_bytes(fn, next_off, count_after)
     jmp = None
     old_next = next_off
     if aft[0] in {jmp_short, jmp_near} or aft[0] & 0xf0 == jcc_short:
@@ -209,7 +209,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             displacement = from_dword(aft[1:5], signed=True)
             next_off += 5 + displacement
         jmp = aft[0]
-        aft = fpeek(fn, next_off, count_after)
+        aft = read_bytes(fn, next_off, count_after)
     elif aft[0] == call_near or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
         aft = None
 
@@ -449,7 +449,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
                             next_off_2 = line.operands[0].value
-                            aft = fpeek(fn, offset, count_after)
+                            aft = read_bytes(fn, offset, count_after)
 
                             skip = None
                             if match_mov_reg_imm32(aft[:5], Reg.ecx, dword_count):
@@ -491,7 +491,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
         meta.str = 'mov'
 
         next_off = offset - get_start(pre)
-        aft = fpeek(fn, next_off, count_after_for_get_length)
+        aft = read_bytes(fn, next_off, count_after_for_get_length)
         try:
             get_length_info = get_length(aft, old_len, original_string_address)
         except (ValueError, IndexError) as err:

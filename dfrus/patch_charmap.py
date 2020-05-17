@@ -1,4 +1,4 @@
-from .binio import fpoke4, to_dword, fpeek
+from .binio import fpoke4, to_dword, read_bytes
 
 
 def ord_utf16(c: str):
@@ -81,7 +81,7 @@ def search_charmap(fn, sections, xref_table):
 
     offset = sections[1].physical_offset
     size = sum(section.physical_size for section in sections[1:])
-    data_block = fpeek(fn, offset, size)
+    data_block = read_bytes(fn, offset, size)
     for obj_off in xref_table:
         off = obj_off - offset
         if 0 <= off < size:

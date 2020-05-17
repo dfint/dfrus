@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from dfrus.binio import fpeek, from_dword
+from dfrus.binio import read_bytes, from_dword
 
 code, rdata, data = range(3)
 
@@ -11,7 +11,7 @@ def get_cross_references(fn, relocs, sections, image_base):
     # Read all the file sections:
     base_offset = sections[code].physical_offset
     size = sections[-1].physical_offset + sections[-1].physical_size - base_offset
-    buffer = fpeek(fn, base_offset, size)
+    buffer = read_bytes(fn, base_offset, size)
     for reloc in relocs:
         reloc_off = sections.rva_to_offset(reloc)
         local_off = reloc_off - base_offset
