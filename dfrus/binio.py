@@ -37,7 +37,7 @@ def pad_tail(target, size, ch=None):
     return target
 
 
-def write_string(file_object, s, off=None, new_len=None, encoding=None):
+def write_string(file_object, s: str, off=None, new_len=None, encoding=None):
     if off is not None:
         file_object.seek(off)
     
@@ -49,7 +49,7 @@ def write_string(file_object, s, off=None, new_len=None, encoding=None):
     else:
         s = s.encode(encoding)
 
-    file_object.write(pad_tail(s, new_len, b'\0'))
+    file_object.write(s.ljust(new_len, b'\0'))
 
 
 def fpoke4(file_object, off, x):
