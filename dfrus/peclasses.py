@@ -429,7 +429,7 @@ class PortableExecutable:
         self.file = file
         self.file.seek(0)
         self.dos_header = ImageDosHeader.read(file)
-        # assert self.dos_header.sizeof() == 0x40
+        assert self.dos_header.sizeof() == 0x40
         self.nt_headers = ImageNTHeaders(file, self.dos_header.e_lfanew)
         self.file_header = self.nt_headers.file_header
         self.optional_header = self.nt_headers.optional_header
