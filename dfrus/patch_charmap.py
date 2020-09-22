@@ -1,3 +1,4 @@
+import unicodedata
 from typing import Callable, Tuple
 
 from .binio import fpoke4, to_dword, read_bytes
@@ -105,8 +106,7 @@ class Encoder:
 
     def encode(self, input_string: str, errors='strict') -> Tuple[bytes, int]:
         array = []
-
-        for char in input_string:
+        for char in unicodedata.normalize('NFC', input_string):
             if char in self.lookup_table:
                 array.append(self.lookup_table[char])
             else:
