@@ -1,3 +1,5 @@
+from typing import Callable, Tuple
+
 from .binio import fpoke4, to_dword, read_bytes
 
 
@@ -54,9 +56,7 @@ def generate_charmap_table_patch(enc1, enc2):
 
 
 def get_codepages():
-    global _codepages
     if not _codepages:
-        _codepages = dict()
         for i in range(700, 1253):
             try:
                 _codepages['cp%d' % i] = generate_charmap_table_patch('cp437', 'cp%d' % i)
@@ -103,7 +103,7 @@ class Encoder:
                 for i, char in enumerate(value):
                     self.lookup_table[chr_utf16(char)] = char_code + i
 
-    def encode(self, input_string: str, errors='strict') -> (bytes, int):
+    def encode(self, input_string: str, errors='strict') -> Tuple[bytes, int]:
         array = []
 
         for char in input_string:
@@ -118,5 +118,5 @@ class Encoder:
 _encoders = {'viscii': Encoder(_additional_codepages['viscii'])}
 
 
-def get_encoder(encoding: str) -> 'text: str, errors: str -> bytes':
+def get_encoder(encoding: str) -> Callable[[str, str], bytes]:
     return lambda text, errors: _encoders[encoding].encode(text, errors=errors)
