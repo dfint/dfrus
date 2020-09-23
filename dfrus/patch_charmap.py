@@ -1,5 +1,5 @@
 import unicodedata
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 from .binio import fpoke4, to_dword, read_bytes
 
@@ -118,5 +118,5 @@ class Encoder:
 _encoders = {'viscii': Encoder(_additional_codepages['viscii'])}
 
 
-def get_encoder(encoding: str) -> Callable[[str, str], bytes]:
-    return lambda text, errors='strict': _encoders[encoding].encode(text, errors=errors)
+def get_encoder(encoding: str):
+    return _encoders[encoding].encode
