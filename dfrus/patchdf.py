@@ -9,7 +9,7 @@ from warnings import warn
 from binascii import hexlify
 from typing import Dict, Tuple
 
-from .binio import read_bytes, fpoke4, fpoke, pad_tail, from_dword, to_dword
+from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword
 from .cross_references import get_cross_references
 from .disasm import *
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
@@ -163,7 +163,7 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
             return meta
 
     # Write replacement code
-    mach = pad_tail(mach, x['length'], nop)
+    mach = mach.ljust(x['length'], nop.to_bytes(1, 'little'))
     pokes = {0: mach}
 
     # Nop-out old instructions
@@ -763,11 +763,11 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
     return result
 
 
-def add_to_new_section(fn, dest, s, alignment=4, padding_byte=b'\0'):
+def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_byte=b'\0'):
     aligned = align(len(s), alignment)
-    s = pad_tail(s, aligned, padding_byte)
-    fpoke(fn, dest, s)
-    return dest + aligned
+    s = s.ljust(aligned, padding_byte)
+    fpoke(fn, new_section_offset, s)
+    return new_section_offset + aligned
 
 
 def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):

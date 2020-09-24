@@ -20,23 +20,6 @@ def write_dwords(file_object, dwords):
         put_integer32(file_object, x)
 
 
-def pad_tail(target, size, ch=None):
-    if ch is None:
-        if type(target) is str:
-            ch = ' '
-        else:
-            ch = b'\0'
-    elif type(ch) is int:
-        if type(target) is str:
-            ch = chr(ch)
-        else:
-            ch = bytes((ch,))
-            
-    if len(target) < size:
-        target += ch*(size-len(target))
-    return target
-
-
 def write_string(file_object, s: str, off=None, new_len=None, encoding=None):
     if off is not None:
         file_object.seek(off)
