@@ -64,12 +64,15 @@ def slice_translation(trans_table, bounds):
 
 
 def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp437',
-        dict_slice=None, debug=False, stdout=None):
+        dict_slice=None, debug=False, stdout=None, stderr=None):
     if not debug:
         warnings.simplefilter('ignore')
     
     if stdout is not None:
         sys.stdout = stdout
+
+    if stderr is not None:
+        sys.stderr = stderr
 
     if not path or not os.path.exists(path):
         if debug:
