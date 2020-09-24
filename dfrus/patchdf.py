@@ -935,7 +935,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 metadata[(string, ref_rva + image_base)] = fix
 
     for offset, b in delayed_pokes.items():
-        print(hex(offset), b)
+        # print(hex(offset), b)
         fpoke(fn, offset, b)
 
     # Extract information of functions parameters
