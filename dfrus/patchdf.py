@@ -7,6 +7,7 @@ import textwrap
 from collections import defaultdict, OrderedDict
 from warnings import warn
 from binascii import hexlify
+from typing import Dict, Tuple
 
 from .binio import read_bytes, fpoke4, fpoke, pad_tail, from_dword, to_dword
 from .cross_references import get_cross_references
@@ -845,7 +846,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 print("0x{:x} : {!r}".format(*meta[:2]))
 
     fixes = defaultdict(Fix)
-    metadata = OrderedDict()  # type: {tuple: Fix}
+    metadata = OrderedDict()  # type: Dict[Tuple, Fix]
     delayed_pokes = dict()
 
     encoding = codepage if codepage else 'cp437'
