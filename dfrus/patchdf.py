@@ -1101,9 +1101,6 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 data_directory.rewrite()
                 new_section_offset = add_to_new_section(fn, new_section_offset, buffer.getvalue())
 
-        pe.reread()
-        assert set(pe.relocation_table) == relocs
-
     # Add new section to the executable
     if new_section_offset > new_section.physical_offset:
         file_size = align(new_section_offset, file_alignment)
@@ -1130,6 +1127,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
         pe.file_header.rewrite()
         pe.optional_header.rewrite()
+
+    pe.reread()
+    assert set(pe.relocation_table) == relocs, "Error: relocation table is broken"
 
     print('Done.')
 
