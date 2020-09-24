@@ -1014,15 +1014,12 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
             print('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
 
-    hook_off = None
-
     # Delayed fix
     for fix in fixes.values():
         src_off = fix['src_off']
         mach = fix['new_code']
 
-        hook_off = new_section_offset
-        hook_rva = new_section.offset_to_rva(hook_off)
+        hook_rva = new_section.offset_to_rva(new_section_offset)
 
         dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.get('dest_off', None)
 
@@ -1042,7 +1039,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
 
         # Write the hook to the new section
-        new_section_offset = add_to_new_section(fn, hook_off, bytes(mach), padding_byte=int3)
+        new_section_offset = add_to_new_section(fn, new_section_offset, bytes(mach), padding_byte=int3)
 
         # If there are absolute references in the code, add them to relocation table
         if 'added_relocs' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
@@ -1102,8 +1099,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 data_directory.basereloc.size = new_size
                 data_directory.basereloc.virtual_address = new_section.offset_to_rva(new_section_offset)
                 data_directory.rewrite()
-
-                new_section_offset = add_to_new_section(fn, hook_off, buffer.getvalue())
+                new_section_offset = add_to_new_section(fn, new_section_offset, buffer.getvalue())
 
         pe.reread()
         assert set(pe.relocation_table) == relocs
