@@ -1128,6 +1128,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         pe.file_header.rewrite()
         pe.optional_header.rewrite()
 
+    # Check if the patched file is not broken
+    print("Final check...")
     pe.reread()
     assert set(pe.relocation_table) == relocs, "Error: relocation table is broken"
 
