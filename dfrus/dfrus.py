@@ -125,8 +125,8 @@ def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp
         with open(df2, "r+b") as fn:
             try:
                 pe = PortableExecutable(fn)
-            except ValueError as ex:
-                raise ValueError(text="'{}' is broken".format(df2), parent=ex)
+            except ValueError:
+                raise ValueError("'{}' is broken".format(df2))
             
             if pe.file_header['machine'] != 0x014C:
                 raise ValueError("Only 32-bit versions are supported.")
