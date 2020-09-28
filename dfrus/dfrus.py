@@ -121,6 +121,12 @@ def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp
             os.remove(df2)
             return
         
+        if pe.file_header['machine'] != 0x014C:
+            print("Only 32-bit versions are supported.")
+            fn.close()
+            os.remove(df2)
+            return
+        
         fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug)
         
         fn.close()
