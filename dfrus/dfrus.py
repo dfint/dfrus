@@ -2,7 +2,9 @@ import argparse
 import os.path
 import sys
 import warnings
+
 from shutil import copy
+from contextlib import contextmanager
 
 from .patchdf import fix_df_exe, load_trans_file
 from .peclasses import PortableExecutable
@@ -63,6 +65,25 @@ def slice_translation(trans_table, bounds):
     return dict(trans_table)
 
 
+@contextmanager
+def destination_file_context(src, dest):
+    print("Copying '{}'\nTo '{}'...".format(src, dest))
+    try:
+        copy(src, dest)
+    except IOError as ex:
+        print("Failed.")
+        raise ex
+    else:
+        print("Success.")
+    
+    try:
+        yield dest
+    except Exception as ex:
+        # print("Removing '{}'".format(dest))
+        # os.remove(dest)
+        raise ex
+
+
 def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp437',
         dict_slice=None, debug=False, stdout=None, stderr=None):
     if not debug:
@@ -100,39 +121,17 @@ def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp
         trans_table = slice_translation(trans_table, dict_slice)
 
     # --------------------------------------------------------
-    print("Copying '%s'\nTo '%s'..." % (df1, df2))
-
-    try:
-        copy(df1, df2)
-    except IOError:
-        print("Failed.")
-        return
-    else:
-        print("Success.")
-
-    # --------------------------------------------------------
-    try:
-        fn = open(df2, "r+b")
-        try:
-            pe = PortableExecutable(fn)
-        except ValueError:
-            print("Failed. '%s' is not an executable file." % df2)
-            fn.close()
-            os.remove(df2)
-            return
-        
-        if pe.file_header['machine'] != 0x014C:
-            print("Only 32-bit versions are supported.")
-            fn.close()
-            os.remove(df2)
-            return
-        
-        fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug)
-        
-        fn.close()
-        
-    except OSError:
-        print("Failed to open '%s'" % df2)
+    with destination_file_context(df1, df2):
+        with open(df2, "r+b") as fn:
+            try:
+                pe = PortableExecutable(fn)
+            except ValueError as ex:
+                raise ValueError(text="'{}' is broken".format(df2), parent=ex)
+            
+            if pe.file_header['machine'] != 0x014C:
+                raise ValueError("Only 32-bit versions are supported.")
+            
+            fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug)
 
 
 def _main():
