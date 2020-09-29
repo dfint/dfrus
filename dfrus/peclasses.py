@@ -1,7 +1,7 @@
 #! python3
 import struct
 import bisect
-import collections
+from typing import Iterable
 from collections import OrderedDict
 from array import array
 from itertools import zip_longest
@@ -381,7 +381,7 @@ class RelocationTable:
                 yield page | (record & 0x0FFF)
 
     @classmethod
-    def build(cls, relocs: collections.Iterable):
+    def build(cls, relocs: Iterable):
         reloc_table = dict()
         for item in relocs:
             page = item & 0xFFFFF000
@@ -389,7 +389,7 @@ class RelocationTable:
             if page not in reloc_table:
                 reloc_table[page] = []
             bisect.insort(reloc_table[page], offset)
-        return RelocationTable(reloc_table)
+        return cls(reloc_table)
 
     @staticmethod
     def iter_read(file, reloc_size):
@@ -397,7 +397,7 @@ class RelocationTable:
         while cur_off < reloc_size:
             cur_page = int.from_bytes(file.read(4), 'little')
             block_size = int.from_bytes(file.read(4), 'little')
-            assert (block_size > 8)
+            assert (block_size > 8), block_size
             assert ((block_size - 8) % 2 == 0)
             relocs = array('H')
             relocs.fromfile(file, (block_size - 8) // 2)
@@ -406,7 +406,7 @@ class RelocationTable:
 
     @classmethod
     def from_file(cls, file, reloc_size):
-        return RelocationTable(dict(cls.iter_read(file, reloc_size)))
+        return cls(dict(cls.iter_read(file, reloc_size)))
 
     @property
     def size(self):
