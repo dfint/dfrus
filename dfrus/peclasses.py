@@ -420,7 +420,7 @@ class RelocationTable:
             if len(records) % 2 == 1:
                 records.append(RelocationTable.IMAGE_REL_BASED_ABSOLUTE << 12 | 0)
             block_size = 8 + 2 * len(records)  # 2 dwords + N words
-            array('L', [page, block_size]).tofile(file)
+            array('I', [page, block_size]).tofile(file)
             array('H', records).tofile(file)
 
 
