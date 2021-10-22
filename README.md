@@ -4,5 +4,3 @@
 ![Warning: Legacy!](https://img.shields.io/badge/Warning-Legacy!-red)
 
 Patcher for text in the executable of the Dwarf Fortress game
-
-Warning: a lot of legacy code
