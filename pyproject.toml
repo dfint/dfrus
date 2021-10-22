@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "dfrus"
+version = "0.0.5"
+description = "Patcher for text embedded to the executable of the Dwarf Fortress game"
+authors = ["insolor <insolor@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+pytest-cov = "^3.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
