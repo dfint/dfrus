@@ -1,4 +1,7 @@
 venv
+.venv
 .idea
 dfrus.egg-info
+htmlcov
 *.pyc
+.coverage
