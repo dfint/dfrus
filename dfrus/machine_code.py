@@ -1,4 +1,4 @@
-from collections import Iterable, Sequence
+from typing import Iterable, Sequence
 
 '''
 # Concept:
