@@ -10,7 +10,7 @@ test_requires = [
 ]
 
 setup(name='dfrus',
-      version='0.0.4',
+      version='0.0.5',
       # description='',
       url='https://github.com/dfint/dfrus',
       author='insolor',
