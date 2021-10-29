@@ -37,7 +37,7 @@ def load_trans_file(fn):
         yield unescape(parts[0]), unescape(parts[1])
 
 
-code, rdata, data = range(3)
+code_section, rdata_section, data_section = range(3)
 
 
 def find_instruction(s, instruction):
@@ -521,7 +521,12 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
     return Fix(meta=meta)
 
 
-def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, dest=None):
+def get_length(data: bytes,
+               oldlen: int,
+               original_string_address: int = None,
+               reg_state: dict = None,
+               dest: Optional[Operand]=None):
+
     def belongs_to_the_string(ref_value):
         osa = original_string_address
         return osa is None or 0 <= ref_value - osa < oldlen
@@ -555,14 +560,14 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
 
     nops = dict()
     length = None
-    for line in disasm(s):
+    for line in disasm(data):
         offset = line.address
         assert copied_len <= oldlen
         if copied_len == oldlen:
             length = offset
             break
         if line.mnemonic == 'db':
-            raise ValueError('Unknown instruction encountered: ' + hexlify(s[line.address:line.address + 8]).decode())
+            raise ValueError('Unknown instruction encountered: ' + hexlify(data[line.address:line.address + 8]).decode())
         if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
             assert line.operands is not None
             left_operand, right_operand = line.operands
@@ -671,7 +676,7 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                 not_moveable_after = not_moveable_after or offset
 
                 assert line.operands is not None
-                data_after_jump = s[line.operands[0].value:]
+                data_after_jump = data[line.operands[0].value:]
                 if not data_after_jump:
                     raise ValueError('Cannot jump: jump destination not included in the passed machinecode.')
 
@@ -741,7 +746,7 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                 saved_mach += line.data
 
     if not length and copied_len == oldlen:
-        length = len(s)
+        length = len(data)
     if not is_moveable():
         length = not_moveable_after  # return length of code which can be moved harmlessly
     if length is None:
@@ -896,7 +901,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             # Fix string length for each reference
             for ref in refs:
                 ref_rva = sections.offset_to_rva(ref)
-                if 0 <= (ref - sections[code].physical_offset) < sections[code].physical_size:
+                if 0 <= (ref - sections[code_section].physical_offset) < sections[code_section].physical_size:
                     try:
                         fix = fix_len(fn, offset=ref, old_len=len(string), new_len=len(translation),
                                       string_address=string_address,
@@ -945,7 +950,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         assert isinstance(meta, Metadata)
         if meta.func and meta.func[0] == 'call near':
             offset = meta.func[2]
-            address = sections[code].offset_to_rva(offset) + image_base
+            address = sections[code_section].offset_to_rva(offset) + image_base
             if meta.string:
                 str_param = meta.string
                 if functions[offset].string is None:
@@ -967,7 +972,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         print('\nGuessed function parameters:')
         for func in sorted(functions):
             value = functions[func]
-            print('sub_%x: %r' % (sections[code].offset_to_rva(func) + image_base, value))
+            print('sub_%x: %r' % (sections[code_section].offset_to_rva(func) + image_base, value))
         print()
 
     status_unknown = dict()
@@ -1029,11 +1034,11 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         if isinstance(mach, MachineCode):
             for field, value in mach.fields.items():
                 if value is not None:
-                    mach.fields[field] = sections[code].offset_to_rva(value)
+                    mach.fields[field] = sections[code_section].offset_to_rva(value)
             mach.origin_address = hook_rva
 
         if dest_off is not None:
-            dest_rva = sections[code].offset_to_rva(dest_off)
+            dest_rva = sections[code_section].offset_to_rva(dest_off)
             if isinstance(mach, MachineCode):
                 mach.fields['dest'] = dest_rva
             else:
@@ -1058,7 +1063,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             for off, b in fix.pokes.items():
                 fpoke(fn, off, b)
 
-        src_rva = sections[code].offset_to_rva(src_off)
+        src_rva = sections[code_section].offset_to_rva(src_off)
         disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
         fpoke(fn, src_off, to_dword(disp, signed=True))
 

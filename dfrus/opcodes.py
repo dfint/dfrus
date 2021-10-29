@@ -59,6 +59,18 @@ class Reg(Enum):
         else:
             self.parent = self
 
+    @classmethod
+    def segment(cls, code: int):
+        return cls((RegType.segment, code, 2))
+
+    @classmethod
+    def mm(cls, code: int):
+        return cls((RegType.mm, code, 8))
+
+    @classmethod
+    def xmm(cls, code: int):
+        return cls((RegType.xmm, code, 16))
+
     def __int__(self):
         return self.code
     
