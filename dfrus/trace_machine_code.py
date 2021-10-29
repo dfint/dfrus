@@ -1,4 +1,5 @@
 from contextlib import suppress
+from typing import Tuple, Any
 
 from dfrus.binio import read_bytes
 from dfrus.disasm import disasm
@@ -59,11 +60,12 @@ def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.fo
     return None
 
 
-def which_func(fn, offset, stop_cond=lambda _: False):
+def which_func(fn, offset, stop_cond=lambda _: False) -> Tuple[Any, ...]:
     def default_stop_condition(cur_line):
         return str(cur_line).startswith('rep') or stop_cond(cur_line)
 
     disasm_line = trace_code(fn, offset, stop_cond=default_stop_condition)
+    result: Tuple[Any, ...]
     if disasm_line is None:
         result = ('not reached',)
     elif str(disasm_line).startswith('rep'):

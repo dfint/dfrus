@@ -36,7 +36,7 @@ class Reference:
 
 
 class MachineCode:
-    def __init__(self, *args: Union[int, str, Iterable, Reference], origin_address=0, **kwargs):
+    def __init__(self, *args: Union[int, str, Iterable[int], Reference, "MachineCode"], origin_address=0, **kwargs):
         self.origin_address = origin_address
         self._raw_list = list(args)
         self.fields = dict()
@@ -47,7 +47,8 @@ class MachineCode:
             if item is None:
                 pass
             elif isinstance(item, int):
-                assert 0 <= item < 256
+                if not 0 <= item < 256:
+                    raise ValueError(f"Byte value out of range: {item}")
                 i += 1
             elif isinstance(item, str):  # label name encountered
                 item = item.rstrip(':')
@@ -64,6 +65,8 @@ class MachineCode:
                 if not item.is_relative:
                     self._absolute_ref_indexes.append(i)
                 i += item.size
+            else:
+                raise ValueError(f'Value unsupported by MachineCode: {item}')
         self.code_length = i
 
         for item, value in kwargs.items():

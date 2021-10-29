@@ -55,7 +55,7 @@ class Metadata:
     cause: Optional[str] = None  #: A cause of failure (if fixed == 'no')
     length: Optional[str] = None  #: A way of string length specification (a register, push, etc.)
     string: Optional[str] = None  #: A way of string value passing (a register, push, etc.)
-    func: Optional[str] = None  #: A function to which the string is passed
+    func: Optional[Union[str, Tuple[Any, ...]]] = None  #: A function to which the string is passed
     prev_bytes: Optional[str] = None
 
 
@@ -248,12 +248,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
                                 # Restore the cap length value of stl-string if needed
                                 # mov dword [esi+14h], oldlen
-                                fix_cap: Optional[MachineCode]
                                 if mov_esp_edi:
                                     fix_cap = MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14,
                                                           to_dword(old_len))
                                 else:
-                                    fix_cap = None
+                                    fix_cap = MachineCode()
 
                                 new_code = MachineCode(
                                     fix_cap,
