@@ -1,12 +1,13 @@
 import codecs
 import csv
 import io
+import sys
 import textwrap
 
 from collections import defaultdict, OrderedDict
 from warnings import warn
 from binascii import hexlify
-from typing import Dict, Tuple, Optional, Any, List
+from typing import Dict, Tuple, Optional, Any, List, Union
 
 from dataclasses import dataclass, fields
 
@@ -52,16 +53,16 @@ def find_instruction(s, instruction):
 class Metadata:
     fixed: Optional[str] = None  #: Was the string length value fixed?
     cause: Optional[str] = None  #: A cause of failure (if fixed == 'no')
-    length: Optional[int] = None  #: A way of string length specification (a register, push, etc.)
-    string: Optional[int] = None  #: A way of string value passing (a register, push, etc.)
+    length: Optional[str] = None  #: A way of string length specification (a register, push, etc.)
+    string: Optional[str] = None  #: A way of string value passing (a register, push, etc.)
     func: Optional[str] = None  #: A function to which the string is passed
     prev_bytes: Optional[str] = None
 
 
 @dataclass
 class Fix:
-    new_code: Optional[bytes] = None
-    pokes: Optional[List[Any]] = None
+    new_code: Optional[Union[bytes, MachineCode]] = None
+    pokes: Optional[dict] = None
     poke: Any = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
@@ -473,18 +474,18 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
         else:
             fix = Fix(**get_fix_for_moves(get_length_info, new_len, string_address, meta))
 
-            if fix['fixed'] == 'yes':
+            if fix.fixed == 'yes':
                 # Make deleted relocs offsets relative to the given offset
-                fix['deleted_relocs'] = [next_off + ref - offset for ref in fix['deleted_relocs']]
+                fix.deleted_relocs = [next_off + ref - offset for ref in fix.deleted_relocs]
 
                 if 'fix' in fix:
-                    fix['fix'].src_off = next_off + 1
+                    fix.fix.src_off = next_off + 1
                 else:
                     # Make new relocations relative to the given offset (only if they not belong to a procedure)
-                    fix['added_relocs'] = [next_off + ref - offset for ref in fix['added_relocs']]
+                    fix.added_relocs = [next_off + ref - offset for ref in fix.added_relocs]
 
-                if 'pokes' in fix:
-                    fix['pokes'] = {next_off + off: b for off, b in fix['pokes'].items()}
+                if fix.pokes:
+                    fix.pokes = {next_off + off: b for off, b in fix.pokes.items()}
 
             return fix
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
@@ -875,23 +876,23 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 if meta.string == 'cmp reg':
                     # This is probably a bound of an array, not a string reference
                     continue
-                elif 'new_code' in fix:
-                    new_code = fix['new_code']
+                elif fix.new_code:
+                    new_code = fix.new_code
                     assert isinstance(new_code, (bytes, bytearray, MachineCode))
-                    src_off = fix['src_off']
+                    src_off = fix.src_off
 
                     fixes[src_off].add_fix(fix)
                 else:
-                    if 'added_relocs' in fix:
+                    if fix.added_relocs:
                         # Add relocations of new references of moved items
-                        relocs_to_add.update(item + ref_rva for item in fix['added_relocs'])
+                        relocs_to_add.update(item + ref_rva for item in fix.added_relocs)
 
-                    if 'pokes' in fix:
-                        delayed_pokes.update({off + ref: val for off, val in fix['pokes'].items()})
+                    if fix.pokes:
+                        delayed_pokes.update({off + ref: val for off, val in fix.pokes.items()})
 
                 # Remove relocations of the overwritten references
-                if 'deleted_relocs' in fix and fix['deleted_relocs']:
-                    relocs_to_remove.update(item + ref_rva for item in fix['deleted_relocs'])
+                if fix.deleted_relocs:
+                    relocs_to_remove.update(item + ref_rva for item in fix.deleted_relocs)
                 elif is_long and string_address:
                     fpoke4(fn, ref, string_address)
 
@@ -916,7 +917,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 elif str_param not in functions[offset].string:
                     print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
                           (address, str_param, functions[offset].string))
-                    functions[offset].string.add(str_param)
+                    # functions[offset].string.add(str_param)  # FIXME
 
             if meta.length is not None:
                 len_param = meta.length
@@ -979,12 +980,12 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
     # Delayed fix
     for fix in fixes.values():
-        src_off = fix['src_off']
-        mach = fix['new_code']
+        src_off = fix.src_off
+        mach = fix.new_code
 
         hook_rva = new_section.offset_to_rva(new_section_offset)
 
-        dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.get('dest_off', None)
+        dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.dest_off
 
         if isinstance(mach, MachineCode):
             for field, value in mach.fields.items():
@@ -1009,12 +1010,12 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             new_refs = set(mach.absolute_references) if isinstance(mach, MachineCode) else set()
 
             if 'added_relocs' in fix:
-                new_refs.update(fix['added_relocs'])
+                new_refs.update(fix.added_relocs)
 
             relocs_to_add.update(hook_rva + item for item in new_refs)
 
         if 'pokes' in fix:
-            for off, b in fix['pokes'].items():
+            for off, b in fix.pokes.items():
                 fpoke(fn, off, b)
 
         src_rva = sections[code].offset_to_rva(src_off)
