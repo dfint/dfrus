@@ -1,5 +1,5 @@
 
-import collections
+from typing import Iterable
 
 
 def put_integer32(file_object, val):
@@ -36,7 +36,7 @@ def write_string(file_object, s: str, off=None, new_len=None, encoding=None):
 
 
 def fpoke4(file_object, off, x):
-    if isinstance(x, collections.Iterable):
+    if isinstance(x, Iterable):
         file_object.seek(off)
         write_dwords(file_object, x)
     else:
@@ -46,7 +46,7 @@ def fpoke4(file_object, off, x):
 
 def fpoke(file_object, off, x):
     assert off, off
-    if isinstance(x, collections.Iterable):
+    if isinstance(x, Iterable):
         file_object.seek(off)
         file_object.write(bytes(to_unsigned(item, 8) for item in x))
     else:

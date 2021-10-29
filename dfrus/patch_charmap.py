@@ -1,6 +1,6 @@
 import functools
 import unicodedata
-from typing import Callable, Tuple, Optional, Any, Dict, Iterable, Union
+from typing import Tuple
 
 from .binio import fpoke4, to_dword, read_bytes
 
