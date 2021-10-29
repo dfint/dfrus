@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 import pytest
 
-from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32
+from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata, Fix
 from dfrus.disasm import disasm
 from dfrus.opcodes import *
 
@@ -599,9 +599,13 @@ test_data_create_new_world = bytes.fromhex(
 
 
 def test_create_new_world():
-    result = get_length(test_data_create_new_world, len("Create New World!"), 0xf2a8b8)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    original_string_address = 0xf2a8b8
+    result = get_length(test_data_create_new_world, len("Create New World!"), original_string_address)
+    result_dict = asdict(result)
+    result_dict['dest'] = str(result.dest)
+    new_len = len("Создать новый мир!")
+
+    assert result_dict == dict(
         length=67,
         dest='[ecx]',  # [ebx+0x110]
         deleted_relocs={2, 14, 25, 37, 50},
@@ -610,3 +614,7 @@ def test_create_new_world():
         nops=dict(),
         pokes=dict()
     )
+
+    meta = Metadata()
+    fix = get_fix_for_moves(result, new_len, original_string_address, meta)
+    assert len(fix.pokes[0]) == result.length

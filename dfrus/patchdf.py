@@ -69,7 +69,6 @@ class Fix:
     deleted_relocs: Iterable[int] = field(default_factory=list)
     meta: Optional[Metadata] = None
     op: Optional[Any] = None
-    fixed: Optional[Any] = None
     fix: Optional[Any] = None
 
     def update(self, other: "Fix"):
@@ -482,7 +481,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
         else:
             fix = get_fix_for_moves(get_length_info, new_len, string_address, meta)
 
-            if fix.fixed == 'yes':
+            if meta.fixed == 'yes':
                 # Make deleted relocs offsets relative to the given offset
                 fix.deleted_relocs = [next_off + ref - offset for ref in fix.deleted_relocs]
 
