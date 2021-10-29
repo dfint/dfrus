@@ -4,13 +4,13 @@ import sys
 import warnings
 from contextlib import contextmanager
 from shutil import copy
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, Union, Dict, Iterable
 
 from .patchdf import fix_df_exe, load_trans_file
 from .peclasses import PortableExecutable
 
 
-def slice_translation(trans_table, bounds):
+def slice_translation(trans_table: Union[Dict[str, str], Iterable[Tuple[str, str]]], bounds) -> Dict[str, str]:
     if isinstance(trans_table, dict):
         trans_table = list(trans_table.items())
     else:
@@ -93,9 +93,9 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
     df2 = os.path.join(dest_path, dest_name)
 
     if not debug:
-        trans_table = dict(trans_table)
+        trans_dict = dict(trans_table)
     else:
-        trans_table = slice_translation(trans_table, dict_slice)
+        trans_dict = slice_translation(trans_table, dict_slice)
 
     # --------------------------------------------------------
     with destination_file_context(df1, df2):
@@ -108,7 +108,7 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
             if pe.file_header['machine'] != 0x014C:
                 raise ValueError("Only 32-bit versions are supported.")
             
-            fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug)
+            fix_df_exe(fn, pe, codepage, original_codepage, trans_dict, debug)
 
 
 def init_argparser():

@@ -5,10 +5,9 @@ import sys
 import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
+from dataclasses import dataclass, fields, field
 from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping
 from warnings import warn
-
-from dataclasses import dataclass, fields, field
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
@@ -795,7 +794,7 @@ def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_by
     return new_section_offset + aligned
 
 
-def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
+def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, str], debug=False):
     print("Finding cross-references...")
 
     image_base = pe.optional_header.image_base
