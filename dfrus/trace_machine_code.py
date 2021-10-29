@@ -60,6 +60,7 @@ def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.fo
     return None
 
 
+# TODO: make custom class for the return value of which_func
 def which_func(fn, offset, stop_cond=lambda _: False) -> Tuple[Any, ...]:
     def default_stop_condition(cur_line):
         return str(cur_line).startswith('rep') or stop_cond(cur_line)
