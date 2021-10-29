@@ -6,7 +6,8 @@ authors = ["insolor <insolor@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.6.1"
+python = "^3.6"
+dataclasses = { version = "^0.8", python = "~3.6" }
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
