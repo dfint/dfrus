@@ -2,10 +2,9 @@ import argparse
 import os.path
 import sys
 import warnings
-
-from shutil import copy
 from contextlib import contextmanager
-from typing import Sequence
+from shutil import copy
+from typing import Sequence, Tuple
 
 from .patchdf import fix_df_exe, load_trans_file
 from .peclasses import PortableExecutable
@@ -62,7 +61,7 @@ def destination_file_context(src, dest):
         raise ex
 
 
-def run(path: str, dest: str, trans_table: Sequence, codepage, original_codepage='cp437',
+def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, original_codepage='cp437',
         dict_slice=None, debug=False, stdout=None, stderr=None):
     if not debug:
         warnings.simplefilter('ignore')
