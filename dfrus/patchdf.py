@@ -65,8 +65,8 @@ class Fix:
     poke: Any = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
-    added_relocs: List[int] = field(default_factory=list)
-    deleted_relocs: List[int] = field(default_factory=list)
+    added_relocs: Set[int] = field(default_factory=set)
+    deleted_relocs: Set[int] = field(default_factory=set)
     meta: Optional[Metadata] = None
     op: Optional[Any] = None
     fixed: Optional[Any] = None
@@ -99,20 +99,18 @@ class Fix:
                 self.update(fix)
 
 
-def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
-    x = get_length_info
+def get_fix_for_moves(get_length_info: "GetLengthResult", newlen, string_address, meta: Metadata) -> Fix:
+    added_relocs = get_length_info.added_relocs
 
-    added_relocs = x['added_relocs']
-
-    mach, new_refs = mach_memcpy(string_address, x['dest'], newlen + 1)
-    if x['saved_mach']:
-        mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
-        new_refs = {item + len(x['saved_mach']) for item in new_refs}
+    mach, new_refs = mach_memcpy(string_address, get_length_info.dest, newlen + 1)
+    if get_length_info.saved_mach:
+        mach = get_length_info.saved_mach + mach  # If there is "lea edi, [dest]", put it before the new code
+        new_refs = {item + len(get_length_info.saved_mach) for item in new_refs}
 
     added_relocs.update(new_refs)
 
     proc = None
-    if len(mach) > x['length']:
+    if len(mach) > get_length_info.length:
         # if memcpy code is to long, try to write it into the new section and make call to it
         if isinstance(mach, bytes):
             mach = bytearray(mach)
@@ -121,38 +119,38 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
         proc = mach
 
         mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
-        if len(mach) > x['length']:
+        if len(mach) > get_length_info.length:
             # Too tight here, even for a procedure call
             meta.fixed = 'no'
             meta.cause = 'to tight to call'
-            return meta
+            return Fix(meta=meta)
 
     # Write replacement code
-    mach = mach.ljust(x['length'], nop.to_bytes(1, 'little'))
+    mach = mach.ljust(get_length_info.length, nop.to_bytes(1, 'little'))
     pokes = {0: mach}
 
     # Nop-out old instructions
-    if 'nops' in x:
-        for off, count in x['nops'].items():
+    if get_length_info.nops:
+        for off, count in get_length_info.nops.items():
             pokes[off] = bytes(nop for _ in range(count))
 
     if proc:
-        retvalue = dict(
+        fix = Fix(
             # src_off=next_off + 1,
             fix=Fix(new_code=proc, pokes=pokes),
-            deleted_relocs=x['deleted_relocs'],
+            deleted_relocs=get_length_info.deleted_relocs,
             added_relocs=added_relocs,  # These relocs belong to proc, not to the current code block
         )
     else:
-        retvalue = dict(
-            deleted_relocs=x['deleted_relocs'],
+        fix = Fix(
+            deleted_relocs=get_length_info.deleted_relocs,
             added_relocs=added_relocs,
             pokes=pokes,
         )
 
     meta.fixed = 'yes'
-    retvalue['meta'] = meta
-    return retvalue
+    fix.meta = meta
+    return fix
 
 
 count_before = 0x20
@@ -474,15 +472,15 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             meta.cause = repr(err)
             return Fix(meta=meta)
 
-        if 'pokes' in get_length_info:
-            for off, b in get_length_info['pokes'].items():
+        if get_length_info.pokes:
+            for off, b in get_length_info.pokes.items():
                 fpoke(fn, next_off + off, b)
 
-        if new_len <= old_len and 'pokes' not in get_length_info:
+        if new_len <= old_len and not get_length_info.pokes:
             meta.fixed = 'not needed'
             return Fix(meta=meta)
         else:
-            fix = Fix(**get_fix_for_moves(get_length_info, new_len, string_address, meta))
+            fix = get_fix_for_moves(get_length_info, new_len, string_address, meta)
 
             if fix.fixed == 'yes':
                 # Make deleted relocs offsets relative to the given offset
@@ -521,11 +519,22 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
     return Fix(meta=meta)
 
 
+@dataclass
+class GetLengthResult:
+    deleted_relocs: Set[int]
+    added_relocs: Set[int]
+    dest: Operand
+    length: int
+    saved_mach: bytes
+    nops: Dict[int, int] = field(default_factory=dict)
+    pokes: Dict[int, bytes] = field(default_factory=dict)
+
+
 def get_length(data: bytes,
                oldlen: int,
                original_string_address: int = None,
                reg_state: dict = None,
-               dest: Optional[Operand]=None):
+               dest: Optional[Operand] = None) -> GetLengthResult:
 
     def belongs_to_the_string(ref_value):
         osa = original_string_address
@@ -557,8 +566,8 @@ def get_length(data: bytes,
         return not_moveable_after is None
 
     pokes = dict()  # eg. fixes of jumps
-
     nops = dict()
+
     length = None
     for line in disasm(data):
         offset = line.address
@@ -680,14 +689,14 @@ def get_length(data: bytes,
                 if not data_after_jump:
                     raise ValueError('Cannot jump: jump destination not included in the passed machinecode.')
 
-                x = get_length(data_after_jump, oldlen - copied_len - 1,
-                               original_string_address, reg_state, dest)
-                dest = x['dest']
+                result = get_length(data_after_jump, oldlen - copied_len - 1,
+                                    original_string_address, reg_state, dest)
+                dest = result.dest
                 if 'short' in line.mnemonic:
-                    disp = line.data[1] + x['length']
+                    disp = line.data[1] + result.length
                     pokes = {offset + 1: disp}
                 else:
-                    disp = from_dword(line.data[1:]) + x['length']
+                    disp = from_dword(line.data[1:]) + result.length
                     pokes = {offset + 1: to_dword(disp)}
                 break
             else:
@@ -754,17 +763,20 @@ def get_length(data: bytes,
     if dest is None:
         raise ValueError('Destination not recognized.')
 
-    result = dict(
+    result = GetLengthResult(
         length=length,
         dest=dest,
         deleted_relocs=deleted_relocs,
         saved_mach=saved_mach,
         added_relocs=added_relocs
     )
+
     if nops:
-        result['nops'] = nops
+        result.nops = nops
+
     if pokes:
-        result['pokes'] = pokes
+        result.pokes = pokes
+
     return result
 
 
