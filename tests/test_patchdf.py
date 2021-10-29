@@ -576,3 +576,36 @@ def test_get_start(test_data, expected):
 
 def test_match_mov_reg_imm32():
     assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx.code, 0x0a)
+
+
+test_data_create_new_world = bytes.fromhex(
+    "8b 0d b8 a8 f2 00    "  # mov    ecx,DWORD PTR ds:0xf2a8b8
+    "89 8b 10 01 00 00    "  # mov    DWORD PTR [ebx+0x110],ecx
+    "8b 15 bc a8 f2 00    "  # mov    edx,DWORD PTR ds:0xf2a8bc
+    "89 93 14 01 00 00    "  # mov    DWORD PTR [ebx+0x114],edx
+    "a1 c0 a8 f2 00       "  # mov    eax,ds:0xf2a8c0
+    "89 83 18 01 00 00    "  # mov    DWORD PTR [ebx+0x118],eax
+    "8b 0d c4 a8 f2 00    "  # mov    ecx,DWORD PTR ds:0xf2a8c4
+    "89 8b 1c 01 00 00    "  # mov    DWORD PTR [ebx+0x11c],ecx
+    "66 8b 15 c8 a8 f2 00 "  # mov    dx,WORD PTR ds:0xf2a8c8
+    "8d 8b 10 01 00 00    "  # lea    ecx,[ebx+0x110]
+    "66 89 93 20 01 00 00 "  # mov    WORD PTR [ebx+0x120],dx
+    "8d 51 01             "  # lea    edx,[ecx+0x1]
+    "8a 01                "  # mov    al,BYTE PTR [ecx]
+    "41                   "  # inc    ecx
+    "84 c0                "  # test   al,al
+)
+
+
+def test_create_new_world():
+    result = get_length(test_data_create_new_world, len("Create New World!"), 0xf2a8b8)
+    result.dest = str(result.dest)
+    assert asdict(result) == dict(
+        length=67,
+        dest='[ebx+0x11C]',
+        deleted_relocs={2, 14, 25, 37, 50},
+        saved_mach=bytes.fromhex("8d 8b 10 01 00 00"),  # lea    ecx,[ebx+0x110]
+        added_relocs=set(),
+        nops=dict(),
+        pokes=dict()
+    )
