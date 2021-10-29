@@ -1,5 +1,5 @@
 from enum import auto
-from typing import Optional, Tuple, Any, Iterator
+from typing import Optional, Tuple, Any, Iterator, Union
 
 from dataclasses import dataclass, asdict
 
@@ -240,11 +240,11 @@ class Operand:
         return self.value
 
 
-def unify_operands(x: ModRmAnalysisResult, size=None) -> Tuple[Operand, Operand]:
+def unify_operands(x: ModRmAnalysisResult, size=None) -> Tuple[Union[int, Operand], Operand]:
     modrm = x.modrm
 
     if size is None:
-        op1 = modrm.reg
+        op1 = modrm.reg  # FIXME - don't use different types for op1
     else:
         op1 = Operand(reg=Reg((RegType.general, modrm.reg, size)))
 
