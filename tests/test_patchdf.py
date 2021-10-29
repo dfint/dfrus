@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 import pytest
 
-from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32
+from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata, Fix
 from dfrus.disasm import disasm
 from dfrus.opcodes import *
 
@@ -576,3 +576,45 @@ def test_get_start(test_data, expected):
 
 def test_match_mov_reg_imm32():
     assert match_mov_reg_imm32(b'\xb9\x0a\x00\x00\x00', Reg.ecx.code, 0x0a)
+
+
+test_data_create_new_world = bytes.fromhex(
+    "8b 0d b8 a8 f2 00    "  # mov    ecx,DWORD PTR ds:0xf2a8b8
+    "89 8b 10 01 00 00    "  # mov    DWORD PTR [ebx+0x110],ecx
+    "8b 15 bc a8 f2 00    "  # mov    edx,DWORD PTR ds:0xf2a8bc
+    "89 93 14 01 00 00    "  # mov    DWORD PTR [ebx+0x114],edx
+    "a1 c0 a8 f2 00       "  # mov    eax,ds:0xf2a8c0
+    "89 83 18 01 00 00    "  # mov    DWORD PTR [ebx+0x118],eax
+    "8b 0d c4 a8 f2 00    "  # mov    ecx,DWORD PTR ds:0xf2a8c4
+    "89 8b 1c 01 00 00    "  # mov    DWORD PTR [ebx+0x11c],ecx
+    "66 8b 15 c8 a8 f2 00 "  # mov    dx,WORD PTR ds:0xf2a8c8
+    "8d 8b 10 01 00 00    "  # lea    ecx,[ebx+0x110]
+    "66 89 93 20 01 00 00 "  # mov    WORD PTR [ebx+0x120],dx
+    # end
+    "8d 51 01             "  # lea    edx,[ecx+0x1]
+    "8a 01                "  # mov    al,BYTE PTR [ecx]
+    "41                   "  # inc    ecx
+    "84 c0                "  # test   al,al
+)
+
+
+def test_create_new_world():
+    original_string_address = 0xf2a8b8
+    result = get_length(test_data_create_new_world, len("Create New World!"), original_string_address)
+    result_dict = asdict(result)
+    result_dict['dest'] = str(result.dest)
+    new_len = len("Создать новый мир!")
+
+    assert result_dict == dict(
+        length=67,
+        dest='[ecx]',  # [ebx+0x110]
+        deleted_relocs={2, 14, 25, 37, 50},
+        saved_mach=bytes.fromhex("8d 8b 10 01 00 00"),  # lea    ecx,[ebx+0x110]
+        added_relocs=set(),
+        nops=dict(),
+        pokes=dict()
+    )
+
+    meta = Metadata()
+    fix = get_fix_for_moves(result, new_len, original_string_address, meta)
+    assert len(fix.pokes[0]) == result.length

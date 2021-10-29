@@ -69,7 +69,6 @@ class Fix:
     deleted_relocs: Iterable[int] = field(default_factory=list)
     meta: Optional[Metadata] = None
     op: Optional[Any] = None
-    fixed: Optional[Any] = None
     fix: Optional[Any] = None
 
     def update(self, other: "Fix"):
@@ -482,7 +481,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
         else:
             fix = get_fix_for_moves(get_length_info, new_len, string_address, meta)
 
-            if fix.fixed == 'yes':
+            if meta.fixed == 'yes':
                 # Make deleted relocs offsets relative to the given offset
                 fix.deleted_relocs = [next_off + ref - offset for ref in fix.deleted_relocs]
 
@@ -682,8 +681,12 @@ def get_length(data: bytes,
             # Left operand of lea is always a register
             assert left_operand.reg is not None
             reg_state[left_operand.reg.parent] = -1
-            if dest is not None and dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
+            if (dest is not None
+                    and dest.base_reg == right_operand.base_reg
+                    and dest.disp == right_operand.disp):
+
                 dest = Operand(base_reg=left_operand.reg, disp=0)
+
             saved_mach += line.data
         elif line.mnemonic.startswith('j'):
             if line.mnemonic.startswith('jmp'):
