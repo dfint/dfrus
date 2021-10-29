@@ -123,8 +123,8 @@ def init_argparser():
     parser.add_argument('-n', '--destname', dest='dest',
                         default='Dwarf Fortress Patched.exe',
                         help='name of the patched DF executable, default="Dwarf Fortress Patched.exe"')
-    parser.add_argument('-d', '--dict', default='dict.txt', dest='dictionary',
-                        help='path to the dictionary file, default=dict.txt')
+    parser.add_argument('-d', '--dict', default='dict.csv', dest='dictionary',
+                        help='path to the dictionary file, default=dict.csv')
     parser.add_argument('--debug', action='store_true', help='enable debugging mode')
     parser.add_argument('-c', '--codepage', help='enable given codepage by name')
     parser.add_argument('-oc', '--original_codepage', default='cp437',
