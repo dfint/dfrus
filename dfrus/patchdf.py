@@ -7,7 +7,7 @@ import textwrap
 from collections import defaultdict, OrderedDict
 from warnings import warn
 from binascii import hexlify
-from typing import Dict, Tuple, Optional, Any, List, Union, Set
+from typing import Dict, Tuple, Optional, Any, List, Union, Set, Iterable
 
 from dataclasses import dataclass, fields, field
 
@@ -666,7 +666,7 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
             else:
                 raise ValueError('Conditional jump encountered at offset 0x%02x' % line.address)
         else:
-            if str(line).startswith('rep'):
+            if line.prefix and line.prefix.name.startswith('rep'):
                 reg_state[Reg.ecx] = None  # Mark ecx as unoccupied
             if line.mnemonic.startswith('movs'):
                 reg_state[Reg.esi] = None
@@ -950,7 +950,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     _, src_off, dest_off = func
                     assert src_off is not None
                     src_off += 1
-                    code_chunk = None
+                    code_chunk: Optional[Iterable[int]] = None
                     if functions[dest_off].length == 'push':
                         # mov [esp+8], ecx
                         code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
@@ -987,6 +987,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         src_off = fix.src_off
         assert src_off is not None
         mach = fix.new_code
+        assert mach is not None
 
         hook_rva = new_section.offset_to_rva(new_section_offset)
 
@@ -1007,6 +1008,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 # Add jump from the hook
                 mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
 
+        assert mach is not None
         # Write the hook to the new section
         new_section_offset = add_to_new_section(fn, new_section_offset, bytes(mach), padding_byte=int3)
 

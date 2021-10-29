@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from .binio import to_dword, from_dword
 from .disasm import join_byte, Operand
 from .machine_code import MachineCode, Reference
@@ -7,7 +9,7 @@ from .opcodes import push_reg, Reg, xor_rm_reg, cmp_rm_imm, jcc_short, Cond, inc
 MAX_LEN = 0x100
 
 
-def mach_strlen(code_chunk):
+def mach_strlen(code_chunk: Iterable[int]):
     """
         push ecx
         xor ecx, ecx

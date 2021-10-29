@@ -1,5 +1,5 @@
 import functools
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 from dataclasses import dataclass, asdict
 
@@ -114,21 +114,22 @@ seg_prefixes = {Prefix.seg_es: Reg.es, Prefix.seg_cs: Reg.cs, Prefix.seg_ss: Reg
 op_sizes = {1: "byte", 2: "word", 4: "dword", 8: "qword", 16: "dqword"}
 
 
+@dataclass
 class Operand:
-    def __init__(self, value=None, reg=None, base_reg=None, index_reg=None, scale=None, disp=0, data_size=None,
-                 seg_prefix=None):
-        self.value = value
-        assert reg is None or isinstance(reg, Reg)
-        self.reg = reg
-        assert base_reg is None or isinstance(base_reg, Reg)
-        self.base_reg = base_reg
-        assert(data_size is None or 0 <= data_size <= 2)
-        self._data_size = data_size
-        assert index_reg is None or isinstance(index_reg, Reg)
-        self.index_reg = index_reg
-        self.scale = scale
-        self.disp = disp
-        self.seg_prefix = seg_prefix
+    value: Any = None
+    reg: Optional[Reg] = None
+    base_reg: Optional[Reg] = None
+    index_reg: Optional[Reg] = None
+    seg_prefix: Optional[Reg] = None
+    scale: Optional[int] = None
+    disp: int = 0
+    _data_size: Optional[int] = None
+
+    def __post_init__(self):
+        assert self.reg is None or isinstance(self.reg, Reg)
+        assert self.base_reg is None or isinstance(self.base_reg, Reg)
+        assert(self._data_size is None or 0 <= self._data_size <= 2)
+        assert self.index_reg is None or isinstance(self.index_reg, Reg)
         if self.reg is not None:
             self._data_size = self.reg.size
 
@@ -198,7 +199,7 @@ class Operand:
             if self.seg_prefix is None:
                 result = "[%s]" % result
             else:
-                result = "%s:[%s]" % (seg_regs[self.seg_prefix], result)
+                result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
 
             if self.data_size is not None:
                 result = op_sizes[self.data_size] + ' ' + result
@@ -234,6 +235,7 @@ def unify_operands(x: ModRmAnalysisResult, size=None) -> Tuple[Operand, Operand]
     else:
         if modrm.mode == 0 and modrm.regmem == 5:
             # Direct addressing
+            assert x.disp is not None
             op2 = Operand(disp=x.disp)
         else:
             if modrm.regmem != 4:
@@ -242,7 +244,8 @@ def unify_operands(x: ModRmAnalysisResult, size=None) -> Tuple[Operand, Operand]
             else:
                 # Use the SIB, Luke
                 sib = x.sib
-                
+
+                assert sib is not None
                 base_reg = sib.base_reg if not (sib.base_reg == Reg.ebp.code and modrm.mode == 0) else None
                 index_reg = sib.index_reg if sib.index_reg != 4 else None
                 
@@ -255,11 +258,12 @@ def unify_operands(x: ModRmAnalysisResult, size=None) -> Tuple[Operand, Operand]
     return op1, op2
 
 
-def process_operands(x):
+def process_operands(x: ModRmAnalysisResult) -> Tuple[Reg, int]:
     _, op = unify_operands(x)
     if op.base_reg is not None:
         base_reg = op.base_reg
     else:
+        assert op.index_reg is not None
         base_reg = op.index_reg
     disp = op.disp
     return base_reg, disp
@@ -310,7 +314,7 @@ def asmhex(n):
         return '0x{:X}'.format(n)
 
 
-@dataclass(repr=False, frozen=True)
+@dataclass(repr=False)
 class DisasmLine:
     address: int
     data: bytes
@@ -318,7 +322,6 @@ class DisasmLine:
     operands: Optional[Tuple[Operand, ...]] = None
     prefix: Optional[Prefix] = None
 
-    @functools.lru_cache()
     def __str__(self):
         if not self.operands:
             text = self.mnemonic
@@ -437,7 +440,7 @@ def disasm(s: bytes, start_address=0):
             x, i = analyse_modrm(s, i+1)
             reg_code, operand2 = unify_operands(x)
             if (si & 0xFE) == mov_rm_imm:
-                operand: Operand = operand2
+                operand = operand2
                 operand.data_size = 1 << (flag_size*2-size_prefix)
                 imm_size = operand.data_size
                 immediate_operand = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
@@ -555,7 +558,7 @@ def disasm(s: bytes, start_address=0):
             opcode = s[i] & 0xFE
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
-            mnemonic = op_shifts_rolls[x['modrm'][1]]
+            mnemonic = op_shifts_rolls[x.modrm[1]]
             _, op1 = unify_operands(x)
             op1.data_size = 1 << (flag_size*2 - size_prefix)
             if opcode == shift_op_rm_1:
@@ -570,7 +573,7 @@ def disasm(s: bytes, start_address=0):
         elif s[i] & 0xFE == test_or_unary_rm:
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
-            modrm1 = x['modrm'][1]
+            modrm1 = x.modrm[1]
             if modrm1 != 1:
                 _, op1 = unify_operands(x)
                 size = flag_size*2 - size_prefix
@@ -596,7 +599,12 @@ def disasm(s: bytes, start_address=0):
                 mnemonic = "set%s" % Cond(condition).name
                 reg_op = Operand(reg=Reg((RegType.general, s[i+1] & 7, 1)))
                 i += 2
-                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(reg_op,), prefix=rep_prefix)
+                line = DisasmLine(start_address+j,
+                                  data=s[j:i],
+                                  mnemonic=mnemonic,
+                                  operands=(reg_op,),
+                                  prefix=rep_prefix)
+
             elif s[i] & 0xF0 == x0f_jcc_near:
                 condition = s[i] & 0x0F
                 mnemonic = "j%s near" % Cond(condition).name
