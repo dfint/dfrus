@@ -1,5 +1,7 @@
 from typing import Iterable, Sequence, Union
 
+from dataclasses import dataclass
+
 '''
 # Concept:
 new_code = MachineCode(
@@ -18,11 +20,11 @@ fn.write(bytes(new_code))
 '''
 
 
+@dataclass
 class Reference:
-    def __init__(self, name: str, size=4, is_relative: bool = None):
-        self.name = name
-        self.size = size
-        self.is_relative = is_relative
+    name: str
+    size: int
+    is_relative: bool
     
     @classmethod
     def relative(cls, name, size=4):
