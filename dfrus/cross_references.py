@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from dfrus.binio import read_bytes, from_dword
+from .binio import read_bytes, from_dword
 
 code, rdata, data = range(3)
 

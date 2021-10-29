@@ -5,7 +5,7 @@ import sys
 import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
-from typing import Dict, Tuple, Optional, Any, List, Union, Set, Iterable
+from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping
 from warnings import warn
 
 from dataclasses import dataclass, fields, field
@@ -65,8 +65,8 @@ class Fix:
     poke: Any = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
-    added_relocs: Set[int] = field(default_factory=set)
-    deleted_relocs: Set[int] = field(default_factory=set)
+    added_relocs: Iterable[int] = field(default_factory=list)
+    deleted_relocs: Iterable[int] = field(default_factory=list)
     meta: Optional[Metadata] = None
     op: Optional[Any] = None
     fixed: Optional[Any] = None
@@ -526,8 +526,12 @@ class GetLengthResult:
     dest: Operand
     length: int
     saved_mach: bytes
-    nops: Dict[int, int] = field(default_factory=dict)
-    pokes: Dict[int, bytes] = field(default_factory=dict)
+    nops: Mapping[int, int] = field(default_factory=dict)
+    pokes: Mapping[int, Union[int, bytes]] = field(default_factory=dict)
+
+
+def is_empty(reg_state: Mapping[Reg, int], reg: Reg):
+    return reg_state[reg.parent] is None or reg_state[reg.parent] == 0
 
 
 def get_length(data: bytes,
@@ -554,9 +558,6 @@ def get_length(data: bytes,
     # * > 0  - not empty: a value of the specific size is stored in the register
     reg_state = reg_state or {reg.parent: None for reg in Reg if reg.type is not RegType.segment}
 
-    def is_empty(reg: Reg):
-        return reg_state[reg.parent] is None or reg_state[reg.parent] == 0
-
     deleted_relocs = set()
     added_relocs = set()  # Added relocs offsets are relative to the start of saved_mach
     saved_mach = bytes()
@@ -572,11 +573,15 @@ def get_length(data: bytes,
     for line in disasm(data):
         offset = line.address
         assert copied_len <= oldlen
+
         if copied_len == oldlen:
             length = offset
             break
+
         if line.mnemonic == 'db':
-            raise ValueError('Unknown instruction encountered: ' + hexlify(data[line.address:line.address + 8]).decode())
+            raise ValueError('Unknown instruction encountered: '
+                             + hexlify(data[line.address:line.address + 8]).decode())
+
         if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
             assert line.operands is not None
             left_operand, right_operand = line.operands
@@ -584,10 +589,10 @@ def get_length(data: bytes,
                 # mov reg, [...]
                 assert left_operand.reg is not None
 
-                if (not is_empty(left_operand.reg) and
+                if (not is_empty(reg_state, left_operand.reg) and
                         left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
-                    warn('%s register is already marked as occupied. String address: 0x%x' %
-                         (left_operand, original_string_address), stacklevel=2)
+                    warn(f'{left_operand} register is already marked as occupied. '
+                         f'String address: 0x{original_string_address:x}', stacklevel=2)
 
                 if right_operand.get_type() is OperandType.absolute_memory_reference:
                     # mov reg, [mem]
@@ -863,7 +868,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 print("0x{:x} : {!r}".format(*meta[:2]))
 
     fixes = defaultdict(Fix)
-    metadata = OrderedDict()  # type: Dict[Tuple, Fix]
+    metadata: MutableMapping[Tuple, Fix] = OrderedDict()
     delayed_pokes = dict()
 
     encoding = codepage if codepage else 'cp437'

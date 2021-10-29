@@ -1,5 +1,5 @@
 from enum import auto
-from typing import Optional, Tuple, Any, Iterator, Union
+from typing import Optional, Tuple, Any, Iterator
 
 from dataclasses import dataclass, asdict
 
@@ -550,11 +550,16 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             analysis_result, i = analyse_modrm(s, i+1)
 
             operand1 = Operand(reg=Reg.segment(analysis_result.modrm.reg))
-            operand = create_operand2_from_modrm_or_sib(analysis_result)
+            operand2 = create_operand2_from_modrm_or_sib(analysis_result)
 
             if not dir_flag:
-                operand1, operand = operand, operand1
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=(operand1, operand), prefix=rep_prefix)
+                operand1, operand2 = operand2, operand1
+            line = DisasmLine(start_address+j,
+                              data=s[j:i],
+                              mnemonic='mov',
+                              operands=(operand1, operand2),
+                              prefix=rep_prefix)
+
         elif s[i] == pop_rm:
             analysis_result, i = analyse_modrm(s, i+1)
             operand = create_operand2_from_modrm_or_sib(analysis_result)
@@ -580,8 +585,13 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
             operand1 = Operand(reg=Reg((RegType.general, Reg.eax.code, 1 << size)))
-            operand = Operand(value=immediate)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(operand1, operand), prefix=rep_prefix)
+            operand2 = Operand(value=immediate)
+            line = DisasmLine(start_address+j,
+                              data=s[j:i],
+                              mnemonic=mnemonic,
+                              operands=(operand1, operand2),
+                              prefix=rep_prefix)
+
         elif s[i] & 0xF0 == mov_reg_imm:
             flag_size = (s[i] & 8) >> 3
             reg = s[i] & 7
@@ -591,8 +601,13 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
             operand1 = Operand(reg=Reg((RegType.general, reg, 1 << size)))
-            operand = Operand(value=immediate)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=(operand1, operand), prefix=rep_prefix)
+            operand2 = Operand(value=immediate)
+            line = DisasmLine(start_address+j,
+                              data=s[j:i],
+                              mnemonic='mov',
+                              operands=(operand1, operand2),
+                              prefix=rep_prefix)
+
         elif s[i] & 0xFE in {shift_op_rm_1, shift_op_rm_cl, shift_op_rm_imm8}:
             opcode = s[i] & 0xFE
             flag_size = s[i] & 1
@@ -608,7 +623,12 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
                 immediate = s[i]
                 i += 1
                 operand = Operand(value=immediate)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(operand1, operand), prefix=rep_prefix)
+            line = DisasmLine(start_address+j,
+                              data=s[j:i],
+                              mnemonic=mnemonic,
+                              operands=(operand1, operand),
+                              prefix=rep_prefix)
+
         elif s[i] & 0xFE == test_or_unary_rm:
             flag_size = s[i] & 1
             analysis_result, i = analyse_modrm(s, i+1)

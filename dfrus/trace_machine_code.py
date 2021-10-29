@@ -1,17 +1,18 @@
 from contextlib import suppress
+from enum import Enum, auto
 from typing import Tuple, Any
 
-from dfrus.binio import read_bytes
-from dfrus.disasm import disasm
+from .binio import read_bytes
+from .disasm import disasm
 
 count_after = 0x100
 
 
-class Trace:
-    not_follow = 0
-    follow = 1
-    stop = 2
-    forward_only = 3
+class Trace(Enum):
+    not_follow = auto()
+    follow = auto()
+    stop = auto()
+    forward_only = auto()
 
 
 def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop):
@@ -25,37 +26,37 @@ def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.fo
                 return line
             elif line.mnemonic.startswith('jmp'):
                 assert line.operands is not None
-                if trace_jmp == Trace.not_follow:
+                if trace_jmp is Trace.not_follow:
                     pass
-                elif trace_jmp == Trace.follow:
+                elif trace_jmp is Trace.follow:
                     return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-                elif trace_jmp == Trace.stop:
+                elif trace_jmp is Trace.stop:
                     return line
-                elif trace_jmp == Trace.forward_only:
+                elif trace_jmp is Trace.forward_only:
                     if int(line.operands[0]) > line.address:
                         return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
             elif line.mnemonic.startswith('j'):
                 assert line.operands is not None
-                if trace_jcc == Trace.not_follow:
+                if trace_jcc is Trace.not_follow:
                     pass
-                elif trace_jcc == Trace.follow:
+                elif trace_jcc is Trace.follow:
                     return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
-                elif trace_jcc == Trace.stop:
+                elif trace_jcc is Trace.stop:
                     return line
-                elif trace_jcc == Trace.forward_only:
+                elif trace_jcc is Trace.forward_only:
                     if int(line.operands[0]) > line.address:
                         return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
             elif line.mnemonic.startswith('call'):
                 assert line.operands is not None
-                if trace_call == Trace.not_follow:
+                if trace_call is Trace.not_follow:
                     pass
-                elif trace_call == Trace.follow:
+                elif trace_call is Trace.follow:
                     returned = trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
                     if returned is None or not returned.mnemonic.startswith('ret'):
                         return returned
-                elif trace_call == Trace.stop:
+                elif trace_call is Trace.stop:
                     return line
-                elif trace_call == Trace.forward_only:
+                elif trace_call is Trace.forward_only:
                     if int(line.operands[0]) > line.address:
                         return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
             elif line.mnemonic.startswith('ret'):
