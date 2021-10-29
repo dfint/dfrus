@@ -28,11 +28,11 @@ def write_string(file_object, s: str, off=None, new_len=None, encoding=None):
         new_len = len(s)+1
 
     if encoding is None:
-        s = s.encode()
+        bs = s.encode()
     else:
-        s = s.encode(encoding)
+        bs = s.encode(encoding)
 
-    file_object.write(s.ljust(new_len, b'\0'))
+    file_object.write(bs.ljust(new_len, b'\0'))
 
 
 def fpoke4(file_object, off, x):

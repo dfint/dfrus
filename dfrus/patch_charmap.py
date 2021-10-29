@@ -1,5 +1,5 @@
 import unicodedata
-from typing import Callable, Tuple, Optional
+from typing import Callable, Tuple, Optional, Any, Dict, Iterable, Union
 
 from .binio import fpoke4, to_dword, read_bytes
 
@@ -46,7 +46,7 @@ _additional_codepages = {
         0xF0: map(ord_utf16, 'đựòóôõỏọụùúũủýợỮ')
     }
 }
-_codepages = dict()
+_codepages: Dict[str, Dict[int, Union[int, Iterable[int]]]] = dict()
 
 
 def generate_charmap_table_patch(enc1, enc2):

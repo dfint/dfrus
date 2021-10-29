@@ -9,7 +9,7 @@ from warnings import warn
 from binascii import hexlify
 from typing import Dict, Tuple, Optional, Any, List, Union
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword
 from .cross_references import get_cross_references
@@ -66,8 +66,8 @@ class Fix:
     poke: Any = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
-    added_relocs: Optional[List[int]] = None
-    deleted_relocs: Optional[List[int]] = None
+    added_relocs: List[int] = field(default_factory=list)
+    deleted_relocs: List[int] = field(default_factory=list)
     meta: Optional[Metadata] = None
     op: Optional[Any] = None
     fixed: Optional[Any] = None
@@ -79,11 +79,13 @@ class Fix:
 
     def add_fix(self, fix: "Fix"):
         new_code = fix.new_code
+        assert new_code is not None
         old_fix = self
         if not self:
             self.update(fix)
         else:
             old_code = old_fix.new_code
+            assert old_code is not None
             if bytes(new_code) in bytes(old_code):
                 pass  # Fix is already added, do nothing
             else:
@@ -478,7 +480,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                 # Make deleted relocs offsets relative to the given offset
                 fix.deleted_relocs = [next_off + ref - offset for ref in fix.deleted_relocs]
 
-                if 'fix' in fix:
+                if fix.fix:
                     fix.fix.src_off = next_off + 1
                 else:
                     # Make new relocations relative to the given offset (only if they not belong to a procedure)

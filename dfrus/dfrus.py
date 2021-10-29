@@ -5,6 +5,7 @@ import warnings
 
 from shutil import copy
 from contextlib import contextmanager
+from typing import Iterable
 
 from .patchdf import fix_df_exe, load_trans_file
 from .peclasses import PortableExecutable
@@ -84,7 +85,7 @@ def destination_file_context(src, dest):
         raise ex
 
 
-def run(path: str, dest: str, trans_table: iter, codepage, original_codepage='cp437',
+def run(path: str, dest: str, trans_table: Iterable, codepage, original_codepage='cp437',
         dict_slice=None, debug=False, stdout=None, stderr=None):
     if not debug:
         warnings.simplefilter('ignore')
