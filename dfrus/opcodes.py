@@ -1,5 +1,5 @@
-from enum import IntEnum, Enum
 from collections import namedtuple
+from enum import IntEnum, Enum
 
 
 class Cond(IntEnum):
@@ -23,7 +23,7 @@ class Cond(IntEnum):
     nle = g
 
 
-class RegType(Enum):
+class RegType(IntEnum):
     general, segment, mm, xmm = range(4)
 
 
@@ -58,6 +58,18 @@ class Reg(Enum):
             self.parent = type(self)(RegData(RegType.xmm, self.code, 16))
         else:
             self.parent = self
+
+    @classmethod
+    def segment(cls, code: int):
+        return cls((RegType.segment, code, 2))
+
+    @classmethod
+    def mm(cls, code: int):
+        return cls((RegType.mm, code, 8))
+
+    @classmethod
+    def xmm(cls, code: int):
+        return cls((RegType.xmm, code, 16))
 
     def __int__(self):
         return self.code

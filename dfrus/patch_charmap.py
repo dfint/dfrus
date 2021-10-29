@@ -1,5 +1,6 @@
+import functools
 import unicodedata
-from typing import Callable, Tuple, Optional
+from typing import Tuple
 
 from .binio import fpoke4, to_dword, read_bytes
 
@@ -46,7 +47,6 @@ _additional_codepages = {
         0xF0: map(ord_utf16, 'đựòóôõỏọụùúũủýợỮ')
     }
 }
-_codepages = dict()
 
 
 def generate_charmap_table_patch(enc1, enc2):
@@ -56,17 +56,19 @@ def generate_charmap_table_patch(enc1, enc2):
                 if a != b and b.isalpha())
 
 
+@functools.lru_cache()
 def get_codepages():
-    if not _codepages:
-        for i in range(700, 1253):
-            try:
-                _codepages['cp%d' % i] = generate_charmap_table_patch('cp437', 'cp%d' % i)
-            except LookupError:
-                pass
-        
-        _codepages.update(_additional_codepages)
+    codepages = dict()
 
-    return _codepages
+    for i in range(700, 1253):
+        try:
+            codepages['cp%d' % i] = generate_charmap_table_patch('cp437', 'cp%d' % i)
+        except LookupError:
+            pass
+
+    codepages.update(_additional_codepages)
+
+    return codepages
 
 
 def patch_unicode_table(fn, off, codepage):

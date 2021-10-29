@@ -3,19 +3,20 @@ import csv
 import io
 import sys
 import textwrap
-
-from collections import defaultdict, OrderedDict
-from warnings import warn
 from binascii import hexlify
-from typing import Dict, Tuple
+from collections import defaultdict, OrderedDict
+from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping
+from warnings import warn
 
-from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword
+from dataclasses import dataclass, fields, field
+
+from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
-from .disasm import *
-from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
-from .machine_code import MachineCode, Reference
-from .opcodes import *
+from .disasm import disasm, DisasmLine, join_byte, Operand, align, OperandType
 from .extract_strings import extract_strings
+from .machine_code import MachineCode, Reference
+from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
+from .opcodes import *
 from .patch_charmap import search_charmap, patch_unicode_table, get_codepages, get_encoder
 from .peclasses import Section, RelocationTable
 from .trace_machine_code import which_func
@@ -36,7 +37,7 @@ def load_trans_file(fn):
         yield unescape(parts[0]), unescape(parts[1])
 
 
-code, rdata, data = range(3)
+code_section, rdata_section, data_section = range(3)
 
 
 def find_instruction(s, instruction):
@@ -47,79 +48,43 @@ def find_instruction(s, instruction):
     return None
 
 
+@dataclass
 class Metadata:
-    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None):
-        self.fixed = fixed
-        self.cause = cause
-        self.len = len_
-        self.str = str_
-        self.func = func
-        self.prev_bytes = prev_bytes
-
-    def __repr__(self):
-        return '{}({})'.format(type(self).__name__,
-                               ', '.join('{}={!r}'.format(key, self.__getattribute__(key))
-                                         for key in sorted(dir(self))
-                                         if key[0] != '_' and self.__getattribute__(key) is not None))
+    fixed: Optional[str] = None  #: Was the string length value fixed?
+    cause: Optional[str] = None  #: A cause of failure (if fixed == 'no')
+    length: Optional[str] = None  #: A way of string length specification (a register, push, etc.)
+    string: Optional[str] = None  #: A way of string value passing (a register, push, etc.)
+    func: Optional[Union[str, Tuple[Any, ...]]] = None  #: A function to which the string is passed
+    prev_bytes: Optional[str] = None
 
 
+@dataclass
 class Fix:
-    _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'dest_off', 'added_relocs',
-                       'deleted_relocs', 'fixed', 'fix'}
+    new_code: Optional[Union[bytes, MachineCode]] = None
+    pokes: Optional[dict] = None
+    poke: Any = None
+    src_off: Optional[int] = None
+    dest_off: Optional[int] = None
+    added_relocs: Iterable[int] = field(default_factory=list)
+    deleted_relocs: Iterable[int] = field(default_factory=list)
+    meta: Optional[Metadata] = None
+    op: Optional[Any] = None
+    fixed: Optional[Any] = None
+    fix: Optional[Any] = None
 
-    def __init__(self, new_code=None, pokes=None, poke=None, src_off=None, dest_off=None,
-                 added_relocs=None, deleted_relocs=None, meta: Metadata = None, op=None, fixed=None,
-                 fix=None):
-        self.new_code = new_code
-        self.pokes = pokes
-        self.poke = poke
-        self.src_off = src_off
-        self.dest_off = dest_off
-        self.added_relocs = added_relocs
-        self.deleted_relocs = deleted_relocs
-        self.meta = meta
-        self.op = op
-        self.fixed = fixed
-        self.fix = fix
-
-    # Some crutches to make Fix compatible with plain dict
-    def __getitem__(self, item):
-        return self.__getattribute__(item)
-
-    def get(self, key, d=None):
-        return self[key] if key in self._allowed_fields else d
-
-    def __setitem__(self, key, value):
-        if key in self._allowed_fields:
-            self.__setattr__(key, value)
-        else:
-            raise IndexError('{!r} key is not allowed'.format(key))
-
-    def __contains__(self, item):
-        return self.__getattribute__(item) is not None
-
-    def __repr__(self):
-        return '{}({})'.format(type(self).__name__,
-                               ', '.join('{}={!r}'.format(key, self.__getattribute__(key))
-                                         for key in sorted(self._allowed_fields)
-                                         if key[0] != '_' and self.__getattribute__(key) is not None))
-
-    def __bool__(self):
-        return any(self.__getattribute__(attr) for attr in self._allowed_fields)
-
-    def copy(self, other: "Fix"):
-        # TODO: Could be optimized
-        for field in self._allowed_fields:
-            assert self.__getattribute__(field) is None or self.__getattribute__(field) == other.__getattribute__(field)
-            self.__setattr__(field, other.__getattribute__(field))
+    def update(self, other: "Fix"):
+        for field in fields(self):
+            self.__setattr__(field.name, other.__getattribute__(field.name))
 
     def add_fix(self, fix: "Fix"):
         new_code = fix.new_code
+        assert new_code is not None
         old_fix = self
         if not self:
-            self.copy(fix)
+            self.update(fix)
         else:
             old_code = old_fix.new_code
+            assert old_code is not None
             if bytes(new_code) in bytes(old_code):
                 pass  # Fix is already added, do nothing
             else:
@@ -131,23 +96,21 @@ class Fix:
                 else:
                     new_code = old_code + new_code
                 fix.new_code = new_code
-                self.copy(fix)
+                self.update(fix)
 
 
-def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
-    x = get_length_info
+def get_fix_for_moves(get_length_info: "GetLengthResult", newlen, string_address, meta: Metadata) -> Fix:
+    added_relocs = get_length_info.added_relocs
 
-    added_relocs = x['added_relocs']
-
-    mach, new_refs = mach_memcpy(string_address, x['dest'], newlen + 1)
-    if x['saved_mach']:
-        mach = x['saved_mach'] + mach  # If there is "lea edi, [dest]", put it before the new code
-        new_refs = {item + len(x['saved_mach']) for item in new_refs}
+    mach, new_refs = mach_memcpy(string_address, get_length_info.dest, newlen + 1)
+    if get_length_info.saved_mach:
+        mach = get_length_info.saved_mach + mach  # If there is "lea edi, [dest]", put it before the new code
+        new_refs = {item + len(get_length_info.saved_mach) for item in new_refs}
 
     added_relocs.update(new_refs)
 
     proc = None
-    if len(mach) > x['length']:
+    if len(mach) > get_length_info.length:
         # if memcpy code is to long, try to write it into the new section and make call to it
         if isinstance(mach, bytes):
             mach = bytearray(mach)
@@ -156,38 +119,38 @@ def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
         proc = mach
 
         mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
-        if len(mach) > x['length']:
+        if len(mach) > get_length_info.length:
             # Too tight here, even for a procedure call
             meta.fixed = 'no'
             meta.cause = 'to tight to call'
-            return meta
+            return Fix(meta=meta)
 
     # Write replacement code
-    mach = mach.ljust(x['length'], nop.to_bytes(1, 'little'))
+    mach = mach.ljust(get_length_info.length, nop.to_bytes(1, 'little'))
     pokes = {0: mach}
 
     # Nop-out old instructions
-    if 'nops' in x:
-        for off, count in x['nops'].items():
+    if get_length_info.nops:
+        for off, count in get_length_info.nops.items():
             pokes[off] = bytes(nop for _ in range(count))
 
     if proc:
-        retvalue = dict(
+        fix = Fix(
             # src_off=next_off + 1,
             fix=Fix(new_code=proc, pokes=pokes),
-            deleted_relocs=x['deleted_relocs'],
+            deleted_relocs=get_length_info.deleted_relocs,
             added_relocs=added_relocs,  # These relocs belong to proc, not to the current code block
         )
     else:
-        retvalue = dict(
-            deleted_relocs=x['deleted_relocs'],
+        fix = Fix(
+            deleted_relocs=get_length_info.deleted_relocs,
             added_relocs=added_relocs,
             pokes=pokes,
         )
 
     meta.fixed = 'yes'
-    retvalue['meta'] = meta
-    return retvalue
+    fix.meta = meta
+    return fix
 
 
 count_before = 0x20
@@ -217,11 +180,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
     meta = Metadata()
     if pre[-1] == push_imm32:
         # push offset str
-        meta.str = 'push'
+        meta.string = 'push'
 
         if pre[-3] == push_imm8 and pre[-2] == old_len:
             fpoke(fn, offset - 2, new_len)
-            meta.len = 'push before'
+            meta.length = 'push before'
             meta.fixed = 'yes'
 
         meta.func = which_func(fn, old_next)
@@ -230,11 +193,17 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
         reg = pre[-1] & 7
 
         def stop_func(disasm_line: DisasmLine):
-            return disasm_line.operands and (
-                    (disasm_line.operands[0].type == 'reg gen' and disasm_line.operands[0].reg == reg) or
-                    (len(disasm_line.operands) > 1 and disasm_line.operands[1].type == 'ref rel' and
-                     disasm_line.operands[1].base_reg == reg)
-            )
+            if disasm_line.operands:
+                operands = disasm_line.operands
+                if (operands[0].get_type() is OperandType.general_purpose_register
+                        and operands[0].reg == reg):
+                    return True
+                elif (len(operands) > 1
+                      and operands[1].get_type() == OperandType.relative_memory_reference
+                      and operands[1].base_reg == reg):
+                    return True
+
+            return False
 
         func = which_func(fn, old_next, stop_cond=stop_func)
 
@@ -248,7 +217,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                 fpoke4(fn, offset - 5, new_len)
                 meta.fixed = 'yes'
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi.code:
-                    meta.len = 'edi'
+                    meta.length = 'edi'
                     # mov edi, len before
                     if (old_len == 15 or old_len == 16) and aft and not jmp:
                         # Trying to fix the case when the edi value is used as a stl-string cap size
@@ -286,7 +255,9 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                     fix_cap = MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14,
                                                           to_dword(old_len))
                                 else:
-                                    fix_cap = None
+                                    fix_cap = MachineCode()
+
+                                assert line.operands is not None
 
                                 new_code = MachineCode(
                                     fix_cap,
@@ -308,12 +279,12 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             elif pre[-3] == push_imm8 and pre[-2] == old_len:
                 # push len ; before
                 fpoke(fn, offset - 2, new_len)
-                meta.len = 'push'
+                meta.length = 'push'
                 meta.fixed = 'yes'
                 return Fix(meta=meta)
             elif aft and aft[0] == push_imm8 and aft[1] == old_len:
                 # push len ; after
-                meta.len = 'push'
+                meta.length = 'push'
                 if not jmp:
                     fpoke(fn, next_off + 1, new_len)
                     meta.fixed = 'yes'
@@ -341,7 +312,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                         return ret_value
             elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
-                meta.len = 'edi'
+                meta.length = 'edi'
                 # There's no code in DF that passes this condition. Leaved just in case.
                 # TODO: Drop it
                 i = find_instruction(aft, call_near)
@@ -357,7 +328,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     return ret_value
             elif aft and match_mov_reg_imm32(aft[:5], Reg.edi, old_len):
                 # mov edi, len ; after
-                meta.len = 'edi'
+                meta.length = 'edi'
                 if not jmp:
                     fpoke4(fn, next_off + 1, new_len)
                     meta.fixed = 'yes'
@@ -387,14 +358,14 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                 displacement = to_signed(pre[-2], 8)
                 if displacement == old_len:
                     # lea edi, [reg+old_len]
-                    meta.len = 'edi'
+                    meta.length = 'edi'
                     fpoke(fn, offset - 2, new_len)
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
             elif (aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
                   aft[2] == push_imm8 and aft[3] == old_len):
                 # mov ecx, reg; push imm8
-                meta.len = 'push'
+                meta.length = 'push'
                 if not jmp:
                     fpoke(fn, next_off + 3, new_len)
                     meta.fixed = 'yes'
@@ -416,7 +387,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             # repz movsd
             # movsw
             # movsb
-            meta.str = 'esi'
+            meta.string = 'esi'
             r = (old_len + 1) % 4
             dword_count = (old_len + 1) // 4
             new_dword_count = (new_len - r) // 4 + 1
@@ -424,13 +395,13 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             if match_mov_reg_imm32(pre[-6:-1], Reg.ecx, dword_count):
                 # mov ecx, dword_count
                 fpoke4(fn, offset - 5, new_dword_count)
-                meta.len = 'ecx*4'
+                meta.length = 'ecx*4'
                 meta.fixed = 'yes'
                 return Fix(meta=meta)
             elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
                 fpoke(fn, offset - 2, new_dword_count)
-                meta.len = 'ecx*4'
+                meta.length = 'ecx*4'
                 meta.fixed = 'yes'
                 return Fix(meta=meta)
             elif new_len > old_len:
@@ -445,10 +416,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                         offset = line.address
                         line_data = line.data
                         if line_data[0] == Prefix.rep:
-                            meta.len = 'ecx*4'
+                            meta.length = 'ecx*4'
                             meta.fixed = 'no'
                             return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
+                            assert line.operands is not None
                             next_off_2 = line.operands[0].value
                             aft = read_bytes(fn, offset, count_after)
 
@@ -459,7 +431,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                 skip = 3
 
                             if skip is not None:
-                                meta.len = 'ecx*4'
+                                meta.length = 'ecx*4'
                                 ret_value = Fix(
                                     src_off=line.address + 1,
                                     new_code=bytes((mov_reg_imm | 8 | Reg.ecx.code,)) + to_dword(dword_count),
@@ -472,24 +444,24 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             return Fix(meta=meta)
                         elif len(line_data) == 5 and match_mov_reg_imm32(line_data, Reg.ecx, dword_count):
                             fpoke4(fn, line.address + 1, new_dword_count)
-                            meta.len = 'ecx*4'
+                            meta.length = 'ecx*4'
                             meta.fixed = 'yes'
                             return Fix(meta=meta)
                         elif line_data[0] == lea and line_data[1] & 0xf8 == mod_1_ecx_0 and line_data[2] == dword_count:
                             fpoke(fn, line.address + 2, new_dword_count)
-                            meta.len = 'ecx*4'
+                            meta.length = 'ecx*4'
                             meta.fixed = 'yes'
                             return Fix(meta=meta)
                     return Fix(meta=meta)
         else:
-            meta.str = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
+            meta.string = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
         return Fix(meta=meta)
     elif (pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and
                                             pre[-1] & 0xC7 == join_byte(0, 0, 5)) or  # mov
           pre[-3] == 0x0F and pre[-2] in {x0f_movups, x0f_movaps} and
           pre[-1] & 0xC7 == join_byte(0, 0, 5)):  # movups or movaps
         # mov eax, [addr] or mov reg, [addr]
-        meta.str = 'mov'
+        meta.string = 'mov'
 
         next_off = offset - get_start(pre)
         aft = read_bytes(fn, next_off, count_after_for_get_length)
@@ -500,54 +472,74 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             meta.cause = repr(err)
             return Fix(meta=meta)
 
-        if 'pokes' in get_length_info:
-            for off, b in get_length_info['pokes'].items():
+        if get_length_info.pokes:
+            for off, b in get_length_info.pokes.items():
                 fpoke(fn, next_off + off, b)
 
-        if new_len <= old_len and 'pokes' not in get_length_info:
+        if new_len <= old_len and not get_length_info.pokes:
             meta.fixed = 'not needed'
             return Fix(meta=meta)
         else:
-            fix = Fix(**get_fix_for_moves(get_length_info, new_len, string_address, meta))
+            fix = get_fix_for_moves(get_length_info, new_len, string_address, meta)
 
-            if fix['fixed'] == 'yes':
+            if fix.fixed == 'yes':
                 # Make deleted relocs offsets relative to the given offset
-                fix['deleted_relocs'] = [next_off + ref - offset for ref in fix['deleted_relocs']]
+                fix.deleted_relocs = [next_off + ref - offset for ref in fix.deleted_relocs]
 
-                if 'fix' in fix:
-                    fix['fix'].src_off = next_off + 1
+                if fix.fix:
+                    fix.fix.src_off = next_off + 1
                 else:
                     # Make new relocations relative to the given offset (only if they not belong to a procedure)
-                    fix['added_relocs'] = [next_off + ref - offset for ref in fix['added_relocs']]
+                    fix.added_relocs = [next_off + ref - offset for ref in fix.added_relocs]
 
-                if 'pokes' in fix:
-                    fix['pokes'] = {next_off + off: b for off, b in fix['pokes'].items()}
+                if fix.pokes:
+                    fix.pokes = {next_off + off: b for off, b in fix.pokes.items()}
 
             return fix
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
         # mov reg8, string[reg]
         meta.func = 'strcpy'
-        meta.str = 'mov byte'
+        meta.string = 'mov byte'
         meta.fixed = 'not needed'
         return Fix(meta=meta)  # No need fixing
     elif pre[-1] == add_acc_imm | 1:
         # add reg, offset string
         meta.func = 'array'
-        meta.str = 'add offset'
+        meta.string = 'add offset'
         meta.fixed = 'not needed'
         return Fix(meta=meta)
     elif pre[-2] == op_rm_imm | 1 and pre[-1] & 0xF8 == 0xF8:
         # cmp reg, offset string
-        meta.str = 'cmp reg'
+        meta.string = 'cmp reg'
     elif pre[-4] == mov_rm_imm | 1 and pre[-3] == join_byte(1, 0, 4) and pre[-2] == join_byte(0, 4, Reg.esp):
         # mov [esp+N], offset string
-        meta.str = 'mov var'
+        meta.string = 'mov var'
         meta.fixed = 'not needed'
     meta.prev_bytes = ' '.join('%02X' % x for x in pre[-4:])
     return Fix(meta=meta)
 
 
-def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, dest=None):
+@dataclass
+class GetLengthResult:
+    deleted_relocs: Set[int]
+    added_relocs: Set[int]
+    dest: Operand
+    length: int
+    saved_mach: bytes
+    nops: Mapping[int, int] = field(default_factory=dict)
+    pokes: Mapping[int, Union[int, bytes]] = field(default_factory=dict)
+
+
+def is_empty(reg_state: Mapping[Reg, int], reg: Reg):
+    return reg_state[reg.parent] is None or reg_state[reg.parent] == 0
+
+
+def get_length(data: bytes,
+               oldlen: int,
+               original_string_address: int = None,
+               reg_state: dict = None,
+               dest: Optional[Operand] = None) -> GetLengthResult:
+
     def belongs_to_the_string(ref_value):
         osa = original_string_address
         return osa is None or 0 <= ref_value - osa < oldlen
@@ -566,9 +558,6 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
     # * > 0  - not empty: a value of the specific size is stored in the register
     reg_state = reg_state or {reg.parent: None for reg in Reg if reg.type is not RegType.segment}
 
-    def is_empty(reg: Reg):
-        return reg_state[reg.parent] is None or reg_state[reg.parent] == 0
-
     deleted_relocs = set()
     added_relocs = set()  # Added relocs offsets are relative to the start of saved_mach
     saved_mach = bytes()
@@ -578,27 +567,34 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
         return not_moveable_after is None
 
     pokes = dict()  # eg. fixes of jumps
-
     nops = dict()
+
     length = None
-    for line in disasm(s):
+    for line in disasm(data):
         offset = line.address
         assert copied_len <= oldlen
+
         if copied_len == oldlen:
             length = offset
             break
-        if line.mnemonic == 'db':
-            raise ValueError('Unknown instruction encountered: ' + hexlify(s[line.address:line.address + 8]).decode())
-        if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
-            left_operand, right_operand = line.operands
-            if left_operand.type in {'reg gen', 'reg xmm'}:
-                # mov reg, [...]
-                if (not is_empty(left_operand.reg) and
-                        left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
-                    warn('%s register is already marked as occupied. String address: 0x%x' %
-                         (left_operand, original_string_address), stacklevel=2)
 
-                if right_operand.type == 'ref abs':
+        if line.mnemonic == 'db':
+            raise ValueError('Unknown instruction encountered: '
+                             + hexlify(data[line.address:line.address + 8]).decode())
+
+        if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
+            assert line.operands is not None
+            left_operand, right_operand = line.operands
+            if left_operand.get_type() in {OperandType.general_purpose_register, OperandType.xmm_register}:
+                # mov reg, [...]
+                assert left_operand.reg is not None
+
+                if (not is_empty(reg_state, left_operand.reg) and
+                        left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
+                    warn(f'{left_operand} register is already marked as occupied. '
+                         f'String address: 0x{original_string_address:x}', stacklevel=2)
+
+                if right_operand.get_type() is OperandType.absolute_memory_reference:
                     # mov reg, [mem]
                     local_offset = line.data.index(to_dword(right_operand.disp))
                     if belongs_to_the_string(right_operand.disp):
@@ -610,7 +606,7 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                         reg_state[left_operand.reg.parent] = -1
                         # This may be a reference to another string, thus it is not moveable
                         not_moveable_after = not_moveable_after or offset
-                elif right_operand.type == 'imm' and valid_reference(right_operand.value):
+                elif right_operand.get_type() is OperandType.immediate_value and valid_reference(right_operand.value):
                     # This may be a reference to another string
                     not_moveable_after = not_moveable_after or offset
                 else:
@@ -623,9 +619,13 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                             deleted_relocs.add(offset + local_offset)
                             added_relocs.add(len(saved_mach) + local_offset)
                         saved_mach += line.data
-            elif left_operand.type in {'ref rel', 'ref abs'}:
+            elif left_operand.get_type() in {OperandType.relative_memory_reference,
+                                             OperandType.absolute_memory_reference}:
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
-                if right_operand.type in {'reg gen', 'reg xmm'}:
+                if right_operand.get_type() in {OperandType.general_purpose_register,
+                                                OperandType.xmm_register}:
+
+                    assert right_operand.reg is not None
                     if reg_state[right_operand.reg.parent] is None or reg_state[right_operand.reg.parent] < 0:
                         # It can be a part of a copying code of another string. Leave it as is.
                         not_moveable_after = not_moveable_after or offset
@@ -636,12 +636,12 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                         if reg_state[right_operand.reg.parent] == 0:
                             raise ValueError('Copying of a string to several diferent locations not supported.')
 
-                        if (dest is None or (dest.type == left_operand.type and
+                        if (dest is None or (dest.get_type() == left_operand.get_type() and
                                              dest.base_reg == left_operand.base_reg and
                                              dest.disp > left_operand.disp)):
                             dest = left_operand
 
-                        if left_operand.type == 'ref abs':
+                        if left_operand.get_type() is OperandType.absolute_memory_reference:
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
 
                         copied_len += left_operand.data_size or right_operand.data_size
@@ -651,17 +651,20 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
 
                         reg_state[right_operand.reg.parent] = 0  # Mark the register as freed
                 elif is_moveable():
-                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and
-                            valid_reference(right_operand.value)):
+                    if (right_operand.get_type() is OperandType.absolute_memory_reference
+                            or (right_operand.get_type() is OperandType.immediate_value
+                                and valid_reference(right_operand.value))):
                         # TODO: check if this actually a reference. Until then just skip
                         not_moveable_after = not_moveable_after or offset
                         continue
-                        # value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
+                        # value = right_operand.disp
+                        # if right_operand.get_type() is OperandType.absolute_memory_reference
+                        # else right_operand.value
                         # local_offset = line.data.rindex(to_dword(value))  # use rindex() to find the second operand
                         # deleted_relocs.add(offset + local_offset)
                         # added_relocs.add(len(saved_mach) + local_offset)
 
-                    if left_operand.type == 'ref abs':
+                    if left_operand.get_type() == OperandType.absolute_memory_reference:
                         value = left_operand.disp
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
@@ -671,9 +674,13 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
             else:
                 # Segment register etc.
                 raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' %
-                                 (left_operand, left_operand.type, str(line)))
+                                 (left_operand, left_operand.get_type(), str(line)))
         elif line.mnemonic == 'lea':
+            assert line.operands is not None
             left_operand, right_operand = line.operands
+
+            # Left operand of lea is always a register
+            assert left_operand.reg is not None
             reg_state[left_operand.reg.parent] = -1
             if dest is not None and dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
                 dest = Operand(base_reg=left_operand.reg, disp=0)
@@ -682,43 +689,53 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
             if line.mnemonic.startswith('jmp'):
                 not_moveable_after = not_moveable_after or offset
 
-                data_after_jump = s[line.operands[0].value:]
+                assert line.operands is not None
+                data_after_jump = data[line.operands[0].value:]
                 if not data_after_jump:
                     raise ValueError('Cannot jump: jump destination not included in the passed machinecode.')
 
-                x = get_length(data_after_jump, oldlen - copied_len - 1,
-                               original_string_address, reg_state, dest)
-                dest = x['dest']
+                result = get_length(data_after_jump, oldlen - copied_len - 1,
+                                    original_string_address, reg_state, dest)
+                dest = result.dest
                 if 'short' in line.mnemonic:
-                    disp = line.data[1] + x['length']
+                    disp = line.data[1] + result.length
                     pokes = {offset + 1: disp}
                 else:
-                    disp = from_dword(line.data[1:]) + x['length']
+                    disp = from_dword(line.data[1:]) + result.length
                     pokes = {offset + 1: to_dword(disp)}
                 break
             else:
                 raise ValueError('Conditional jump encountered at offset 0x%02x' % line.address)
         else:
-            if str(line).startswith('rep'):
+            if line.prefix and line.prefix.name.startswith('rep'):
                 reg_state[Reg.ecx] = None  # Mark ecx as unoccupied
             if line.mnemonic.startswith('movs'):
                 reg_state[Reg.esi] = None
                 reg_state[Reg.edi] = None
             elif line.mnemonic.startswith('set'):
                 # setz, setnz etc.
+                assert line.operands is not None
+                assert line.operands[0].reg is not None
                 reg_state[line.operands[0].reg.parent] = -1
             elif line.mnemonic == 'push':
-                if line.operands[0].type == 'reg gen':
+                assert line.operands is not None
+                if line.operands[0].get_type() is OperandType.general_purpose_register:
+                    assert line.operands[0].reg is not None
                     reg_state[line.operands[0].reg.parent] = None  # Mark the pushed register as unoccupied
                 not_moveable_after = not_moveable_after or offset
             elif line.mnemonic == 'pop':
-                if line.operands[0].type == 'reg gen':
+                assert line.operands is not None
+                if line.operands[0].get_type() is OperandType.general_purpose_register:
+                    assert line.operands[0].reg is not None
                     reg_state[line.operands[0].reg.parent] = -1
                 not_moveable_after = not_moveable_after or offset
-            elif line.mnemonic in {'add', 'sub', 'and', 'xor', 'or'} and line.operands[0].type == 'reg gen':
-                if line.operands[0].reg == Reg.esp:
-                    not_moveable_after = not_moveable_after or offset
-                reg_state[line.operands[0].reg.parent] = -1
+            elif line.mnemonic in {'add', 'sub', 'and', 'xor', 'or'}:
+                assert line.operands is not None
+                if line.operands[0].get_type() is OperandType.general_purpose_register:
+                    assert line.operands[0].reg is not None
+                    if line.operands[0].reg == Reg.esp:
+                        not_moveable_after = not_moveable_after or offset
+                    reg_state[line.operands[0].reg.parent] = -1
             elif line.mnemonic.startswith('call'):
                 not_moveable_after = not_moveable_after or offset
             elif line.mnemonic.startswith('ret'):
@@ -726,12 +743,14 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
 
             if is_moveable():
                 if line.operands:
-                    abs_refs = [operand for operand in line.operands if operand.type in {'ref abs', 'imm'}]
+                    abs_refs = [operand for operand in line.operands
+                                if operand.get_type() in {OperandType.absolute_memory_reference,
+                                                          OperandType.immediate_value}]
 
                     for ref in abs_refs:
-                        value = ref.disp if ref.type == 'ref abs' else ref.value
+                        value = ref.disp if ref.get_type() is OperandType.absolute_memory_reference else ref.value
 
-                        if ref.type == 'imm' and not valid_reference(value):
+                        if ref.get_type() is OperandType.immediate_value and not valid_reference(value):
                             continue
 
                         local_offset = line.data.index(to_dword(value))
@@ -741,7 +760,7 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                 saved_mach += line.data
 
     if not length and copied_len == oldlen:
-        length = len(s)
+        length = len(data)
     if not is_moveable():
         length = not_moveable_after  # return length of code which can be moved harmlessly
     if length is None:
@@ -749,17 +768,20 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
     if dest is None:
         raise ValueError('Destination not recognized.')
 
-    result = dict(
+    result = GetLengthResult(
         length=length,
         dest=dest,
         deleted_relocs=deleted_relocs,
         saved_mach=saved_mach,
         added_relocs=added_relocs
     )
+
     if nops:
-        result['nops'] = nops
+        result.nops = nops
+
     if pokes:
-        result['pokes'] = pokes
+        result.pokes = pokes
+
     return result
 
 
@@ -778,8 +800,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
     # Getting addresses of all relocatable entries
     relocs = set(pe.relocation_table)
-    relocs_to_add = set()
-    relocs_to_remove = set()
+    relocs_to_add: Set[int] = set()
+    relocs_to_remove: Set[int] = set()
 
     # Getting cross-references:
     xref_table = get_cross_references(fn, relocs, sections, image_base)
@@ -846,7 +868,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 print("0x{:x} : {!r}".format(*meta[:2]))
 
     fixes = defaultdict(Fix)
-    metadata = OrderedDict()  # type: Dict[Tuple, Fix]
+    metadata: MutableMapping[Tuple, Fix] = OrderedDict()
     delayed_pokes = dict()
 
     encoding = codepage if codepage else 'cp437'
@@ -896,7 +918,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             # Fix string length for each reference
             for ref in refs:
                 ref_rva = sections.offset_to_rva(ref)
-                if 0 <= (ref - sections[code].physical_offset) < sections[code].physical_size:
+                if 0 <= (ref - sections[code_section].physical_offset) < sections[code_section].physical_size:
                     try:
                         fix = fix_len(fn, offset=ref, old_len=len(string), new_len=len(translation),
                                       string_address=string_address,
@@ -909,26 +931,26 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     fix = Fix(meta=Metadata(fixed='not needed'))
 
                 meta = fix.meta
-                if meta.str == 'cmp reg':
+                if meta.string == 'cmp reg':
                     # This is probably a bound of an array, not a string reference
                     continue
-                elif 'new_code' in fix:
-                    new_code = fix['new_code']
+                elif fix.new_code:
+                    new_code = fix.new_code
                     assert isinstance(new_code, (bytes, bytearray, MachineCode))
-                    src_off = fix['src_off']
+                    src_off = fix.src_off
 
                     fixes[src_off].add_fix(fix)
                 else:
-                    if 'added_relocs' in fix:
+                    if fix.added_relocs:
                         # Add relocations of new references of moved items
-                        relocs_to_add.update(item + ref_rva for item in fix['added_relocs'])
+                        relocs_to_add.update(item + ref_rva for item in fix.added_relocs)
 
-                    if 'pokes' in fix:
-                        delayed_pokes.update({off + ref: val for off, val in fix['pokes'].items()})
+                    if fix.pokes:
+                        delayed_pokes.update({off + ref: val for off, val in fix.pokes.items()})
 
                 # Remove relocations of the overwritten references
-                if 'deleted_relocs' in fix and fix['deleted_relocs']:
-                    relocs_to_remove.update(item + ref_rva for item in fix['deleted_relocs'])
+                if fix.deleted_relocs:
+                    relocs_to_remove.update(item + ref_rva for item in fix.deleted_relocs)
                 elif is_long and string_address:
                     fpoke4(fn, ref, string_address)
 
@@ -945,29 +967,29 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         assert isinstance(meta, Metadata)
         if meta.func and meta.func[0] == 'call near':
             offset = meta.func[2]
-            address = sections[code].offset_to_rva(offset) + image_base
-            if meta.str:
-                str_param = meta.str
-                if functions[offset].str is None:
-                    functions[offset].str = {str_param}
-                elif str_param not in functions[offset].str:
+            address = sections[code_section].offset_to_rva(offset) + image_base
+            if meta.string:
+                str_param = meta.string
+                if functions[offset].string is None:
+                    functions[offset].string = {str_param}
+                elif str_param not in functions[offset].string:
                     print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
-                          (address, str_param, functions[offset].str))
-                    functions[offset].str.add(str_param)
+                          (address, str_param, functions[offset].string))
+                    # functions[offset].string.add(str_param)  # FIXME
 
-            if meta.len is not None:
-                len_param = meta.len
-                if functions[offset].len is None:
-                    functions[offset].len = len_param
-                elif functions[offset].len != len_param:
+            if meta.length is not None:
+                len_param = meta.length
+                if functions[offset].length is None:
+                    functions[offset].length = len_param
+                elif functions[offset].length != len_param:
                     raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
-                                     (address, functions[offset].len, len_param))
+                                     (address, functions[offset].length, len_param))
 
     if debug:
         print('\nGuessed function parameters:')
         for func in sorted(functions):
             value = functions[func]
-            print('sub_%x: %r' % (sections[code].offset_to_rva(func) + image_base, value))
+            print('sub_%x: %r' % (sections[code_section].offset_to_rva(func) + image_base, value))
         print()
 
     status_unknown = dict()
@@ -979,14 +1001,15 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         if (meta.fixed is None or meta.fixed == 'no') and fix.new_code is None:
             func = meta.func
             if func is not None and func[0] == 'call near':
-                if functions[func[2]].len is not None:
+                if functions[func[2]].length is not None:
                     _, src_off, dest_off = func
+                    assert src_off is not None
                     src_off += 1
-                    code_chunk = None
-                    if functions[dest_off].len == 'push':
+                    code_chunk: Optional[Iterable[int]] = None
+                    if functions[dest_off].length == 'push':
                         # mov [esp+8], ecx
                         code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
-                    elif functions[dest_off].len == 'edi':
+                    elif functions[dest_off].length == 'edi':
                         code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
 
                     if code_chunk:
@@ -1016,21 +1039,23 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
     # Delayed fix
     for fix in fixes.values():
-        src_off = fix['src_off']
-        mach = fix['new_code']
+        src_off = fix.src_off
+        assert src_off is not None
+        mach = fix.new_code
+        assert mach is not None
 
         hook_rva = new_section.offset_to_rva(new_section_offset)
 
-        dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.get('dest_off', None)
+        dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.dest_off
 
         if isinstance(mach, MachineCode):
             for field, value in mach.fields.items():
                 if value is not None:
-                    mach.fields[field] = sections[code].offset_to_rva(value)
+                    mach.fields[field] = sections[code_section].offset_to_rva(value)
             mach.origin_address = hook_rva
 
         if dest_off is not None:
-            dest_rva = sections[code].offset_to_rva(dest_off)
+            dest_rva = sections[code_section].offset_to_rva(dest_off)
             if isinstance(mach, MachineCode):
                 mach.fields['dest'] = dest_rva
             else:
@@ -1038,23 +1063,24 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                 # Add jump from the hook
                 mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
 
+        assert mach is not None
         # Write the hook to the new section
         new_section_offset = add_to_new_section(fn, new_section_offset, bytes(mach), padding_byte=int3)
 
         # If there are absolute references in the code, add them to relocation table
-        if 'added_relocs' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
+        if fix.added_relocs or isinstance(mach, MachineCode) and list(mach.absolute_references):
             new_refs = set(mach.absolute_references) if isinstance(mach, MachineCode) else set()
 
-            if 'added_relocs' in fix:
-                new_refs.update(fix['added_relocs'])
+            if fix.added_relocs:
+                new_refs.update(fix.added_relocs)
 
             relocs_to_add.update(hook_rva + item for item in new_refs)
 
-        if 'pokes' in fix:
-            for off, b in fix['pokes'].items():
+        if fix.pokes:
+            for off, b in fix.pokes.items():
                 fpoke(fn, off, b)
 
-        src_rva = sections[code].offset_to_rva(src_off)
+        src_rva = sections[code_section].offset_to_rva(src_off)
         disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
         fpoke(fn, src_off, to_dword(disp, signed=True))
 
@@ -1154,7 +1180,7 @@ def find_earliest_midrefs(offset, xref_table, length):
                         break
 
         while k + increment >= length + 1 and increment > 1:
-            increment /= 2
+            increment //= 2
 
         k += increment
     return references

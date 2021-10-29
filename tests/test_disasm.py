@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
+from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib, ModRmAnalysisResult
 
 
 @pytest.mark.parametrize('hex_data,disasm_str', [
@@ -13,6 +13,18 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
     ('c605c2a3890101', 'mov byte [0x189A3C2], 1'),
     ('F3 A5', 'rep movsd'),
     ('0f4ff8', 'cmovg edi, eax'),
+    ('8d 0c ff', 'lea ecx, [edi+8*edi]'),
+    ('8b 0c 8d c0 ee d0 0a', 'mov ecx, [4*ecx+0xAD0EEC0]'),
+    ('2b 0d e0 82 d6 0a', 'sub ecx, [0xAD682E0]'),
+    ('8916', "mov [esi], edx"),
+    ('8b157c3d5400', 'mov edx, [0x543D7C]'),
+    ('894604', 'mov [esi+4], eax'),
+    ('66a1803d5400', 'mov ax, [0x543D80]'),
+    ('83c40c', 'add esp, 0xC'),
+    ('895608', 'mov [esi+8], edx'),
+    ('6689460c', 'mov [esi+0xC], ax'),
+    ('83f90a', 'cmp ecx, 0xA'),
+
     # MMX/SSE
     ('0f10 05 2cddeb00', 'movups xmm0, [0xEBDD2C]'),
     ('0f11 02', 'movups [edx], xmm0'),
@@ -33,8 +45,11 @@ def test_disasm(hex_data, disasm_str):
 
 def test_analyse_modrm():
     data = bytes.fromhex('0c8dc0eed00a')
-    assert (analyse_modrm(data, 0) ==
-            (dict(modrm=ModRM(mode=0, reg=1, regmem=4),
-                  sib=Sib(scale=2, index_reg=1, base_reg=5),
-                  disp=0x0AD0EEC0),
-             len(data)))
+    assert (analyse_modrm(data, 0) == (
+                ModRmAnalysisResult(
+                    modrm=ModRM(mode=0, reg=1, regmem=4),
+                    sib=Sib(scale=2, index_reg=1, base_reg=5),
+                    disp=0x0AD0EEC0
+                ),
+                len(data)
+    ))
