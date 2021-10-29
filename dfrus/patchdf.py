@@ -1,13 +1,14 @@
 import codecs
 import csv
 import io
-import sys
 import textwrap
 
 from collections import defaultdict, OrderedDict
 from warnings import warn
 from binascii import hexlify
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
+
+from dataclasses import dataclass
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword
 from .cross_references import get_cross_references
@@ -47,20 +48,14 @@ def find_instruction(s, instruction):
     return None
 
 
+@dataclass
 class Metadata:
-    def __init__(self, fixed=None, cause=None, len_=None, str_=None, func=None, prev_bytes=None):
-        self.fixed = fixed
-        self.cause = cause
-        self.len = len_
-        self.str = str_
-        self.func = func
-        self.prev_bytes = prev_bytes
-
-    def __repr__(self):
-        return '{}({})'.format(type(self).__name__,
-                               ', '.join('{}={!r}'.format(key, self.__getattribute__(key))
-                                         for key in sorted(dir(self))
-                                         if key[0] != '_' and self.__getattribute__(key) is not None))
+    fixed: Optional[str] = None  #: Was the string length value fixed?
+    cause: Optional[str] = None  #: A cause of failure (if fixed == 'no')
+    length: Optional[int] = None  #: A way of string length specification (a register, push, etc.)
+    string: Optional[int] = None  #: A way of string value passing (a register, push, etc.)
+    func: Optional[str] = None  #: A function to which the string is passed
+    prev_bytes: Optional[str] = None
 
 
 class Fix:
@@ -217,11 +212,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
     meta = Metadata()
     if pre[-1] == push_imm32:
         # push offset str
-        meta.str = 'push'
+        meta.string = 'push'
 
         if pre[-3] == push_imm8 and pre[-2] == old_len:
             fpoke(fn, offset - 2, new_len)
-            meta.len = 'push before'
+            meta.length = 'push before'
             meta.fixed = 'yes'
 
         meta.func = which_func(fn, old_next)
@@ -248,7 +243,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                 fpoke4(fn, offset - 5, new_len)
                 meta.fixed = 'yes'
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi.code:
-                    meta.len = 'edi'
+                    meta.length = 'edi'
                     # mov edi, len before
                     if (old_len == 15 or old_len == 16) and aft and not jmp:
                         # Trying to fix the case when the edi value is used as a stl-string cap size
@@ -308,12 +303,12 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             elif pre[-3] == push_imm8 and pre[-2] == old_len:
                 # push len ; before
                 fpoke(fn, offset - 2, new_len)
-                meta.len = 'push'
+                meta.length = 'push'
                 meta.fixed = 'yes'
                 return Fix(meta=meta)
             elif aft and aft[0] == push_imm8 and aft[1] == old_len:
                 # push len ; after
-                meta.len = 'push'
+                meta.length = 'push'
                 if not jmp:
                     fpoke(fn, next_off + 1, new_len)
                     meta.fixed = 'yes'
@@ -341,7 +336,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                         return ret_value
             elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
-                meta.len = 'edi'
+                meta.length = 'edi'
                 # There's no code in DF that passes this condition. Leaved just in case.
                 # TODO: Drop it
                 i = find_instruction(aft, call_near)
@@ -357,7 +352,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     return ret_value
             elif aft and match_mov_reg_imm32(aft[:5], Reg.edi, old_len):
                 # mov edi, len ; after
-                meta.len = 'edi'
+                meta.length = 'edi'
                 if not jmp:
                     fpoke4(fn, next_off + 1, new_len)
                     meta.fixed = 'yes'
@@ -387,14 +382,14 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                 displacement = to_signed(pre[-2], 8)
                 if displacement == old_len:
                     # lea edi, [reg+old_len]
-                    meta.len = 'edi'
+                    meta.length = 'edi'
                     fpoke(fn, offset - 2, new_len)
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
             elif (aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
                   aft[2] == push_imm8 and aft[3] == old_len):
                 # mov ecx, reg; push imm8
-                meta.len = 'push'
+                meta.length = 'push'
                 if not jmp:
                     fpoke(fn, next_off + 3, new_len)
                     meta.fixed = 'yes'
@@ -416,7 +411,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             # repz movsd
             # movsw
             # movsb
-            meta.str = 'esi'
+            meta.string = 'esi'
             r = (old_len + 1) % 4
             dword_count = (old_len + 1) // 4
             new_dword_count = (new_len - r) // 4 + 1
@@ -424,13 +419,13 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             if match_mov_reg_imm32(pre[-6:-1], Reg.ecx, dword_count):
                 # mov ecx, dword_count
                 fpoke4(fn, offset - 5, new_dword_count)
-                meta.len = 'ecx*4'
+                meta.length = 'ecx*4'
                 meta.fixed = 'yes'
                 return Fix(meta=meta)
             elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
                 fpoke(fn, offset - 2, new_dword_count)
-                meta.len = 'ecx*4'
+                meta.length = 'ecx*4'
                 meta.fixed = 'yes'
                 return Fix(meta=meta)
             elif new_len > old_len:
@@ -445,7 +440,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                         offset = line.address
                         line_data = line.data
                         if line_data[0] == Prefix.rep:
-                            meta.len = 'ecx*4'
+                            meta.length = 'ecx*4'
                             meta.fixed = 'no'
                             return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
@@ -459,7 +454,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                 skip = 3
 
                             if skip is not None:
-                                meta.len = 'ecx*4'
+                                meta.length = 'ecx*4'
                                 ret_value = Fix(
                                     src_off=line.address + 1,
                                     new_code=bytes((mov_reg_imm | 8 | Reg.ecx.code,)) + to_dword(dword_count),
@@ -472,24 +467,24 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             return Fix(meta=meta)
                         elif len(line_data) == 5 and match_mov_reg_imm32(line_data, Reg.ecx, dword_count):
                             fpoke4(fn, line.address + 1, new_dword_count)
-                            meta.len = 'ecx*4'
+                            meta.length = 'ecx*4'
                             meta.fixed = 'yes'
                             return Fix(meta=meta)
                         elif line_data[0] == lea and line_data[1] & 0xf8 == mod_1_ecx_0 and line_data[2] == dword_count:
                             fpoke(fn, line.address + 2, new_dword_count)
-                            meta.len = 'ecx*4'
+                            meta.length = 'ecx*4'
                             meta.fixed = 'yes'
                             return Fix(meta=meta)
                     return Fix(meta=meta)
         else:
-            meta.str = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
+            meta.string = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
         return Fix(meta=meta)
     elif (pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and
                                             pre[-1] & 0xC7 == join_byte(0, 0, 5)) or  # mov
           pre[-3] == 0x0F and pre[-2] in {x0f_movups, x0f_movaps} and
           pre[-1] & 0xC7 == join_byte(0, 0, 5)):  # movups or movaps
         # mov eax, [addr] or mov reg, [addr]
-        meta.str = 'mov'
+        meta.string = 'mov'
 
         next_off = offset - get_start(pre)
         aft = read_bytes(fn, next_off, count_after_for_get_length)
@@ -527,21 +522,21 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
         # mov reg8, string[reg]
         meta.func = 'strcpy'
-        meta.str = 'mov byte'
+        meta.string = 'mov byte'
         meta.fixed = 'not needed'
         return Fix(meta=meta)  # No need fixing
     elif pre[-1] == add_acc_imm | 1:
         # add reg, offset string
         meta.func = 'array'
-        meta.str = 'add offset'
+        meta.string = 'add offset'
         meta.fixed = 'not needed'
         return Fix(meta=meta)
     elif pre[-2] == op_rm_imm | 1 and pre[-1] & 0xF8 == 0xF8:
         # cmp reg, offset string
-        meta.str = 'cmp reg'
+        meta.string = 'cmp reg'
     elif pre[-4] == mov_rm_imm | 1 and pre[-3] == join_byte(1, 0, 4) and pre[-2] == join_byte(0, 4, Reg.esp):
         # mov [esp+N], offset string
-        meta.str = 'mov var'
+        meta.string = 'mov var'
         meta.fixed = 'not needed'
     meta.prev_bytes = ' '.join('%02X' % x for x in pre[-4:])
     return Fix(meta=meta)
@@ -909,7 +904,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
                     fix = Fix(meta=Metadata(fixed='not needed'))
 
                 meta = fix.meta
-                if meta.str == 'cmp reg':
+                if meta.string == 'cmp reg':
                     # This is probably a bound of an array, not a string reference
                     continue
                 elif 'new_code' in fix:
@@ -946,22 +941,22 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         if meta.func and meta.func[0] == 'call near':
             offset = meta.func[2]
             address = sections[code].offset_to_rva(offset) + image_base
-            if meta.str:
-                str_param = meta.str
-                if functions[offset].str is None:
-                    functions[offset].str = {str_param}
-                elif str_param not in functions[offset].str:
+            if meta.string:
+                str_param = meta.string
+                if functions[offset].string is None:
+                    functions[offset].string = {str_param}
+                elif str_param not in functions[offset].string:
                     print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
-                          (address, str_param, functions[offset].str))
-                    functions[offset].str.add(str_param)
+                          (address, str_param, functions[offset].string))
+                    functions[offset].string.add(str_param)
 
-            if meta.len is not None:
-                len_param = meta.len
-                if functions[offset].len is None:
-                    functions[offset].len = len_param
-                elif functions[offset].len != len_param:
+            if meta.length is not None:
+                len_param = meta.length
+                if functions[offset].length is None:
+                    functions[offset].length = len_param
+                elif functions[offset].length != len_param:
                     raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
-                                     (address, functions[offset].len, len_param))
+                                     (address, functions[offset].length, len_param))
 
     if debug:
         print('\nGuessed function parameters:')
@@ -979,14 +974,14 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         if (meta.fixed is None or meta.fixed == 'no') and fix.new_code is None:
             func = meta.func
             if func is not None and func[0] == 'call near':
-                if functions[func[2]].len is not None:
+                if functions[func[2]].length is not None:
                     _, src_off, dest_off = func
                     src_off += 1
                     code_chunk = None
-                    if functions[dest_off].len == 'push':
+                    if functions[dest_off].length == 'push':
                         # mov [esp+8], ecx
                         code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
-                    elif functions[dest_off].len == 'edi':
+                    elif functions[dest_off].length == 'edi':
                         code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
 
                     if code_chunk:
