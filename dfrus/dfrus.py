@@ -5,33 +5,10 @@ import warnings
 
 from shutil import copy
 from contextlib import contextmanager
-from typing import Iterable
+from typing import Sequence
 
 from .patchdf import fix_df_exe, load_trans_file
 from .peclasses import PortableExecutable
-
-
-def init_argparser():
-    parser = argparse.ArgumentParser(
-            add_help=True,
-            description='A patcher for the hardcoded strings of the Dwarf Fortress')
-    parser.add_argument('-p', '--dfpath', dest='path',
-                        default='Dwarf Fortress.exe',
-                        help='path to the DF directory or to the Dwarf Fortress.exe itself, '
-                             'default="Dwarf Fortress.exe"')
-    parser.add_argument('-n', '--destname', dest='dest',
-                        default='Dwarf Fortress Patched.exe',
-                        help='name of the patched DF executable, default="Dwarf Fortress Patched.exe"')
-    parser.add_argument('-d', '--dict', default='dict.txt', dest='dictionary',
-                        help='path to the dictionary file, default=dict.txt')
-    parser.add_argument('--debug', action='store_true', help='enable debugging mode')
-    parser.add_argument('-c', '--codepage', help='enable given codepage by name')
-    parser.add_argument('-oc', '--original_codepage', default='cp437',
-                        help='specify original codepage of strings in the executable')
-    parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
-                        type=lambda s: tuple(int(x) for x in s.split(':')))
-
-    return parser
 
 
 def slice_translation(trans_table, bounds):
@@ -85,7 +62,7 @@ def destination_file_context(src, dest):
         raise ex
 
 
-def run(path: str, dest: str, trans_table: Iterable, codepage, original_codepage='cp437',
+def run(path: str, dest: str, trans_table: Sequence, codepage, original_codepage='cp437',
         dict_slice=None, debug=False, stdout=None, stderr=None):
     if not debug:
         warnings.simplefilter('ignore')
@@ -133,6 +110,29 @@ def run(path: str, dest: str, trans_table: Iterable, codepage, original_codepage
                 raise ValueError("Only 32-bit versions are supported.")
             
             fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug)
+
+
+def init_argparser():
+    parser = argparse.ArgumentParser(
+            add_help=True,
+            description='A patcher for the hardcoded strings of the Dwarf Fortress')
+    parser.add_argument('-p', '--dfpath', dest='path',
+                        default='Dwarf Fortress.exe',
+                        help='path to the DF directory or to the Dwarf Fortress.exe itself, '
+                             'default="Dwarf Fortress.exe"')
+    parser.add_argument('-n', '--destname', dest='dest',
+                        default='Dwarf Fortress Patched.exe',
+                        help='name of the patched DF executable, default="Dwarf Fortress Patched.exe"')
+    parser.add_argument('-d', '--dict', default='dict.txt', dest='dictionary',
+                        help='path to the dictionary file, default=dict.txt')
+    parser.add_argument('--debug', action='store_true', help='enable debugging mode')
+    parser.add_argument('-c', '--codepage', help='enable given codepage by name')
+    parser.add_argument('-oc', '--original_codepage', default='cp437',
+                        help='specify original codepage of strings in the executable')
+    parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
+                        type=lambda s: tuple(int(x) for x in s.split(':')))
+
+    return parser
 
 
 def _main():
