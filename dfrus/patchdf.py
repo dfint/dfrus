@@ -3,22 +3,20 @@ import csv
 import io
 import sys
 import textwrap
-
-from collections import defaultdict, OrderedDict
-from warnings import warn
 from binascii import hexlify
+from collections import defaultdict, OrderedDict
 from typing import Dict, Tuple, Optional, Any, List, Union, Set, Iterable
+from warnings import warn
 
 from dataclasses import dataclass, fields, field
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
-# from .disasm import *
-from .disasm import disasm, DisasmLine, join_byte, Operand, align
-from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
-from .machine_code import MachineCode, Reference
-from .opcodes import *
+from .disasm import disasm, DisasmLine, join_byte, Operand, align, OperandType
 from .extract_strings import extract_strings
+from .machine_code import MachineCode, Reference
+from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
+from .opcodes import *
 from .patch_charmap import search_charmap, patch_unicode_table, get_codepages, get_encoder
 from .peclasses import Section, RelocationTable
 from .trace_machine_code import which_func
@@ -197,11 +195,17 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
         reg = pre[-1] & 7
 
         def stop_func(disasm_line: DisasmLine):
-            return disasm_line.operands and (
-                    (disasm_line.operands[0].type == 'reg gen' and disasm_line.operands[0].reg == reg) or
-                    (len(disasm_line.operands) > 1 and disasm_line.operands[1].type == 'ref rel' and
-                     disasm_line.operands[1].base_reg == reg)
-            )
+            if disasm_line.operands:
+                operands = disasm_line.operands
+                if (operands[0].get_type() is OperandType.general_purpose_register
+                        and operands[0].reg == reg):
+                    return True
+                elif (len(operands) > 1
+                      and operands[1].get_type() == OperandType.relative_memory_reference
+                      and operands[1].base_reg == reg):
+                    return True
+
+            return False
 
         func = which_func(fn, old_next, stop_cond=stop_func)
 
@@ -254,6 +258,8 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                                           to_dword(old_len))
                                 else:
                                     fix_cap = MachineCode()
+
+                                assert line.operands is not None
 
                                 new_code = MachineCode(
                                     fix_cap,
@@ -416,6 +422,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             meta.fixed = 'no'
                             return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
+                            assert line.operands is not None
                             next_off_2 = line.operands[0].value
                             aft = read_bytes(fn, offset, count_after)
 
@@ -557,15 +564,18 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
         if line.mnemonic == 'db':
             raise ValueError('Unknown instruction encountered: ' + hexlify(s[line.address:line.address + 8]).decode())
         if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
+            assert line.operands is not None
             left_operand, right_operand = line.operands
-            if left_operand.type in {'reg gen', 'reg xmm'}:
+            if left_operand.get_type() in {OperandType.general_purpose_register, OperandType.xmm_register}:
                 # mov reg, [...]
+                assert left_operand.reg is not None
+
                 if (not is_empty(left_operand.reg) and
                         left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
                     warn('%s register is already marked as occupied. String address: 0x%x' %
                          (left_operand, original_string_address), stacklevel=2)
 
-                if right_operand.type == 'ref abs':
+                if right_operand.get_type() is OperandType.absolute_memory_reference:
                     # mov reg, [mem]
                     local_offset = line.data.index(to_dword(right_operand.disp))
                     if belongs_to_the_string(right_operand.disp):
@@ -577,7 +587,7 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                         reg_state[left_operand.reg.parent] = -1
                         # This may be a reference to another string, thus it is not moveable
                         not_moveable_after = not_moveable_after or offset
-                elif right_operand.type == 'imm' and valid_reference(right_operand.value):
+                elif right_operand.get_type() is OperandType.immediate_value and valid_reference(right_operand.value):
                     # This may be a reference to another string
                     not_moveable_after = not_moveable_after or offset
                 else:
@@ -590,9 +600,13 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                             deleted_relocs.add(offset + local_offset)
                             added_relocs.add(len(saved_mach) + local_offset)
                         saved_mach += line.data
-            elif left_operand.type in {'ref rel', 'ref abs'}:
+            elif left_operand.get_type() in {OperandType.relative_memory_reference,
+                                             OperandType.absolute_memory_reference}:
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
-                if right_operand.type in {'reg gen', 'reg xmm'}:
+                if right_operand.get_type() in {OperandType.general_purpose_register,
+                                                OperandType.xmm_register}:
+
+                    assert right_operand.reg is not None
                     if reg_state[right_operand.reg.parent] is None or reg_state[right_operand.reg.parent] < 0:
                         # It can be a part of a copying code of another string. Leave it as is.
                         not_moveable_after = not_moveable_after or offset
@@ -603,12 +617,12 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                         if reg_state[right_operand.reg.parent] == 0:
                             raise ValueError('Copying of a string to several diferent locations not supported.')
 
-                        if (dest is None or (dest.type == left_operand.type and
+                        if (dest is None or (dest.get_type() == left_operand.get_type() and
                                              dest.base_reg == left_operand.base_reg and
                                              dest.disp > left_operand.disp)):
                             dest = left_operand
 
-                        if left_operand.type == 'ref abs':
+                        if left_operand.get_type() is OperandType.absolute_memory_reference:
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
 
                         copied_len += left_operand.data_size or right_operand.data_size
@@ -618,17 +632,20 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
 
                         reg_state[right_operand.reg.parent] = 0  # Mark the register as freed
                 elif is_moveable():
-                    if (right_operand.type == 'ref abs' or right_operand.type == 'imm' and
-                            valid_reference(right_operand.value)):
+                    if (right_operand.get_type() is OperandType.absolute_memory_reference
+                            or (right_operand.get_type() is OperandType.immediate_value
+                                and valid_reference(right_operand.value))):
                         # TODO: check if this actually a reference. Until then just skip
                         not_moveable_after = not_moveable_after or offset
                         continue
-                        # value = right_operand.disp if right_operand.type == 'ref abs' else right_operand.value
+                        # value = right_operand.disp
+                        # if right_operand.get_type() is OperandType.absolute_memory_reference
+                        # else right_operand.value
                         # local_offset = line.data.rindex(to_dword(value))  # use rindex() to find the second operand
                         # deleted_relocs.add(offset + local_offset)
                         # added_relocs.add(len(saved_mach) + local_offset)
 
-                    if left_operand.type == 'ref abs':
+                    if left_operand.get_type() == OperandType.absolute_memory_reference:
                         value = left_operand.disp
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
@@ -638,9 +655,13 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
             else:
                 # Segment register etc.
                 raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' %
-                                 (left_operand, left_operand.type, str(line)))
+                                 (left_operand, left_operand.get_type(), str(line)))
         elif line.mnemonic == 'lea':
+            assert line.operands is not None
             left_operand, right_operand = line.operands
+
+            # Left operand of lea is always a register
+            assert left_operand.reg is not None
             reg_state[left_operand.reg.parent] = -1
             if dest is not None and dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
                 dest = Operand(base_reg=left_operand.reg, disp=0)
@@ -649,6 +670,7 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
             if line.mnemonic.startswith('jmp'):
                 not_moveable_after = not_moveable_after or offset
 
+                assert line.operands is not None
                 data_after_jump = s[line.operands[0].value:]
                 if not data_after_jump:
                     raise ValueError('Cannot jump: jump destination not included in the passed machinecode.')
@@ -673,19 +695,28 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
                 reg_state[Reg.edi] = None
             elif line.mnemonic.startswith('set'):
                 # setz, setnz etc.
+                assert line.operands is not None
+                assert line.operands[0].reg is not None
                 reg_state[line.operands[0].reg.parent] = -1
             elif line.mnemonic == 'push':
-                if line.operands[0].type == 'reg gen':
+                assert line.operands is not None
+                if line.operands[0].get_type() is OperandType.general_purpose_register:
+                    assert line.operands[0].reg is not None
                     reg_state[line.operands[0].reg.parent] = None  # Mark the pushed register as unoccupied
                 not_moveable_after = not_moveable_after or offset
             elif line.mnemonic == 'pop':
-                if line.operands[0].type == 'reg gen':
+                assert line.operands is not None
+                if line.operands[0].get_type() is OperandType.general_purpose_register:
+                    assert line.operands[0].reg is not None
                     reg_state[line.operands[0].reg.parent] = -1
                 not_moveable_after = not_moveable_after or offset
-            elif line.mnemonic in {'add', 'sub', 'and', 'xor', 'or'} and line.operands[0].type == 'reg gen':
-                if line.operands[0].reg == Reg.esp:
-                    not_moveable_after = not_moveable_after or offset
-                reg_state[line.operands[0].reg.parent] = -1
+            elif line.mnemonic in {'add', 'sub', 'and', 'xor', 'or'}:
+                assert line.operands is not None
+                if line.operands[0].get_type() is OperandType.general_purpose_register:
+                    assert line.operands[0].reg is not None
+                    if line.operands[0].reg == Reg.esp:
+                        not_moveable_after = not_moveable_after or offset
+                    reg_state[line.operands[0].reg.parent] = -1
             elif line.mnemonic.startswith('call'):
                 not_moveable_after = not_moveable_after or offset
             elif line.mnemonic.startswith('ret'):
@@ -693,12 +724,14 @@ def get_length(s: bytes, oldlen, original_string_address=None, reg_state=None, d
 
             if is_moveable():
                 if line.operands:
-                    abs_refs = [operand for operand in line.operands if operand.type in {'ref abs', 'imm'}]
+                    abs_refs = [operand for operand in line.operands
+                                if operand.get_type() in {OperandType.absolute_memory_reference,
+                                                          OperandType.immediate_value}]
 
                     for ref in abs_refs:
-                        value = ref.disp if ref.type == 'ref abs' else ref.value
+                        value = ref.disp if ref.get_type() is OperandType.absolute_memory_reference else ref.value
 
-                        if ref.type == 'imm' and not valid_reference(value):
+                        if ref.get_type() is OperandType.immediate_value and not valid_reference(value):
                             continue
 
                         local_offset = line.data.index(to_dword(value))

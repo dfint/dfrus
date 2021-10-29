@@ -24,6 +24,7 @@ def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.fo
             elif stop_cond(line):  # Stop when the stop_cond returns True
                 return line
             elif line.mnemonic.startswith('jmp'):
+                assert line.operands is not None
                 if trace_jmp == Trace.not_follow:
                     pass
                 elif trace_jmp == Trace.follow:
@@ -34,6 +35,7 @@ def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.fo
                     if int(line.operands[0]) > line.address:
                         return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
             elif line.mnemonic.startswith('j'):
+                assert line.operands is not None
                 if trace_jcc == Trace.not_follow:
                     pass
                 elif trace_jcc == Trace.follow:
@@ -44,6 +46,7 @@ def trace_code(fn, offset, stop_cond, trace_jmp=Trace.follow, trace_jcc=Trace.fo
                     if int(line.operands[0]) > line.address:
                         return trace_code(fn, int(line.operands[0]), stop_cond, trace_jmp, trace_jcc, trace_call)
             elif line.mnemonic.startswith('call'):
+                assert line.operands is not None
                 if trace_call == Trace.not_follow:
                     pass
                 elif trace_call == Trace.follow:

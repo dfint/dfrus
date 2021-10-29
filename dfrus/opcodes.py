@@ -1,5 +1,5 @@
-from enum import IntEnum, Enum
 from collections import namedtuple
+from enum import IntEnum, Enum
 
 
 class Cond(IntEnum):
@@ -23,7 +23,7 @@ class Cond(IntEnum):
     nle = g
 
 
-class RegType(Enum):
+class RegType(IntEnum):
     general, segment, mm, xmm = range(4)
 
 

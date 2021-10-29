@@ -1,11 +1,10 @@
-import functools
-from typing import Optional, Tuple, Any
+from enum import auto
+from typing import Optional, Tuple, Any, Iterator
 
 from dataclasses import dataclass, asdict
 
-from .opcodes import *
 from .binio import to_signed
-from collections import namedtuple
+from .opcodes import *
 
 
 def align(n, edge=4):
@@ -25,29 +24,38 @@ def join_byte(*parts):
     return s
 
 
-class ModRM(namedtuple('ModRM', ['mode', 'reg', 'regmem'])):
-    __slots__ = ()
-    
+@dataclass(frozen=True)
+class ModRM:
+    mode: int
+    reg: int
+    regmem: int
+
     @classmethod
     def split(cls, x):
         return cls(*split_byte(x))
     
     def __int__(self):
-        return join_byte(*self)
+        return join_byte(self.mode, self.reg, self.regmem)
 
     def __index__(self):
         return int(self)
 
 
-class Sib(namedtuple('Sib', ['scale', 'index_reg', 'base_reg'])):
-    __slots__ = ()
+@dataclass(frozen=True)
+class Sib:
+    scale: int
+    index_reg: int
+    base_reg: int
     
     @classmethod
     def split(cls, x):
         return cls(*split_byte(x))
     
     def __int__(self):
-        return join_byte(*self)
+        return join_byte(self.scale, self.index_reg, self.base_reg)
+
+    def __index__(self):
+        return int(self)
 
 
 @dataclass(frozen=True)
@@ -114,6 +122,16 @@ seg_prefixes = {Prefix.seg_es: Reg.es, Prefix.seg_cs: Reg.cs, Prefix.seg_ss: Reg
 op_sizes = {1: "byte", 2: "word", 4: "dword", 8: "qword", 16: "dqword"}
 
 
+class OperandType(Enum):
+    immediate_value = auto()
+    general_purpose_register = auto()
+    xmm_register = auto()
+    segment_register = auto()
+    absolute_memory_reference = auto()
+    relative_memory_reference = auto()
+    unknown = auto()
+
+
 @dataclass
 class Operand:
     value: Any = None
@@ -133,21 +151,22 @@ class Operand:
         if self.reg is not None:
             self._data_size = self.reg.size
 
-    @property
-    def type(self):
+    def get_type(self) -> OperandType:
         if self.value is not None:
-            return 'imm'  # immediate value
+            return OperandType.immediate_value
         elif self.reg is not None:
             if self.reg.type == RegType.general:
-                return 'reg gen'  # general purpose register
+                return OperandType.general_purpose_register
             elif self.reg.type == RegType.xmm:
-                return 'reg xmm'  # xmm register
+                return OperandType.xmm_register
             elif self.reg.type == RegType.segment:
-                return 'reg seg'  # segment register
+                return OperandType.segment_register
         elif self.base_reg is None and self.index_reg is None:
-            return 'ref abs'  # absolute memory reference
+            return OperandType.absolute_memory_reference
         else:
-            return 'ref rel'  # relative memory reference
+            return OperandType.relative_memory_reference
+
+        return OperandType.unknown
 
     @property
     def data_size(self):
@@ -342,7 +361,7 @@ class BytesLine(DisasmLine):
         super().__init__(address, data, mnemonic='db', operands=tuple(Operand(value=n) for n in data))
 
 
-def disasm(s: bytes, start_address=0):
+def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
     s = bytes(s)
     i = 0
     while i < len(s):
@@ -414,7 +433,7 @@ def disasm(s: bytes, start_address=0):
             flags = s[i] & 3
             mnemonics = ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"]
             x, i = analyse_modrm(s, i+1)
-            mnemonic = mnemonics[x.modrm[1]]
+            mnemonic = mnemonics[x.modrm.reg]
             _, operand = unify_operands(x)
             if operand.reg is None:
                 operand.data_size = 1 << (2*bool(flags)-size_prefix)
@@ -558,7 +577,7 @@ def disasm(s: bytes, start_address=0):
             opcode = s[i] & 0xFE
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
-            mnemonic = op_shifts_rolls[x.modrm[1]]
+            mnemonic = op_shifts_rolls[x.modrm.reg]
             _, op1 = unify_operands(x)
             op1.data_size = 1 << (flag_size*2 - size_prefix)
             if opcode == shift_op_rm_1:
@@ -573,7 +592,7 @@ def disasm(s: bytes, start_address=0):
         elif s[i] & 0xFE == test_or_unary_rm:
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
-            modrm1 = x.modrm[1]
+            modrm1 = x.modrm.reg
             if modrm1 != 1:
                 _, op1 = unify_operands(x)
                 size = flag_size*2 - size_prefix
