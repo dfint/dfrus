@@ -1,7 +1,7 @@
 import functools
 from typing import Optional, Tuple
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from .opcodes import *
 from .binio import to_signed
@@ -35,6 +35,9 @@ class ModRM(namedtuple('ModRM', ['mode', 'reg', 'regmem'])):
     def __int__(self):
         return join_byte(*self)
 
+    def __index__(self):
+        return int(self)
+
 
 class Sib(namedtuple('Sib', ['scale', 'index_reg', 'base_reg'])):
     __slots__ = ()
@@ -47,45 +50,49 @@ class Sib(namedtuple('Sib', ['scale', 'index_reg', 'base_reg'])):
         return join_byte(*self)
 
 
-def analyse_modrm(s, i):
-    result = dict()
+@dataclass(frozen=True)
+class ModRmAnalysisResult:
+    modrm: ModRM
+    sib: Optional[Sib]
+    disp: Optional[int]
 
+    def as_dict(self):
+        return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+def analyse_modrm(s: bytes, i: int) -> Tuple[ModRmAnalysisResult, int]:
     modrm = ModRM.split(s[i])
-    result['modrm'] = modrm
 
     i += 1
+
+    sib = None
+    disp = None
 
     if modrm.mode != 3:
         # Not register addressing
         if modrm.mode == 0 and modrm.regmem == 5:
             # Direct addressing: [imm32]
             imm32 = int.from_bytes(s[i:i+4], byteorder='little')
-            result['disp'] = imm32
+            disp = imm32
             i += 4
         else:
             # Indirect addressing
             if modrm.regmem == 4:
                 # Indirect addressing with scale
                 sib = Sib.split(s[i])
-                result['sib'] = sib
                 i += 1
-            else:
-                sib = None
 
             if modrm.mode == 1:
                 disp = to_signed(s[i], 8)
-                result['disp'] = disp
                 i += 1
             elif modrm.mode == 2:
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
-                result['disp'] = disp
                 i += 4
             elif sib and sib.base_reg == Reg.ebp.code:
                 disp = int.from_bytes(s[i:i+4], byteorder='little', signed=True)
-                result['disp'] = disp
                 i += 4
 
-    return result, i
+    return ModRmAnalysisResult(modrm, sib, disp), i
 
 
 regs = (
@@ -213,8 +220,8 @@ class Operand:
         return self.value
 
 
-def unify_operands(x, size=None) -> Tuple[Operand, Operand]:
-    modrm = x['modrm']
+def unify_operands(x: ModRmAnalysisResult, size=None) -> Tuple[Operand, Operand]:
+    modrm = x.modrm
 
     if size is None:
         op1 = modrm.reg
@@ -227,14 +234,14 @@ def unify_operands(x, size=None) -> Tuple[Operand, Operand]:
     else:
         if modrm.mode == 0 and modrm.regmem == 5:
             # Direct addressing
-            op2 = Operand(disp=x['disp'])
+            op2 = Operand(disp=x.disp)
         else:
             if modrm.regmem != 4:
                 # Without SIB-byte
                 op2 = Operand(base_reg=Reg((RegType.general, modrm.regmem, 4)))
             else:
                 # Use the SIB, Luke
-                sib = x['sib']
+                sib = x.sib
                 
                 base_reg = sib.base_reg if not (sib.base_reg == Reg.ebp.code and modrm.mode == 0) else None
                 index_reg = sib.index_reg if sib.index_reg != 4 else None
@@ -243,7 +250,7 @@ def unify_operands(x, size=None) -> Tuple[Operand, Operand]:
                               index_reg=None if index_reg is None else Reg((RegType.general, index_reg, 4)),
                               base_reg=None if base_reg is None else Reg((RegType.general, base_reg, 4)))
 
-            op2.disp = x.get('disp', 0)
+            op2.disp = x.disp or 0
 
     return op1, op2
 
@@ -273,7 +280,7 @@ def analyse_mach(s):
             i += 4
         elif op & 0xfc == mov_rm_reg or op == lea:
             modrm, i = analyse_modrm(s, i)
-            result.update(modrm)
+            result.update(modrm.as_dict())
         else:
             break
 
@@ -404,7 +411,7 @@ def disasm(s: bytes, start_address=0):
             flags = s[i] & 3
             mnemonics = ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"]
             x, i = analyse_modrm(s, i+1)
-            mnemonic = mnemonics[x['modrm'][1]]
+            mnemonic = mnemonics[x.modrm[1]]
             _, operand = unify_operands(x)
             if operand.reg is None:
                 operand.data_size = 1 << (2*bool(flags)-size_prefix)

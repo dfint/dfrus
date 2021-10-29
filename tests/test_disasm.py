@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib
+from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib, ModRmAnalysisResult
 
 
 @pytest.mark.parametrize('hex_data,disasm_str', [
@@ -34,7 +34,7 @@ def test_disasm(hex_data, disasm_str):
 def test_analyse_modrm():
     data = bytes.fromhex('0c8dc0eed00a')
     assert (analyse_modrm(data, 0) ==
-            (dict(modrm=ModRM(mode=0, reg=1, regmem=4),
-                  sib=Sib(scale=2, index_reg=1, base_reg=5),
-                  disp=0x0AD0EEC0),
+            (ModRmAnalysisResult(modrm=ModRM(mode=0, reg=1, regmem=4),
+                                 sib=Sib(scale=2, index_reg=1, base_reg=5),
+                                 disp=0x0AD0EEC0),
              len(data)))
