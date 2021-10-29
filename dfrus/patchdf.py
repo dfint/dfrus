@@ -248,6 +248,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
                                 # Restore the cap length value of stl-string if needed
                                 # mov dword [esi+14h], oldlen
+                                fix_cap: Optional[MachineCode]
                                 if mov_esp_edi:
                                     fix_cap = MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14,
                                                           to_dword(old_len))

@@ -1,4 +1,4 @@
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, Union
 
 '''
 # Concept:
@@ -34,7 +34,7 @@ class Reference:
 
 
 class MachineCode:
-    def __init__(self, *args, origin_address=0, **kwargs):
+    def __init__(self, *args: Union[int, str, Iterable, Reference], origin_address=0, **kwargs):
         self.origin_address = origin_address
         self._raw_list = list(args)
         self.fields = dict()
