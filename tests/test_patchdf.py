@@ -590,6 +590,7 @@ test_data_create_new_world = bytes.fromhex(
     "66 8b 15 c8 a8 f2 00 "  # mov    dx,WORD PTR ds:0xf2a8c8
     "8d 8b 10 01 00 00    "  # lea    ecx,[ebx+0x110]
     "66 89 93 20 01 00 00 "  # mov    WORD PTR [ebx+0x120],dx
+    # end
     "8d 51 01             "  # lea    edx,[ecx+0x1]
     "8a 01                "  # mov    al,BYTE PTR [ecx]
     "41                   "  # inc    ecx
@@ -602,7 +603,7 @@ def test_create_new_world():
     result.dest = str(result.dest)
     assert asdict(result) == dict(
         length=67,
-        dest='[ebx+0x11C]',
+        dest='[ecx]',  # [ebx+0x110]
         deleted_relocs={2, 14, 25, 37, 50},
         saved_mach=bytes.fromhex("8d 8b 10 01 00 00"),  # lea    ecx,[ebx+0x110]
         added_relocs=set(),

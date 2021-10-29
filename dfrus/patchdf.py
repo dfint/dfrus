@@ -682,8 +682,12 @@ def get_length(data: bytes,
             # Left operand of lea is always a register
             assert left_operand.reg is not None
             reg_state[left_operand.reg.parent] = -1
-            if dest is not None and dest.base_reg == right_operand.base_reg and dest.disp >= right_operand.disp:
+            if (dest is not None
+                    and dest.base_reg == right_operand.base_reg
+                    and dest.disp == right_operand.disp):
+
                 dest = Operand(base_reg=left_operand.reg, disp=0)
+
             saved_mach += line.data
         elif line.mnemonic.startswith('j'):
             if line.mnemonic.startswith('jmp'):
