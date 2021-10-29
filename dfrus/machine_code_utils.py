@@ -88,6 +88,8 @@ def get_start(s):
         i = 3
         return i  # prefix is not allowed here
 
+    assert i is not None
+
     if s[-1 - i] == Prefix.operand_size:
         i += 1
 

@@ -60,9 +60,10 @@ def check_string_array(buf, offset, encoding='cp437'):
                 end = None
         elif start is not None and not end:
             end = i
-    
-    if end:
-        yield offset + start, buf[start:end], len(buf) - start - 1
+    else:
+        if end:
+            assert start is not None
+            yield offset + start, buf[start:end], len(buf) - start - 1
 
 
 def count_zeros(buf):

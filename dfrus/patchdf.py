@@ -7,13 +7,14 @@ import textwrap
 from collections import defaultdict, OrderedDict
 from warnings import warn
 from binascii import hexlify
-from typing import Dict, Tuple, Optional, Any, List, Union
+from typing import Dict, Tuple, Optional, Any, List, Union, Set
 
 from dataclasses import dataclass, fields, field
 
-from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword
+from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
-from .disasm import *
+# from .disasm import *
+from .disasm import disasm, DisasmLine, join_byte, Operand, align
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .machine_code import MachineCode, Reference
 from .opcodes import *
@@ -744,8 +745,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
 
     # Getting addresses of all relocatable entries
     relocs = set(pe.relocation_table)
-    relocs_to_add = set()
-    relocs_to_remove = set()
+    relocs_to_add: Set[int] = set()
+    relocs_to_remove: Set[int] = set()
 
     # Getting cross-references:
     xref_table = get_cross_references(fn, relocs, sections, image_base)
@@ -947,6 +948,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
             if func is not None and func[0] == 'call near':
                 if functions[func[2]].length is not None:
                     _, src_off, dest_off = func
+                    assert src_off is not None
                     src_off += 1
                     code_chunk = None
                     if functions[dest_off].length == 'push':
@@ -983,6 +985,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
     # Delayed fix
     for fix in fixes.values():
         src_off = fix.src_off
+        assert src_off is not None
         mach = fix.new_code
 
         hook_rva = new_section.offset_to_rva(new_section_offset)
@@ -1008,15 +1011,15 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table, debug=False):
         new_section_offset = add_to_new_section(fn, new_section_offset, bytes(mach), padding_byte=int3)
 
         # If there are absolute references in the code, add them to relocation table
-        if 'added_relocs' in fix or isinstance(mach, MachineCode) and list(mach.absolute_references):
+        if fix.added_relocs or isinstance(mach, MachineCode) and list(mach.absolute_references):
             new_refs = set(mach.absolute_references) if isinstance(mach, MachineCode) else set()
 
-            if 'added_relocs' in fix:
+            if fix.added_relocs:
                 new_refs.update(fix.added_relocs)
 
             relocs_to_add.update(hook_rva + item for item in new_refs)
 
-        if 'pokes' in fix:
+        if fix.pokes:
             for off, b in fix.pokes.items():
                 fpoke(fn, off, b)
 
@@ -1120,7 +1123,7 @@ def find_earliest_midrefs(offset, xref_table, length):
                         break
 
         while k + increment >= length + 1 and increment > 1:
-            increment /= 2
+            increment //= 2
 
         k += increment
     return references

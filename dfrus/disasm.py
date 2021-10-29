@@ -1,3 +1,7 @@
+import functools
+from typing import Optional, Tuple
+
+from dataclasses import dataclass
 
 from .opcodes import *
 from .binio import to_signed
@@ -209,7 +213,7 @@ class Operand:
         return self.value
 
 
-def unify_operands(x, size=None):
+def unify_operands(x, size=None) -> Tuple[Operand, Operand]:
     modrm = x['modrm']
 
     if size is None:
@@ -299,40 +303,37 @@ def asmhex(n):
         return '0x{:X}'.format(n)
 
 
+@dataclass(repr=False, frozen=True)
 class DisasmLine:
-    __slots__ = ('address', 'data', 'mnemonic', 'operands', '__str', 'prefix')
+    address: int
+    data: bytes
+    mnemonic: str
+    operands: Optional[Tuple[Operand, ...]] = None
+    prefix: Optional[Prefix] = None
 
-    def __init__(self, address, data, mnemonic, operands=None, prefix: Prefix = None):
-        self.address = address
-        self.data = data
-        self.mnemonic = mnemonic
-        assert operands is None or all(isinstance(op, Operand) for op in operands)
-        self.operands = operands
-        self.prefix = prefix
-        self.__str = None
-
+    @functools.lru_cache()
     def __str__(self):
-        if not self.__str:
-            if not self.operands:
-                self.__str = self.mnemonic
-            else:
-                self.__str = self.mnemonic + ' ' + ', '.join(str(item) for item in self.operands)
+        if not self.operands:
+            text = self.mnemonic
+        else:
+            text = self.mnemonic + ' ' + ', '.join(str(item) for item in self.operands)
 
-            if self.prefix is not None:
-                self.__str = self.prefix.name + ' ' + self.__str
+        if self.prefix is not None:
+            text = self.prefix.name + ' ' + text
         
-        return self.__str
+        return text
 
     def __repr__(self):
-        return 'DisasmLine(0x{self.address:x}, {self.data}, {self.mnemonic!r}, {self.operands})'.format(self=self)
+        return 'DisasmLine(0x{self.address:x}, {self.data!r}, {self.mnemonic!r}, {self.operands})'.format(self=self)
 
 
 class BytesLine(DisasmLine):
     def __init__(self, address, data):
-        super().__init__(address, data, mnemonic='db', operands=[Operand(value=n) for n in data])
+        super().__init__(address, data, mnemonic='db', operands=tuple(Operand(value=n) for n in data))
 
 
-def disasm(s, start_address=0):
+def disasm(s: bytes, start_address=0):
+    s = bytes(s)
     i = 0
     while i < len(s):
         j = i
@@ -341,7 +342,7 @@ def disasm(s, start_address=0):
         rep_prefix = None
         line = None
         if s[i] in seg_prefixes:
-            seg_prefix = seg_prefixes[s[i]]
+            seg_prefix = seg_prefixes[Prefix(s[i])]
             i += 1
 
         if s[i] == Prefix.operand_size:
@@ -360,7 +361,7 @@ def disasm(s, start_address=0):
                 elif rep_prefix is None:
                     yield BytesLine(start_address+j, data=s[j:i])
                     j = i
-            line = DisasmLine(start_address+j, data=s[j:i+1], mnemonic=mnemonic, prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i+1], mnemonic=mnemonic, prefix=rep_prefix, operands=None)
             i += 1
         elif s[i] == ret_near_n:
             if i > j:
@@ -370,7 +371,7 @@ def disasm(s, start_address=0):
             immediate = int.from_bytes(bytes(s[i:i+2]), byteorder='little')
             i += 2
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='retn',
-                              operands=[Operand(value=immediate)], prefix=rep_prefix)
+                              operands=(Operand(value=immediate),), prefix=rep_prefix)
         elif s[i] in {call_near, jmp_near}:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
@@ -379,7 +380,7 @@ def disasm(s, start_address=0):
             immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
             i += 4
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
-                              operands=[Operand(value=immediate)], prefix=rep_prefix)
+                              operands=(Operand(value=immediate),), prefix=rep_prefix)
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
             if i > j:
                 yield BytesLine(start_address+j, data=s[j:i])
@@ -390,7 +391,7 @@ def disasm(s, start_address=0):
             else:
                 mnemonic = 'j%s short' % Cond(s[i] & 0x0F).name
             line = DisasmLine(start_address+j, data=s[i:i+2], mnemonic=mnemonic,
-                              operands=[Operand(value=immediate)], prefix=rep_prefix)
+                              operands=(Operand(value=immediate),), prefix=rep_prefix)
             i += 2
         elif s[i] == lea:
             if i > j:
@@ -401,20 +402,25 @@ def disasm(s, start_address=0):
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='lea', operands=operands, prefix=rep_prefix)
         elif (s[i] & 0xFC) == op_rm_imm and (s[i] & 3) != 2:
             flags = s[i] & 3
-            mnemonics = ("add", "or", "adc", "sbb", "and", "sub", "xor", "cmp")
+            mnemonics = ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"]
             x, i = analyse_modrm(s, i+1)
             mnemonic = mnemonics[x['modrm'][1]]
-            _, op = unify_operands(x)
-            if op.reg is None:
-                op.data_size = 1 << (2*bool(flags)-size_prefix)
+            _, operand = unify_operands(x)
+            if operand.reg is None:
+                operand.data_size = 1 << (2*bool(flags)-size_prefix)
             if flags == 1:
                 immediate = int.from_bytes(s[i:i+4], byteorder='little')
                 i += 4
             else:  # flags == 0 or flags == 3
                 immediate = s[i]
                 i += 1
-            op2 = Operand(value=immediate)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op, op2], prefix=rep_prefix)
+            operand2 = Operand(value=immediate)
+            line = DisasmLine(start_address+j,
+                              data=s[j:i],
+                              mnemonic=mnemonic,
+                              operands=(operand, operand2),
+                              prefix=rep_prefix)
+
         elif (s[i] & 0xFE) in op_FE_width_REG_RM or (s[i] & 0xFE == mov_rm_imm and (s[i+1] & 0x38) == 0):
             # Operation between register and register/memory without direction flag (xchg or test)
             # or move immediate value to memory
@@ -422,19 +428,19 @@ def disasm(s, start_address=0):
             mnemonic = op_FE_width_REG_RM.get(si & 0xFE, 'mov')
             flag_size = si & 1
             x, i = analyse_modrm(s, i+1)
-            reg_code, op2 = unify_operands(x)
+            reg_code, operand2 = unify_operands(x)
             if (si & 0xFE) == mov_rm_imm:
-                op = op2
-                op.data_size = 1 << (flag_size*2-size_prefix)
-                imm_size = op.data_size
-                immediate = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
+                operand: Operand = operand2
+                operand.data_size = 1 << (flag_size*2-size_prefix)
+                imm_size = operand.data_size
+                immediate_operand = Operand(value=int.from_bytes(s[i:i + imm_size], byteorder='little'))
                 i += imm_size
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[op, immediate], prefix=rep_prefix)
+                                  operands=(operand, immediate_operand), prefix=rep_prefix)
             else:
-                op1 = Operand(reg=Reg((RegType.general, reg_code, 1 << (flag_size*2-size_prefix))))
+                operand1 = Operand(reg=Reg((RegType.general, reg_code, 1 << (flag_size*2-size_prefix))))
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[op1, op2], prefix=rep_prefix)
+                                  operands=(operand1, operand2), prefix=rep_prefix)
         elif (s[i] & 0xFC) in op_FC_dir_width_REG_RM:
             # Operation between a register and register/memory with direction flag
             mnemonic = op_FC_dir_width_REG_RM[s[i] & 0xFC]
@@ -450,14 +456,14 @@ def disasm(s, start_address=0):
                 op2.seg_prefix = seg_prefix
             if not dir_flag:
                 op1, op2 = op2, op1
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(op1, op2), prefix=rep_prefix)
         elif s[i] & 0xF8 in op_F8_reg:
             mnemonic = op_F8_reg[s[i] & 0xF8]
             reg = s[i] & 7
             size = 2 - size_prefix
-            op = Operand(reg=Reg((RegType.general, reg, 1 << size)))
+            operand = Operand(reg=Reg((RegType.general, reg, 1 << size)))
             i += 1
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(operand,), prefix=rep_prefix)
         elif s[i] & 0xFE == 0xFE:
             flag_size = s[i] & 1
             i += 1
@@ -471,12 +477,12 @@ def disasm(s, start_address=0):
                     size = flag_size*2-size_prefix
                     op1.data_size = 1 << size
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                      operands=[op1], prefix=rep_prefix)
+                                      operands=(op1,), prefix=rep_prefix)
                 elif flag_size:
                     if seg_prefix:
                         op1.seg_prefix = seg_prefix
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                      operands=[op1], prefix=rep_prefix)
+                                      operands=(op1,), prefix=rep_prefix)
         elif s[i] & 0xFC == mov_acc_mem:
             dir_flag = s[i] & 2
             size_flag = s[i] & 1
@@ -491,7 +497,7 @@ def disasm(s, start_address=0):
                 op2.seg_prefix = seg_prefix
             if dir_flag:
                 op1, op2 = op2, op1
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=(op1, op2), prefix=rep_prefix)
         elif s[i] & 0xFD == mov_rm_seg:
             dir_flag = s[i] & 2
             x, i = analyse_modrm(s, i+1)
@@ -499,12 +505,12 @@ def disasm(s, start_address=0):
             op1 = Operand(reg=Reg((RegType.segment, reg_code, 2)))
             if not dir_flag:
                 op1, op2 = op2, op1
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=(op1, op2), prefix=rep_prefix)
         elif s[i] == pop_rm:
             x, i = analyse_modrm(s, i+1)
-            _, op = unify_operands(x)
-            op.data_size = 1 << (2-size_prefix)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='pop', operands=[op], prefix=rep_prefix)
+            _, operand = unify_operands(x)
+            operand.data_size = 1 << (2-size_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='pop', operands=(operand,), prefix=rep_prefix)
         elif s[i] & 0xFD == push_imm32:
             size_flag = s[i] & 2
             i += 1
@@ -515,7 +521,7 @@ def disasm(s, start_address=0):
                 immediate = int.from_bytes(s[i:i+4], byteorder='little')
                 i += 4
             line = DisasmLine(start_address+j, data=s[j:i], mnemonic='push',
-                              operands=[Operand(value=immediate)], prefix=rep_prefix)
+                              operands=(Operand(value=immediate),), prefix=rep_prefix)
         elif s[i] & 0xFE in op_FE_width_acc_imm:
             mnemonic = op_FE_width_acc_imm[s[i] & 0xFE]
             flag_size = s[i] & 1
@@ -526,7 +532,7 @@ def disasm(s, start_address=0):
             i += imm_size
             op1 = Operand(reg=Reg((RegType.general, Reg.eax.code, 1 << size)))
             op2 = Operand(value=immediate)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(op1, op2), prefix=rep_prefix)
         elif s[i] & 0xF0 == mov_reg_imm:
             flag_size = (s[i] & 8) >> 3
             reg = s[i] & 7
@@ -537,7 +543,7 @@ def disasm(s, start_address=0):
             i += imm_size
             op1 = Operand(reg=Reg((RegType.general, reg, 1 << size)))
             op2 = Operand(value=immediate)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=[op1, op2], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='mov', operands=(op1, op2), prefix=rep_prefix)
         elif s[i] & 0xFE in {shift_op_rm_1, shift_op_rm_cl, shift_op_rm_imm8}:
             opcode = s[i] & 0xFE
             flag_size = s[i] & 1
@@ -553,7 +559,7 @@ def disasm(s, start_address=0):
                 immediate = s[i]
                 i += 1
                 op2 = Operand(value=immediate)
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[op1, op2], prefix=rep_prefix)
+            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(op1, op2), prefix=rep_prefix)
         elif s[i] & 0xFE == test_or_unary_rm:
             flag_size = s[i] & 1
             x, i = analyse_modrm(s, i+1)
@@ -564,7 +570,7 @@ def disasm(s, start_address=0):
                 op1.data_size = 1 << size
                 if modrm1 >= 2:
                     # unary operations: not, neg, mul, imul etc.
-                    mnemonics = ("not", "neg", "mul", "imul", "div", "idiv")
+                    mnemonics = ["not", "neg", "mul", "imul", "div", "idiv"]
                     mnemonic = mnemonics[modrm1-2]
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
                                       operands=(op1,), prefix=rep_prefix)
@@ -581,9 +587,9 @@ def disasm(s, start_address=0):
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
                 condition = s[i] & 0x0F
                 mnemonic = "set%s" % Cond(condition).name
-                reg = Operand(reg=Reg((RegType.general, s[i+1] & 7, 1)))
+                reg_op = Operand(reg=Reg((RegType.general, s[i+1] & 7, 1)))
                 i += 2
-                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=[reg], prefix=rep_prefix)
+                line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic, operands=(reg_op,), prefix=rep_prefix)
             elif s[i] & 0xF0 == x0f_jcc_near:
                 condition = s[i] & 0x0F
                 mnemonic = "j%s near" % Cond(condition).name
@@ -591,7 +597,7 @@ def disasm(s, start_address=0):
                 immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 i += 4
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[Operand(value=immediate)], prefix=rep_prefix)
+                                  operands=(Operand(value=immediate),), prefix=rep_prefix)
             elif s[i] & 0xFE in {x0f_movzx, x0f_movsx}:
                 op = s[i] & 0xFE
                 mnemonic = 'movzx' if op == x0f_movzx else 'movsx'
@@ -600,7 +606,7 @@ def disasm(s, start_address=0):
                 dest, src = unify_operands(x, size=1 << (flag_size+1))
                 src.data_size = 1 << flag_size
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[dest, src], prefix=rep_prefix)
+                                  operands=(dest, src), prefix=rep_prefix)
             elif s[i] & 0xFE in {x0f_movups, x0f_movaps}:
                 op = s[i] & 0xFE
                 mnemonic = 'movups' if op == x0f_movups else 'movaps'
@@ -611,7 +617,7 @@ def disasm(s, start_address=0):
                 if dir_flag:
                     op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[op1, op2], prefix=rep_prefix)
+                                  operands=(op1, op2), prefix=rep_prefix)
             elif s[i] & 0xEE == x0f_movd_mm:
                 opcode = s[i]
                 size_flag = s[i] & 0x01
@@ -630,7 +636,7 @@ def disasm(s, start_address=0):
                     if dir_flag:
                         op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[op1, op2], prefix=rep_prefix)
+                                  operands=(op1, op2), prefix=rep_prefix)
             elif s[i] == x0f_movq_rm_xmm and size_prefix:
                 mnemonic = 'movq'
                 x, i = analyse_modrm(s, i + 1)
@@ -639,7 +645,7 @@ def disasm(s, start_address=0):
                 op2.data_size = 8  # qword
                 op1, op2 = op2, op1
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[op1, op2], prefix=rep_prefix)
+                                  operands=(op1, op2), prefix=rep_prefix)
             elif s[i] & 0xF0 == x0f_cmov:
                 condition = s[i] & 0x0F
                 mnemonic = 'cmov' + Cond(condition).name
@@ -648,7 +654,7 @@ def disasm(s, start_address=0):
                 op1, op2 = unify_operands(x)
                 op1 = Operand(reg=Reg((RegType.general, op1, size)))
                 line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                  operands=[op1, op2], prefix=rep_prefix)
+                                  operands=(op1, op2), prefix=rep_prefix)
 
         if not line:
             i += 1
