@@ -6,9 +6,9 @@ import textwrap
 from collections import defaultdict, OrderedDict
 from warnings import warn
 from binascii import hexlify
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Any, List
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword
 from .cross_references import get_cross_references
@@ -58,61 +58,29 @@ class Metadata:
     prev_bytes: Optional[str] = None
 
 
+@dataclass
 class Fix:
-    _allowed_fields = {'new_code', 'pokes', 'poke', 'src_off', 'dest_off', 'added_relocs',
-                       'deleted_relocs', 'fixed', 'fix'}
+    new_code: Optional[bytes] = None
+    pokes: Optional[List[Any]] = None
+    poke: Any = None
+    src_off: Optional[int] = None
+    dest_off: Optional[int] = None
+    added_relocs: Optional[List[int]] = None
+    deleted_relocs: Optional[List[int]] = None
+    meta: Optional[Metadata] = None
+    op: Optional[Any] = None
+    fixed: Optional[Any] = None
+    fix: Optional[Any] = None
 
-    def __init__(self, new_code=None, pokes=None, poke=None, src_off=None, dest_off=None,
-                 added_relocs=None, deleted_relocs=None, meta: Metadata = None, op=None, fixed=None,
-                 fix=None):
-        self.new_code = new_code
-        self.pokes = pokes
-        self.poke = poke
-        self.src_off = src_off
-        self.dest_off = dest_off
-        self.added_relocs = added_relocs
-        self.deleted_relocs = deleted_relocs
-        self.meta = meta
-        self.op = op
-        self.fixed = fixed
-        self.fix = fix
-
-    # Some crutches to make Fix compatible with plain dict
-    def __getitem__(self, item):
-        return self.__getattribute__(item)
-
-    def get(self, key, d=None):
-        return self[key] if key in self._allowed_fields else d
-
-    def __setitem__(self, key, value):
-        if key in self._allowed_fields:
-            self.__setattr__(key, value)
-        else:
-            raise IndexError('{!r} key is not allowed'.format(key))
-
-    def __contains__(self, item):
-        return self.__getattribute__(item) is not None
-
-    def __repr__(self):
-        return '{}({})'.format(type(self).__name__,
-                               ', '.join('{}={!r}'.format(key, self.__getattribute__(key))
-                                         for key in sorted(self._allowed_fields)
-                                         if key[0] != '_' and self.__getattribute__(key) is not None))
-
-    def __bool__(self):
-        return any(self.__getattribute__(attr) for attr in self._allowed_fields)
-
-    def copy(self, other: "Fix"):
-        # TODO: Could be optimized
-        for field in self._allowed_fields:
-            assert self.__getattribute__(field) is None or self.__getattribute__(field) == other.__getattribute__(field)
-            self.__setattr__(field, other.__getattribute__(field))
+    def update(self, other: "Fix"):
+        for field in fields(self):
+            self.__setattr__(field.name, other.__getattribute__(field.name))
 
     def add_fix(self, fix: "Fix"):
         new_code = fix.new_code
         old_fix = self
         if not self:
-            self.copy(fix)
+            self.update(fix)
         else:
             old_code = old_fix.new_code
             if bytes(new_code) in bytes(old_code):
@@ -126,7 +94,7 @@ class Fix:
                 else:
                     new_code = old_code + new_code
                 fix.new_code = new_code
-                self.copy(fix)
+                self.update(fix)
 
 
 def get_fix_for_moves(get_length_info, newlen, string_address, meta: Metadata):
