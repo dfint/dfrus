@@ -6,7 +6,8 @@ from contextlib import contextmanager
 from shutil import copy
 from typing import Sequence, Tuple, Union, Dict, Iterable
 
-from .patchdf import fix_df_exe, load_trans_file
+from .dictionary_loaders import load_trans_file
+from .patchdf import fix_df_exe
 from .peclasses import PortableExecutable
 
 
