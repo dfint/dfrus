@@ -968,6 +968,7 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                     fix = Fix(meta=Metadata(fixed='not needed'))
 
                 meta = fix.meta
+                assert meta is not None
                 if 'cmp reg' in meta.string:
                     # This is probably a bound of an array, not a string reference
                     continue
@@ -1011,6 +1012,7 @@ def add_strlens(debug, fixes, functions, metadata):
     for string, fix in metadata.items():
         meta: Metadata = fix.meta
         if (meta.fixed is None or meta.fixed == 'no') and fix.new_code is None:
+            assert meta.func is not None
             func: FunctionInformation = meta.func
             if func is not None and func.info == 'call near':
                 if functions[func.address].length is not None:
@@ -1027,6 +1029,7 @@ def add_strlens(debug, fixes, functions, metadata):
 
                     if code_chunk:
                         new_code = mach_strlen(code_chunk)
+                        assert isinstance(dest_off, int)
                         fix = Fix(src_off=src_off, new_code=new_code, dest_off=dest_off)
                         fixes[src_off].add_fix(fix)
                         meta.fixed = 'yes'

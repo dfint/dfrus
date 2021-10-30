@@ -1,10 +1,10 @@
 #! python3
-import struct
 import bisect
-from typing import Iterable
-from collections import OrderedDict
+import struct
 from array import array
+from collections import OrderedDict
 from itertools import zip_longest
+from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional
 
 from .disasm import align
 
@@ -16,7 +16,7 @@ class Structure:
     def sizeof(cls):
         return cls._struct.size
 
-    _field_names = ('foo',)
+    _field_names: Tuple[str, ...] = ('foo',)
     _formatters = '%x'.split()
     _wrap = True
 
@@ -258,7 +258,7 @@ class Section(Structure):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = self.name.strip(b'\0')
+        self.name: bytes = self.name.strip(b'\0')
 
     def offset_to_rva(self, offset):
         local_offset = offset - self.physical_offset
@@ -305,7 +305,7 @@ class ImageSectionHeader(Structure):
         return virtual_address - self.virtual_address + self.pointer_to_raw_data
 
 
-class Key:
+class Key(Sequence):
     def __init__(self, iterable, key):
         self.iterable = iterable
         self.key = key
@@ -370,9 +370,9 @@ class RelocationTable:
     IMAGE_REL_BASED_ABSOLUTE = 0
     IMAGE_REL_BASED_HIGHLOW = 3
 
-    def __init__(self, table: dict):
-        if not isinstance(table, dict):
-            raise ValueError
+    _table: Mapping[int, List[int]]
+
+    def __init__(self, table: Mapping[int, List[int]]):
         self._table = table
 
     def __iter__(self):
@@ -381,8 +381,8 @@ class RelocationTable:
                 yield page | (record & 0x0FFF)
 
     @classmethod
-    def build(cls, relocs: Iterable):
-        reloc_table = dict()
+    def build(cls, relocs: Iterable[int]):
+        reloc_table: MutableMapping[int, List[int]] = dict()
         for item in relocs:
             page = item & 0xFFFFF000
             offset = item & 0x00000FFF
@@ -392,7 +392,7 @@ class RelocationTable:
         return cls(reloc_table)
 
     @staticmethod
-    def iter_read(file, reloc_size):
+    def iter_read(file: BinaryIO, reloc_size: int) -> Iterable[Tuple[int, List[int]]]:
         cur_off = 0
         while cur_off < reloc_size:
             cur_page = int.from_bytes(file.read(4), 'little')
@@ -415,7 +415,9 @@ class RelocationTable:
 
     def to_file(self, file):
         for page in sorted(self._table):
-            records = [item | RelocationTable.IMAGE_REL_BASED_HIGHLOW << 12 for item in self._table[page]]
+            records = [item | RelocationTable.IMAGE_REL_BASED_HIGHLOW << 12
+                       for item in self._table[page]]
+
             # Padding records:
             if len(records) % 2 == 1:
                 records.append(RelocationTable.IMAGE_REL_BASED_ABSOLUTE << 12 | 0)
@@ -425,7 +427,16 @@ class RelocationTable:
 
 
 class PortableExecutable:
-    def __init__(self, file):
+    file: BinaryIO
+    dos_header: ImageDosHeader
+    nt_headers: ImageNTHeaders
+    file_header: ImageFileHeader
+    optional_header: ImageOptionalHeader
+    data_directory: DataDirectory
+    _section_table: Optional[SectionTable]
+    _relocation_table: Optional[RelocationTable]
+
+    def read_file(self, file):
         self.file = file
         self.file.seek(0)
         self.dos_header = ImageDosHeader.read(file)
@@ -436,6 +447,12 @@ class PortableExecutable:
         self.data_directory = self.nt_headers.data_directory
         self._section_table = None
         self._relocation_table = None
+
+    def reread(self):
+        self.read_file(self.file)
+
+    def __init__(self, file):
+        self.read_file(file)
 
     @property
     def section_table(self):
@@ -454,9 +471,6 @@ class PortableExecutable:
             self.file.seek(offset)
             self._relocation_table = RelocationTable.from_file(self.file, size)
         return self._relocation_table
-
-    def reread(self):
-        self.__init__(self.file)
 
     def info(self):
         return (
