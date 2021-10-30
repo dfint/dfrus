@@ -870,10 +870,6 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
             for meta in strings:
                 print("0x{:x} : {!r}".format(*meta[:2]))
 
-    fixes: MutableMapping[int, Fix] = defaultdict(Fix)
-    metadata: MutableMapping[Tuple[str, int], Fix] = OrderedDict()
-    delayed_pokes = dict()
-
     encoding = codepage if codepage else 'cp437'
 
     try:
@@ -884,6 +880,44 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
         else:
             raise ex
 
+    fixes, metadata, new_section_offset = process_strings(encoder_function, encoding, fn, image_base, new_section,
+                                                          new_section_offset, relocs_to_add, relocs_to_remove, sections,
+                                                          strings, trans_table, xref_table)
+
+    functions = extract_function_information(image_base, metadata, sections)
+
+    if debug:
+        print('\nGuessed function parameters:')
+        for address, meta in sorted(functions.items(), key=itemgetter(0)):
+            print('sub_%x: %r' % (sections[code_section].offset_to_rva(address) + image_base, meta))
+        print()
+
+    add_strlens(debug, fixes, functions, metadata)
+
+    new_section_offset = apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections)
+
+    # Write relocation table to the executable
+    if relocs_to_add or relocs_to_remove:
+        new_section_offset, relocs = update_relocation_table(debug, fn, image_base, new_section, new_section_offset, pe,
+                                                             relocs, relocs_to_add, relocs_to_remove, sections)
+
+    # Add new section to the executable
+    if new_section_offset > new_section.physical_offset:
+        add_new_section(file_alignment, fn, new_section, new_section_offset, pe, section_alignment, sections)
+
+    # Check if the patched file is not broken
+    print("Final check...")
+    pe.reread()
+    assert set(pe.relocation_table) == relocs, "Error: relocation table is broken"
+
+    print('Done.')
+
+
+def process_strings(encoder_function, encoding, fn, image_base, new_section, new_section_offset, relocs_to_add,
+                    relocs_to_remove, sections, strings, trans_table, xref_table):
+    fixes: MutableMapping[int, Fix] = defaultdict(Fix)
+    metadata: MutableMapping[Tuple[str, int], Fix] = OrderedDict()
+    delayed_pokes = dict()
     for off, string, cap_len in strings:
         if string in trans_table:
             translation = trans_table[string]
@@ -963,33 +997,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
         # print(hex(offset), b)
         fpoke(fn, offset, b)
 
-    functions = extract_function_information(image_base, metadata, sections)
-
-    if debug:
-        print('\nGuessed function parameters:')
-        for address, meta in sorted(functions.items(), key=itemgetter(0)):
-            print('sub_%x: %r' % (sections[code_section].offset_to_rva(address) + image_base, meta))
-        print()
-
-    add_strlens(debug, fixes, functions, metadata)
-
-    new_section_offset = apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections)
-
-    # Write relocation table to the executable
-    if relocs_to_add or relocs_to_remove:
-        new_section_offset, relocs = update_relocation_table(debug, fn, image_base, new_section, new_section_offset, pe,
-                                                             relocs, relocs_to_add, relocs_to_remove, sections)
-
-    # Add new section to the executable
-    if new_section_offset > new_section.physical_offset:
-        add_new_section(file_alignment, fn, new_section, new_section_offset, pe, section_alignment, sections)
-
-    # Check if the patched file is not broken
-    print("Final check...")
-    pe.reread()
-    assert set(pe.relocation_table) == relocs, "Error: relocation table is broken"
-
-    print('Done.')
+    return fixes, metadata, new_section_offset
 
 
 def add_strlens(debug, fixes, functions, metadata):

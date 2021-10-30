@@ -1,6 +1,5 @@
-from typing import Iterable, Sequence, Union
-
 from dataclasses import dataclass
+from typing import Iterable, Sequence, Union, Any, MutableMapping
 
 '''
 # Concept:
@@ -39,8 +38,8 @@ class MachineCode:
     def __init__(self, *args: Union[int, str, Iterable[int], Reference, "MachineCode"], origin_address=0, **kwargs):
         self.origin_address = origin_address
         self._raw_list = list(args)
-        self.fields = dict()
-        self._labels = dict()
+        self.fields: MutableMapping[str, Any] = dict()
+        self._labels: MutableMapping[str, int] = dict()
         self._absolute_ref_indexes = []
         i = 0
         for item in args:
