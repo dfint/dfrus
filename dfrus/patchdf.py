@@ -6,7 +6,8 @@ import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
 from dataclasses import dataclass, fields, field
-from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping
+from operator import itemgetter
+from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping, List
 from warnings import warn
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
@@ -18,7 +19,7 @@ from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mac
 from .opcodes import *
 from .patch_charmap import search_charmap, patch_unicode_table, get_codepages, get_encoder
 from .peclasses import Section, RelocationTable
-from .trace_machine_code import which_func
+from .trace_machine_code import which_func, FunctionInformation
 
 
 def load_trans_file(fn):
@@ -52,8 +53,8 @@ class Metadata:
     fixed: Optional[str] = None  #: Was the string length value fixed?
     cause: Optional[str] = None  #: A cause of failure (if fixed == 'no')
     length: Optional[str] = None  #: A way of string length specification (a register, push, etc.)
-    string: Optional[str] = None  #: A way of string value passing (a register, push, etc.)
-    func: Optional[Union[str, Tuple[Any, ...]]] = None  #: A function to which the string is passed
+    string: Set[str] = field(default_factory=set)  #: A way of string value passing (a register, push, etc.)
+    func: Optional[FunctionInformation] = None  #: A function to which the string is passed
     prev_bytes: Optional[str] = None
 
 
@@ -178,7 +179,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
     meta = Metadata()
     if pre[-1] == push_imm32:
         # push offset str
-        meta.string = 'push'
+        meta.string.add('push')
 
         if pre[-3] == push_imm8 and pre[-2] == old_len:
             fpoke(fn, offset - 2, new_len)
@@ -210,7 +211,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
         if reg == Reg.eax.code:
             # mov eax, offset str
-            meta.func = 'eax'
+            meta.func = FunctionInformation('eax')
             if from_dword(pre[-5:-1]) == old_len:
                 fpoke4(fn, offset - 5, new_len)
                 meta.fixed = 'yes'
@@ -385,7 +386,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             # repz movsd
             # movsw
             # movsb
-            meta.string = 'esi'
+            meta.string.add('esi')
             r = (old_len + 1) % 4
             dword_count = (old_len + 1) // 4
             new_dword_count = (new_len - r) // 4 + 1
@@ -459,7 +460,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
           pre[-3] == 0x0F and pre[-2] in {x0f_movups, x0f_movaps} and
           pre[-1] & 0xC7 == join_byte(0, 0, 5)):  # movups or movaps
         # mov eax, [addr] or mov reg, [addr]
-        meta.string = 'mov'
+        meta.string.add('mov')
 
         next_off = offset - get_start(pre)
         aft = read_bytes(fn, next_off, count_after_for_get_length)
@@ -496,22 +497,22 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             return fix
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
         # mov reg8, string[reg]
-        meta.func = 'strcpy'
-        meta.string = 'mov byte'
+        meta.func = FunctionInformation('strcpy')
+        meta.string.add('mov byte')
         meta.fixed = 'not needed'
         return Fix(meta=meta)  # No need fixing
     elif pre[-1] == add_acc_imm | 1:
         # add reg, offset string
-        meta.func = 'array'
-        meta.string = 'add offset'
+        meta.func = FunctionInformation('array')
+        meta.string.add('add offset')
         meta.fixed = 'not needed'
         return Fix(meta=meta)
     elif pre[-2] == op_rm_imm | 1 and pre[-1] & 0xF8 == 0xF8:
         # cmp reg, offset string
-        meta.string = 'cmp reg'
+        meta.string.add('cmp reg')
     elif pre[-4] == mov_rm_imm | 1 and pre[-3] == join_byte(1, 0, 4) and pre[-2] == join_byte(0, 4, Reg.esp):
         # mov [esp+N], offset string
-        meta.string = 'mov var'
+        meta.string.add('mov var')
         meta.fixed = 'not needed'
     meta.prev_bytes = ' '.join('%02X' % x for x in pre[-4:])
     return Fix(meta=meta)
@@ -869,8 +870,8 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
             for meta in strings:
                 print("0x{:x} : {!r}".format(*meta[:2]))
 
-    fixes = defaultdict(Fix)
-    metadata: MutableMapping[Tuple, Fix] = OrderedDict()
+    fixes: MutableMapping[int, Fix] = defaultdict(Fix)
+    metadata: MutableMapping[Tuple[str, int], Fix] = OrderedDict()
     delayed_pokes = dict()
 
     encoding = codepage if codepage else 'cp437'
@@ -933,14 +934,14 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
                     fix = Fix(meta=Metadata(fixed='not needed'))
 
                 meta = fix.meta
-                if meta.string == 'cmp reg':
+                if 'cmp reg' in meta.string:
                     # This is probably a bound of an array, not a string reference
                     continue
                 elif fix.new_code:
                     new_code = fix.new_code
                     assert isinstance(new_code, (bytes, bytearray, MachineCode))
                     src_off = fix.src_off
-
+                    assert src_off is not None
                     fixes[src_off].add_fix(fix)
                 else:
                     if fix.added_relocs:
@@ -962,49 +963,51 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
         # print(hex(offset), b)
         fpoke(fn, offset, b)
 
-    # Extract information of functions parameters
-    functions = defaultdict(Metadata)
-    for fix in metadata.values():
-        meta = fix.meta
-        assert isinstance(meta, Metadata)
-        if meta.func and meta.func[0] == 'call near':
-            offset = meta.func[2]
-            address = sections[code_section].offset_to_rva(offset) + image_base
-            if meta.string:
-                str_param = meta.string
-                if functions[offset].string is None:
-                    functions[offset].string = {str_param}
-                elif str_param not in functions[offset].string:
-                    print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
-                          (address, str_param, functions[offset].string))
-                    # functions[offset].string.add(str_param)  # FIXME
-
-            if meta.length is not None:
-                len_param = meta.length
-                if functions[offset].length is None:
-                    functions[offset].length = len_param
-                elif functions[offset].length != len_param:
-                    raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
-                                     (address, functions[offset].length, len_param))
+    functions = extract_function_information(image_base, metadata, sections)
 
     if debug:
         print('\nGuessed function parameters:')
-        for func in sorted(functions):
-            value = functions[func]
-            print('sub_%x: %r' % (sections[code_section].offset_to_rva(func) + image_base, value))
+        for address, meta in sorted(functions.items(), key=itemgetter(0)):
+            print('sub_%x: %r' % (sections[code_section].offset_to_rva(address) + image_base, meta))
         print()
+
+    add_strlens(debug, fixes, functions, metadata)
+
+    new_section_offset = apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections)
+
+    # Write relocation table to the executable
+    if relocs_to_add or relocs_to_remove:
+        new_section_offset, relocs = update_relocation_table(debug, fn, image_base, new_section, new_section_offset, pe,
+                                                             relocs, relocs_to_add, relocs_to_remove, sections)
+
+    # Add new section to the executable
+    if new_section_offset > new_section.physical_offset:
+        add_new_section(file_alignment, fn, new_section, new_section_offset, pe, section_alignment, sections)
+
+    # Check if the patched file is not broken
+    print("Final check...")
+    pe.reread()
+    assert set(pe.relocation_table) == relocs, "Error: relocation table is broken"
+
+    print('Done.')
+
+
+def add_strlens(debug, fixes, functions, metadata):
+    """
+    Add strlen before call of functions for strings which length was not fixed
+    """
 
     status_unknown = dict()
     not_fixed = dict()
 
-    # Add strlen before call of functions for strings which length was not fixed
     for string, fix in metadata.items():
-        meta = fix.meta
+        meta: Metadata = fix.meta
         if (meta.fixed is None or meta.fixed == 'no') and fix.new_code is None:
-            func = meta.func
-            if func is not None and func[0] == 'call near':
-                if functions[func[2]].length is not None:
-                    _, src_off, dest_off = func
+            func: FunctionInformation = meta.func
+            if func is not None and func.info == 'call near':
+                if functions[func.address].length is not None:
+                    src_off = func.address
+                    dest_off = func.operand
                     assert src_off is not None
                     src_off += 1
                     code_chunk: Optional[Iterable[int]] = None
@@ -1029,7 +1032,6 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
                     status_unknown[string[1]] = (string[0], meta)
                 elif meta.fixed == 'no':
                     not_fixed[string[1]] = (string[0], meta)
-
     if debug:
         for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
             print('Length not fixed: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
@@ -1039,6 +1041,71 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
         for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
             print('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
 
+
+def update_relocation_table(debug, fn, image_base, new_section, new_section_offset, pe, relocs, relocs_to_add,
+                            relocs_to_remove, sections):
+    if relocs_to_remove - relocs:
+        warn("Trying to remove some relocations which weren't in the original list: " +
+             int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs)))
+    relocs -= relocs_to_remove
+    relocs |= relocs_to_add
+    if debug:
+        print("\nRemoved relocations:")
+        print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_remove), 80)))
+        print("\nAdded relocations:")
+        print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_add), 80)))
+    reloc_table = RelocationTable.build(relocs)
+    new_size = reloc_table.size
+    data_directory = pe.data_directory
+    relocation_table_offset = sections.rva_to_offset(data_directory.basereloc.virtual_address)
+    relocation_table_size = data_directory.basereloc.size
+    relocation_section = sections[sections.which_section(offset=relocation_table_offset)]
+    if new_size <= relocation_section.physical_size:
+        fn.seek(relocation_table_offset)
+        reloc_table.to_file(fn)
+
+        if new_size < relocation_table_size:
+            # Clear empty bytes after the relocation table
+            fn.seek(relocation_table_offset + new_size)
+            fn.write(bytes(relocation_table_size - new_size))
+
+        # Update data directory table
+        data_directory.basereloc.size = new_size
+        data_directory.rewrite()
+    else:
+        # Write relocation table to the new section
+        with io.BytesIO() as buffer:
+            reloc_table.to_file(buffer)
+
+            data_directory.basereloc.size = new_size
+            data_directory.basereloc.virtual_address = new_section.offset_to_rva(new_section_offset)
+            data_directory.rewrite()
+            new_section_offset = add_to_new_section(fn, new_section_offset, buffer.getvalue())
+    return new_section_offset, relocs
+
+
+def add_new_section(file_alignment, fn, new_section, new_section_offset, pe, section_alignment, sections):
+    file_size = align(new_section_offset, file_alignment)
+    new_section.physical_size = file_size - new_section.physical_offset
+    print("Adding new data section...")
+    # Align file size
+    if file_size > new_section_offset:
+        fn.seek(file_size - 1)
+        fn.write(b'\0')
+    # Set the new section virtual size
+    new_section.virtual_size = new_section_offset - new_section.physical_offset
+    # Write the new section info
+    fn.seek(pe.nt_headers.offset + pe.nt_headers.sizeof() + len(sections) * Section.sizeof())
+    new_section.write(fn)
+    # Fix number of sections
+    pe.file_header.number_of_sections = len(sections) + 1
+    # Fix ImageSize field of the PE header
+    pe.optional_header.size_of_image = align(new_section.rva + new_section.virtual_size, section_alignment)
+    pe.file_header.rewrite()
+    pe.optional_header.rewrite()
+
+
+def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections):
     # Delayed fix
     for fix in fixes.values():
         src_off = fix.src_off
@@ -1085,83 +1152,42 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
         src_rva = sections[code_section].offset_to_rva(src_off)
         disp = hook_rva - (src_rva + 4)  # 4 is a size of a displacement itself
         fpoke(fn, src_off, to_dword(disp, signed=True))
+    return new_section_offset
 
-    # Write relocation table to the executable
-    if relocs_to_add or relocs_to_remove:
-        if relocs_to_remove - relocs:
-            warn("Trying to remove some relocations which weren't in the original list: " +
-                 int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocs)))
 
-        relocs -= relocs_to_remove
-        relocs |= relocs_to_add
-        if debug:
-            print("\nRemoved relocations:")
-            print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_remove), 80)))
-            print("\nAdded relocations:")
-            print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_add), 80)))
+def extract_function_information(image_base: int,
+                                 metadata: Mapping[Tuple[str, int], Fix],
+                                 sections: List[Section]) -> MutableMapping[int, Metadata]:
+    """
+    Extract information of functions parameters
+    """
 
-        reloc_table = RelocationTable.build(relocs)
-        new_size = reloc_table.size
-        data_directory = pe.data_directory
-        relocation_table_offset = sections.rva_to_offset(data_directory.basereloc.virtual_address)
-        relocation_table_size = data_directory.basereloc.size
-        relocation_section = sections[sections.which_section(offset=relocation_table_offset)]
+    functions: MutableMapping[int, Metadata] = defaultdict(Metadata)
+    for fix in metadata.values():
+        meta = fix.meta
+        assert meta is not None
+        if meta.func and meta.func.info == 'call near':
+            offset = meta.func.address
+            assert offset is not None
+            address = sections[code_section].offset_to_rva(offset) + image_base
+            if meta.string:
+                str_param = meta.string
+                if not functions[offset].string:
+                    functions[offset].string.update(str_param)
+                elif str_param not in functions[offset].string:
+                    print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
+                          (address, str_param, functions[offset].string))
+                    functions[offset].string.update(str_param)
 
-        if new_size <= relocation_section.physical_size:
-            fn.seek(relocation_table_offset)
-            reloc_table.to_file(fn)
+            if meta.length is not None:
+                len_param = meta.length
+                if functions[offset].length is None:
+                    functions[offset].length = len_param
+                elif functions[offset].length != len_param:
+                    raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
+                                     (address, functions[offset].length, len_param))
 
-            if new_size < relocation_table_size:
-                # Clear empty bytes after the relocation table
-                fn.seek(relocation_table_offset + new_size)
-                fn.write(bytes(relocation_table_size - new_size))
-
-            # Update data directory table
-            data_directory.basereloc.size = new_size
-            data_directory.rewrite()
-        else:
-            # Write relocation table to the new section
-            with io.BytesIO() as buffer:
-                reloc_table.to_file(buffer)
-
-                data_directory.basereloc.size = new_size
-                data_directory.basereloc.virtual_address = new_section.offset_to_rva(new_section_offset)
-                data_directory.rewrite()
-                new_section_offset = add_to_new_section(fn, new_section_offset, buffer.getvalue())
-
-    # Add new section to the executable
-    if new_section_offset > new_section.physical_offset:
-        file_size = align(new_section_offset, file_alignment)
-        new_section.physical_size = file_size - new_section.physical_offset
-
-        print("Adding new data section...")
-
-        # Align file size
-        if file_size > new_section_offset:
-            fn.seek(file_size - 1)
-            fn.write(b'\0')
-
-        # Set the new section virtual size
-        new_section.virtual_size = new_section_offset - new_section.physical_offset
-
-        # Write the new section info
-        fn.seek(pe.nt_headers.offset + pe.nt_headers.sizeof() + len(sections) * Section.sizeof())
-        new_section.write(fn)
-
-        # Fix number of sections
-        pe.file_header.number_of_sections = len(sections) + 1
-        # Fix ImageSize field of the PE header
-        pe.optional_header.size_of_image = align(new_section.rva + new_section.virtual_size, section_alignment)
-
-        pe.file_header.rewrite()
-        pe.optional_header.rewrite()
-
-    # Check if the patched file is not broken
-    print("Final check...")
-    pe.reread()
-    assert set(pe.relocation_table) == relocs, "Error: relocation table is broken"
-
-    print('Done.')
+    return functions
 
 
 def int_list_to_hex_str(s):
@@ -1177,7 +1203,7 @@ def find_earliest_midrefs(offset, xref_table, length):
             for j, ref in enumerate(references):
                 mid_refs = xref_table[offset + k]
                 for mid_ref in reversed(sorted(mid_refs)):
-                    if mid_ref < ref and ref - mid_ref < 70:  # Empyrically picked number
+                    if mid_ref < ref and ref - mid_ref < 70:  # Empirically picked number
                         references[j] = mid_ref
                         break
 
