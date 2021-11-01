@@ -2,8 +2,8 @@ from typing import Iterable
 
 from .binio import to_dword, from_dword
 from .disasm import join_byte, Operand
-from .machine_code_builder import MachineCodeBuilder
-from .opcodes import push_reg, Reg, xor_rm_reg, cmp_rm_imm, jcc_short, Cond, inc_reg, jmp_short, pop_reg, pushad, \
+from .machine_code_assembler import MachineCodeAssembler
+from .opcodes import Reg, xor_rm_reg, cmp_rm_imm, Cond, inc_reg, pushad, \
     mov_rm_reg, mov_reg_imm, Prefix, movsd, popad, mov_acc_mem, x0f_movups, lea
 
 MAX_LEN = 0x100
@@ -25,20 +25,20 @@ def mach_strlen(code_chunk: Iterable) -> bytes:
     skip:
         pop ecx
     """
-    m = MachineCodeBuilder()
-    m.byte(push_reg | Reg.ecx.code)  # push ecx
+    m = MachineCodeAssembler()
+    m.push_reg(Reg.ecx)  # push ecx
     m.byte(xor_rm_reg | 1).byte(join_byte(3, Reg.ecx, Reg.ecx))  # xor ecx, ecx
     m.label("@@")
     m.byte(cmp_rm_imm).byte(join_byte(0, 7, 4)).byte(join_byte(0, Reg.ecx, Reg.eax)).byte(0x00)  # cmp byte [eax+ecx], 0
-    m.byte(jcc_short | Cond.z).relative_reference("success", size=1)  # jz success
+    m.jump_conditional_short(Cond.z, "success")  # jz success
     m.byte(cmp_rm_imm | 1).byte(join_byte(3, 7, Reg.ecx)).dword(MAX_LEN)  # cmp ecx, MAX_LEN
-    m.byte(jcc_short | Cond.g).relative_reference("skip", size=1)  # jg skip
+    m.jump_conditional_short(Cond.g, "skip")  # jg skip
     m.byte(inc_reg | Reg.ecx.code)  # inc ecx
-    m.byte(jmp_short).relative_reference("@@", size=1)  # jmp @b
+    m.jump_short("@@")  # jmp @b
     m.label("success")
     m.add_bytes(bytes(code_chunk))
     m.label("skip")
-    m.byte(pop_reg | Reg.ecx.code)  # pop ecx
+    m.pop_reg(Reg.ecx)  # pop ecx
     return m.build()
 
 
@@ -59,7 +59,7 @@ def mach_memcpy(src, dest: Operand, count):
             mach += to_dword(dest.disp)  # imm32
         else:
             # lea edi, [reg+imm]
-            mach += mach_lea(Reg.edi, dest)
+            mach += mach_lea(Reg.edi.code, dest)
 
     mach.append(mov_reg_imm | 8 | Reg.esi.code)  # mov esi, ...
     new_references.add(len(mach))
@@ -98,10 +98,9 @@ def get_start(s):
     return i
 
 
-def mach_lea(dest, src: Operand):
-    mach = bytearray()
-    mach.append(lea)
-    assert src.index_reg is None, 'mach_lea(): right operand with index register not implemented'
+def mach_lea(register: Reg, src: Operand) -> bytes:
+    m = MachineCodeAssembler()
+    m.byte(lea)
 
     if src.disp == 0 and src.base_reg != Reg.ebp:
         mode = 0
@@ -110,14 +109,19 @@ def mach_lea(dest, src: Operand):
     else:
         mode = 2
 
-    if src.base_reg == Reg.esp:
-        mach.append(join_byte(mode, dest, 4))  # mod r/m byte
-        mach.append(join_byte(0, 4, src.base_reg))  # sib byte
+    if src.base_reg != Reg.esp:
+        m.modrm(mode, register.code, src.base_reg.code)
     else:
-        mach.append(join_byte(mode, dest, src.base_reg))  # just mod r/m byte
+        if src.index_reg is None:
+            m.modrm(mode, register.code, 4).sib(0, 4, src.base_reg.code)
+        else:
+            assert src.index_reg != Reg.esp
+            m.modrm(mode, register.code, 4)
+            m.sib(src.scale, src.index_reg.code, src.base_reg.code)
 
     if mode == 1:
-        mach += src.disp.to_bytes(1, byteorder='little', signed=True)
+        m.byte(src.disp)
     else:
-        mach += src.disp.to_bytes(4, byteorder='little', signed=True)
-    return mach
+        m.dword(src.disp)
+
+    return m.build()
