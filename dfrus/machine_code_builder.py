@@ -32,7 +32,7 @@ class MachineCodeItem:
 
     """
     :is_relative
-    * True for relative reverence,
+    * True for relative reference,
     * False for absolute reference,
     * None for everything else
     """
