@@ -1,7 +1,7 @@
 from typing import Iterable, Tuple
 
 from .binio import from_dword
-from .disasm import join_byte, Operand
+from .disasm import Operand
 from .machine_code_assembler import MachineCodeAssembler
 from .opcodes import *
 
@@ -26,11 +26,11 @@ def mach_strlen(code_chunk: Iterable) -> bytes:
     """
     m = MachineCodeAssembler()
     m.push_reg(Reg.ecx)  # push ecx
-    m.byte(xor_rm_reg | 1).byte(join_byte(3, Reg.ecx, Reg.ecx))  # xor ecx, ecx
+    m.byte(xor_rm_reg | 1).modrm(3, Reg.ecx, Reg.ecx)  # xor ecx, ecx
     m.label("@@")
-    m.byte(cmp_rm_imm).byte(join_byte(0, 7, 4)).byte(join_byte(0, Reg.ecx, Reg.eax)).byte(0x00)  # cmp byte [eax+ecx], 0
+    m.byte(cmp_rm_imm).modrm(0, 7, 4).sib(0, Reg.ecx, Reg.eax).byte(0x00)  # cmp byte [eax+ecx], 0
     m.jump_conditional_short(Cond.z, "success")  # jz success
-    m.byte(cmp_rm_imm | 1).byte(join_byte(3, 7, Reg.ecx)).dword(MAX_LEN)  # cmp ecx, MAX_LEN
+    m.byte(cmp_rm_imm | 1).modrm(3, 7, Reg.ecx).dword(MAX_LEN)  # cmp ecx, MAX_LEN
     m.jump_conditional_short(Cond.g, "skip")  # jg skip
     m.byte(inc_reg | Reg.ecx.code)  # inc ecx
     m.jump_short("@@")  # jmp @b
