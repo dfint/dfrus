@@ -190,12 +190,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
         func = which_func(fn, old_next, stop_cond=stop_func)
 
-        if isinstance(func, tuple):
-            meta.func = func
+        meta.func = func
 
         if reg == Reg.eax.code:
             # mov eax, offset str
-            meta.func = FunctionInformation('eax')
+            meta.string.add('eax')
             if from_dword(pre[-5:-1]) == old_len:
                 fpoke4(fn, offset - 5, new_len)
                 meta.fixed = 'yes'
