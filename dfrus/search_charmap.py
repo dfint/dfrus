@@ -1,7 +1,7 @@
 from typing import BinaryIO, Sequence, Optional
 
-from dfrus.binio import to_dword, read_bytes
-from dfrus.peclasses import Section
+from .binio import to_dword, read_bytes
+from .peclasses import Section
 
 
 def search_charmap(file: BinaryIO, sections: Sequence[Section], xref_table) -> Optional[int]:
