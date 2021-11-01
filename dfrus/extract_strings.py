@@ -149,14 +149,16 @@ def main():
             if ascii_only:
                 sys.argv.remove('--ascii')
             
-            with open(sys.argv[1], "r+b") as fn:
-                pe = PortableExecutable(fn)
-                image_base = pe.optional_header.image_base
-                sections = pe.section_table
-                relocs = pe.relocation_table
-                xrefs = get_cross_references(fn, relocs, sections, image_base)
+            with open(sys.argv[1], "r+b") as file:
+                pe = PortableExecutable(file)
+
+                xrefs = get_cross_references(file,
+                                             pe.relocation_table,
+                                             pe.section_table,
+                                             pe.optional_header.image_base)
+
                 encoding = 'cp437' if len(sys.argv) <= 3 else sys.argv[3]
-                strings = list(extract_strings(fn, xrefs, encoding=encoding, arrays=True))
+                strings = list(extract_strings(file, xrefs, encoding=encoding, arrays=True))
                 count = Counter(x[1] for x in strings)
                 with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
                     for offset, s, cap_len in strings:

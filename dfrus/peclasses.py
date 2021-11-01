@@ -463,7 +463,7 @@ class PortableExecutable:
         return self._section_table
 
     @property
-    def relocation_table(self):
+    def relocation_table(self) -> RelocationTable:
         if self._relocation_table is None:
             rva = self.data_directory.basereloc.virtual_address
             offset = self.section_table.rva_to_offset(rva)
