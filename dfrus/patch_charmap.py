@@ -4,6 +4,7 @@ import unicodedata
 from typing import Tuple, Mapping, Union, Iterable, Dict, BinaryIO, Callable
 
 from .binio import fpoke4
+from .type_aliases import Offset
 
 
 def ord_utf16(c: str) -> int:
@@ -57,7 +58,7 @@ def generate_charmap_table_patch(enc1: str, enc2: str) -> Mapping[int, int]:
                 if a != b and b.isalpha())
 
 
-@functools.lru_cache()
+@functools.lru_cache(maxsize=None)
 def get_codepages() -> Mapping[str, Mapping[int, Union[int, Iterable[int]]]]:
     codepages: Dict[str, Mapping[int, Union[int, Iterable[int]]]] = dict()
 
@@ -72,14 +73,16 @@ def get_codepages() -> Mapping[str, Mapping[int, Union[int, Iterable[int]]]]:
     return codepages
 
 
-def patch_unicode_table(file: BinaryIO, offset: int, codepage: str) -> None:
+def patch_unicode_table(file: BinaryIO, offset: Offset, codepage: str) -> None:
     cp = get_codepages()[codepage]
     for item in cp:
         fpoke4(file, offset + item * 4, cp[item])
 
 
 class Encoder:
-    def __init__(self, codepage_data):
+    lookup_table: Dict[str, int]
+
+    def __init__(self, codepage_data: Mapping[int, Union[int, Iterable[int]]]):
         self.lookup_table = dict()
 
         for char_code, value in codepage_data.items():

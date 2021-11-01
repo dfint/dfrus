@@ -1,11 +1,13 @@
 from typing import Iterable, BinaryIO, Optional, Union
 
+from .type_aliases import Offset
+
 
 def write_dword(file_object: BinaryIO, val: int) -> None:
     file_object.write(val.to_bytes(4, byteorder='little'))
 
 
-def read_bytes(file_object: BinaryIO, offset: int, count: int = 1) -> bytes:
+def read_bytes(file_object: BinaryIO, offset: Offset, count: int = 1) -> bytes:
     file_object.seek(offset)
     return file_object.read(count)
 
@@ -36,7 +38,7 @@ def write_string(file_object: BinaryIO,
 
 
 def fpoke4(file_object: BinaryIO,
-           offset: int,
+           offset: Offset,
            x: Union[int, Iterable[int]]) -> None:
 
     file_object.seek(offset)
@@ -47,7 +49,7 @@ def fpoke4(file_object: BinaryIO,
 
 
 def fpoke(file_object: BinaryIO,
-          offset: int,
+          offset: Offset,
           x: Union[int, Iterable[int]]):
 
     assert offset >= 0, offset
