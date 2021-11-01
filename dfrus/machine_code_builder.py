@@ -141,5 +141,5 @@ class MachineCodeBuilder:
 
         return buffer.getvalue()
 
-    def __iter(self) -> bytes:
+    def __iter__(self) -> bytes:
         return self.build()
