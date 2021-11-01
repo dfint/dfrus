@@ -1,13 +1,13 @@
-import codecs
 import io
 import sys
 import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
-from dataclasses import dataclass, fields, field
 from operator import itemgetter
-from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping, List
+from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
 from warnings import warn
+
+from dataclasses import dataclass, fields, field
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
@@ -16,7 +16,7 @@ from .extract_strings import extract_strings
 from .machine_code import MachineCode, Reference
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
-from .patch_charmap import search_charmap, patch_unicode_table, get_codepages, get_encoder
+from .patch_charmap import search_charmap, patch_unicode_table, get_encoder
 from .peclasses import Section, RelocationTable
 from .trace_machine_code import which_func, FunctionInformation
 
@@ -157,7 +157,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
         jmp = aft[0]
         aft = read_bytes(fn, next_off, count_after)
     elif aft[0] == call_near or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
-        aft = None
+        aft = bytes()
 
     meta = Metadata()
     if pre[-1] == push_imm32:
@@ -436,7 +436,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             return Fix(meta=meta)
                     return Fix(meta=meta)
         else:
-            meta.string = ['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg]
+            meta.string.add(['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg])
         return Fix(meta=meta)
     elif (pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and
                                             pre[-1] & 0xC7 == join_byte(0, 0, 5)) or  # mov
@@ -548,7 +548,7 @@ def get_length(data: bytes,
     def is_moveable():
         return not_moveable_after is None
 
-    pokes = dict()  # eg. fixes of jumps
+    pokes: Dict[int, Union[int, bytes]] = dict()  # eg. fixes of jumps
     nops = dict()
 
     length = None
@@ -855,13 +855,7 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
 
     encoding = codepage if codepage else 'cp437'
 
-    try:
-        encoder_function = codecs.getencoder(encoding)
-    except LookupError as ex:
-        if encoding in get_codepages():
-            encoder_function = get_encoder(encoding)
-        else:
-            raise ex
+    encoder_function = get_encoder(encoding)
 
     fixes, metadata, new_section_offset = process_strings(encoder_function, encoding, fn, image_base, new_section,
                                                           new_section_offset, relocs_to_add, relocs_to_remove, sections,

@@ -1,19 +1,21 @@
+import codecs
 import functools
 import unicodedata
-from typing import Tuple
+from typing import Tuple, Mapping, Union, Iterable, Dict, Optional, BinaryIO, Sequence, Callable
 
 from .binio import fpoke4, to_dword, read_bytes
+from .peclasses import Section
 
 
-def ord_utf16(c: str):
+def ord_utf16(c: str) -> int:
     return int.from_bytes(c.encode('utf-16')[2:], 'little')
 
 
-def chr_utf16(value: int):
+def chr_utf16(value: int) -> str:
     return value.to_bytes(2, 'little').decode('utf-16')
 
 
-_additional_codepages = {
+_additional_codepages: Mapping[str, Mapping[int, Union[int, Iterable[int]]]] = {
     'cp437': dict(),  # Stub entry, so that dfrus.py do not complain that cp437 is not implemented
     'cp1251': {
         0xC0: range(ord_utf16('А'), ord_utf16('Я') + 1),
@@ -49,7 +51,7 @@ _additional_codepages = {
 }
 
 
-def generate_charmap_table_patch(enc1, enc2):
+def generate_charmap_table_patch(enc1: str, enc2: str) -> Mapping[int, int]:
     bt = bytes(range(0x80, 0x100))
     return dict((i, ord_utf16(b))
                 for i, (a, b) in enumerate(zip(bt.decode(enc1), bt.decode(enc2, errors='replace')), start=0x80)
@@ -57,8 +59,8 @@ def generate_charmap_table_patch(enc1, enc2):
 
 
 @functools.lru_cache()
-def get_codepages():
-    codepages = dict()
+def get_codepages() -> Mapping[str, Mapping[int, Union[int, Iterable[int]]]]:
+    codepages: Dict[str, Mapping[int, Union[int, Iterable[int]]]] = dict()
 
     for i in range(700, 1253):
         try:
@@ -71,20 +73,20 @@ def get_codepages():
     return codepages
 
 
-def patch_unicode_table(fn, off, codepage):
+def patch_unicode_table(file: BinaryIO, offset: int, codepage: str) -> None:
     cp = get_codepages()[codepage]
     for item in cp:
-        fpoke4(fn, off + item*4, cp[item])
+        fpoke4(file, offset + item * 4, cp[item])
 
 
-def search_charmap(fn, sections, xref_table):
+def search_charmap(file: BinaryIO, sections: Sequence[Section], xref_table) -> Optional[int]:
     unicode_table_start = b''.join(
         to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
     )
 
     offset = sections[1].physical_offset
     size = sum(section.physical_size for section in sections[1:])
-    data_block = read_bytes(fn, offset, size)
+    data_block = read_bytes(file, offset, size)
     for obj_off in xref_table:
         off = obj_off - offset
         if 0 <= off < size:
@@ -120,5 +122,11 @@ class Encoder:
 _encoders = {'viscii': Encoder(_additional_codepages['viscii'])}
 
 
-def get_encoder(encoding: str):
-    return _encoders[encoding].encode
+def get_encoder(encoding: str) -> Callable[[str], Tuple[bytes, int]]:
+    try:
+        return codecs.getencoder(encoding)
+    except LookupError as ex:
+        if encoding in get_codepages():
+            return _encoders[encoding].encode
+        else:
+            raise ex
