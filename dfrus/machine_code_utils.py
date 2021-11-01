@@ -2,14 +2,14 @@ from typing import Iterable
 
 from .binio import to_dword, from_dword
 from .disasm import join_byte, Operand
-from .machine_code import MachineCode, Reference
+from .machine_code_builder import MachineCodeBuilder
 from .opcodes import push_reg, Reg, xor_rm_reg, cmp_rm_imm, jcc_short, Cond, inc_reg, jmp_short, pop_reg, pushad, \
     mov_rm_reg, mov_reg_imm, Prefix, movsd, popad, mov_acc_mem, x0f_movups, lea
 
 MAX_LEN = 0x100
 
 
-def mach_strlen(code_chunk: Iterable[int]):
+def mach_strlen(code_chunk: Iterable[int]) -> bytes:
     """
         push ecx
         xor ecx, ecx
@@ -25,21 +25,21 @@ def mach_strlen(code_chunk: Iterable[int]):
     skip:
         pop ecx
     """
-    return MachineCode(
-        push_reg | Reg.ecx.code,  # push ecx
-        xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
-        '@@:',
-        cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
-        jcc_short | Cond.z, Reference.relative('success', size=1),  # jz success
-        cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), to_dword(MAX_LEN),  # cmp ecx, MAX_LEN
-        jcc_short | Cond.g, Reference.relative('skip', size=1),  # jg skip
-        inc_reg | Reg.ecx.code,  # inc ecx
-        jmp_short, Reference.relative('@@', size=1),  # jmp @b
-        'success:',
-        code_chunk,
-        'skip:',
-        pop_reg | Reg.ecx.code,  # pop ecx
-    )
+    m = MachineCodeBuilder()
+    m.byte(push_reg | Reg.ecx.code)  # push ecx
+    m.byte(xor_rm_reg | 1).byte(join_byte(3, Reg.ecx, Reg.ecx))  # xor ecx, ecx
+    m.label("@@")
+    m.byte(cmp_rm_imm).byte(join_byte(0, 7, 4)).byte(join_byte(0, Reg.ecx, Reg.eax)).byte(0x00)  # cmp byte [eax+ecx], 0
+    m.byte(jcc_short | Cond.z).relative_reference("success", size=1)  # jz success
+    m.byte(cmp_rm_imm | 1).byte(join_byte(3, 7, Reg.ecx)).dword(MAX_LEN)  # cmp ecx, MAX_LEN
+    m.byte(jcc_short | Cond.g).relative_reference("skip", size=1)  # jg skip
+    m.byte(inc_reg | Reg.ecx.code)  # inc ecx
+    m.byte(jmp_short).relative_reference("@@", size=1)  # jmp @b
+    m.label("success")
+    m.bytes(code_chunk)
+    m.label("skip")
+    m.byte(pop_reg | Reg.ecx.code)  # pop ecx
+    return m.build()
 
 
 def mach_memcpy(src, dest: Operand, count):

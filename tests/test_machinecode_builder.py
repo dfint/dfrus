@@ -47,9 +47,3 @@ def test_machinecode_2():
     field_values = m.values()
     found_refs = {b.index(field_values[ref_name].to_bytes(4, 'little')) for ref_name in 'ab'}
     assert found_refs == set(m.absolute_references)
-
-
-# def test_mach_strlen():
-#     # Test the new mach_strlen:
-#     code = mach_strlen(nop)
-#     assert bytes(code) == bytes.fromhex('51 31 C9 80 3C 08 00 74 0B 81 F9 00 01 00 00 7F 04 41 EB EF 90 59')

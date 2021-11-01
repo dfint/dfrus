@@ -1,8 +1,7 @@
-from dfrus.opcodes import mov_rm_imm, Reg, call_near, mov_reg_imm, jmp_near, nop
-from dfrus.disasm import join_byte
 from dfrus.binio import to_dword
+from dfrus.disasm import join_byte
 from dfrus.machine_code import MachineCode, Reference
-from dfrus.machine_code_utils import mach_strlen
+from dfrus.opcodes import mov_rm_imm, Reg, call_near, mov_reg_imm, jmp_near
 
 
 def test_machinecode_1():
@@ -52,9 +51,3 @@ def test_machinecode_2():
     b = bytes(code)
     found_refs = sorted(b.index(to_dword(code.fields[ref_name])) for ref_name in 'ab')
     assert found_refs == list(code.absolute_references)
-
-
-def test_mach_strlen():
-    # Test the new mach_strlen:
-    code = mach_strlen(nop)
-    assert bytes(code) == bytes.fromhex('51 31 C9 80 3C 08 00 74 0B 81 F9 00 01 00 00 7F 04 41 EB EF 90 59')
