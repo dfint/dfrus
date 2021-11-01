@@ -1,10 +1,9 @@
 import codecs
 import functools
 import unicodedata
-from typing import Tuple, Mapping, Union, Iterable, Dict, Optional, BinaryIO, Sequence, Callable
+from typing import Tuple, Mapping, Union, Iterable, Dict, BinaryIO, Callable
 
-from .binio import fpoke4, to_dword, read_bytes
-from .peclasses import Section
+from .binio import fpoke4
 
 
 def ord_utf16(c: str) -> int:
@@ -77,24 +76,6 @@ def patch_unicode_table(file: BinaryIO, offset: int, codepage: str) -> None:
     cp = get_codepages()[codepage]
     for item in cp:
         fpoke4(file, offset + item * 4, cp[item])
-
-
-def search_charmap(file: BinaryIO, sections: Sequence[Section], xref_table) -> Optional[int]:
-    unicode_table_start = b''.join(
-        to_dword(item) for item in [0x20, 0x263A, 0x263B, 0x2665, 0x2666, 0x2663, 0x2660, 0x2022]
-    )
-
-    offset = sections[1].physical_offset
-    size = sum(section.physical_size for section in sections[1:])
-    data_block = read_bytes(file, offset, size)
-    for obj_off in xref_table:
-        off = obj_off - offset
-        if 0 <= off < size:
-            buf = data_block[off:off+len(unicode_table_start)]
-            if buf == unicode_table_start:
-                return obj_off
-
-    return None
 
 
 class Encoder:

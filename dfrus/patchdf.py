@@ -16,8 +16,9 @@ from .extract_strings import extract_strings
 from .machine_code import MachineCode, Reference
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
-from .patch_charmap import search_charmap, patch_unicode_table, get_encoder
+from .patch_charmap import patch_unicode_table, get_encoder
 from .peclasses import Section, RelocationTable
+from .search_charmap import search_charmap
 from .trace_machine_code import which_func, FunctionInformation
 
 code_section, rdata_section, data_section = range(3)
