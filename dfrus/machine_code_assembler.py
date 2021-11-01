@@ -22,12 +22,16 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def sib(self, scale: int, index_register: int, base_register: int) -> "MachineCodeAssembler":
         return self.byte(join_byte(scale, index_register, base_register))
 
-    def mov_reg_imm(self, register: Reg, immediate: int):
+    def mov_reg_imm(self, register: Reg, immediate: int, is_absolute_reference=False):
         assert register.type is RegType.general
         assert register.size != 2
         size_bit = 8 * (register.size == 4)
         self.byte(mov_reg_imm | size_bit | register.code)
-        self.absolute_reference(value=immediate, size=register.size)
+
+        if is_absolute_reference:
+            self.absolute_reference(value=immediate, size=register.size)
+        else:
+            self.add_bytes(immediate.to_bytes(register.size, byteorder='little'))
 
     def mov_reg_reg32(self, dest: Reg, src: Reg):
         self.byte(mov_rm_reg | 1).modrm(3, src.code, dest.code)

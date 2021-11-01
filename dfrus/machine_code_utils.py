@@ -53,11 +53,11 @@ def mach_memcpy(src: int, dest: Operand, count) -> Tuple[bytes, Iterable[int]]:
         if dest.disp == 0:
             m.mov_reg_reg32(Reg.edi, dest.base_reg)  # mov edi, reg
         elif dest.base_reg is None:
-            m.mov_reg_imm(Reg.edi, dest.disp)  # mov edi, imm32
+            m.mov_reg_imm(Reg.edi, dest.disp, True)  # mov edi, imm32
         else:
             m.lea(Reg.edi, dest)  # lea edi, [reg+imm]
 
-    m.mov_reg_imm(Reg.esi, src)  # mov esi, imm32
+    m.mov_reg_imm(Reg.esi, src, True)  # mov esi, imm32
     m.byte(xor_rm_reg | 1).modrm(3, Reg.ecx.code, Reg.ecx.code)  # xor ecx, ecx
     m.mov_reg_imm(Reg.cl, (count + 3) // 4)  # mov cl, (count+3)//4
     m.byte(Prefix.rep).byte(movsd)  # rep movsd
