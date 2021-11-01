@@ -793,25 +793,9 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
     # Getting cross-references:
     xref_table = get_cross_references(fn, relocs, sections, image_base)
 
-    # --------------------------------------------------------
     if codepage:
-        print("Searching for charmap table...")
-        needle = search_charmap(fn, sections, xref_table)
+        fix_unicode_table(codepage, fn, sections, xref_table)
 
-        if needle is None:
-            print("Warning: charmap table not found. Skipping.")
-        else:
-            print("Charmap table found at offset 0x%X" % needle)
-
-            try:
-                print("Patching charmap table to %s..." % codepage)
-                patch_unicode_table(fn, needle, codepage)
-            except KeyError:
-                print("Warning: codepage %s not implemented. Skipping." % codepage)
-            else:
-                print("Done.")
-
-    # --------------------------------------------------------
     if debug:
         print("Preparing additional data section...")
 
@@ -889,6 +873,23 @@ def fix_df_exe(fn, pe, codepage, original_codepage, trans_table: Mapping[str, st
     assert set(pe.relocation_table) == relocs, "Error: relocation table is broken"
 
     print('Done.')
+
+
+def fix_unicode_table(codepage, fn, sections, xref_table):
+    print("Searching for charmap table...")
+    needle = search_charmap(fn, sections, xref_table)
+    if needle is None:
+        print("Warning: charmap table not found. Skipping.")
+    else:
+        print("Charmap table found at offset 0x%X" % needle)
+
+        try:
+            print("Patching charmap table to %s..." % codepage)
+            patch_unicode_table(fn, needle, codepage)
+        except KeyError:
+            print("Warning: codepage %s not implemented. Skipping." % codepage)
+        else:
+            print("Done.")
 
 
 def process_strings(encoder_function, encoding, fn, image_base, new_section, new_section_offset, relocs_to_add,
