@@ -1,10 +1,10 @@
 import sys
-
 from collections import Counter
+from typing import Tuple
 
 from .cross_references import get_cross_references
-from .peclasses import PortableExecutable
 from .disasm import align
+from .peclasses import PortableExecutable
 
 forbidden = set(b'$^')
 
@@ -24,20 +24,27 @@ def possible_to_decode(c, encoding):
         return True
 
 
-def check_string(buf, encoding):
-    s_len = None
-    letters = 0
+def check_string(buf: bytes, encoding: str) -> Tuple[int, int]:
+    """
+    Try to decode bytes as a string in the given encoding
+    :param buf: byte buffer
+    :param encoding: string encoding
+    :return: (string_length: int, number_of_letters: int)
+    """
+    string_length = 0
+    number_of_letters = 0
     for i, c in enumerate(buf):
         if c == 0:
-            s_len = i
+            string_length = i
             break
-        
-        if not is_allowed(c) or not possible_to_decode(buf[i:i+1], encoding):
+
+        current_byte = bytes(buf[i:i + 1])
+        if not is_allowed(c) or not possible_to_decode(current_byte, encoding):
             break
-        elif buf[i:i+1].isalpha():
-            letters += 1
+        elif current_byte.isalpha():
+            number_of_letters += 1
     
-    return s_len, letters
+    return string_length, number_of_letters
 
 
 def check_string_array(buf, offset, encoding='cp437'):
