@@ -56,8 +56,8 @@ class Fix:
     fix: Optional[Any] = None
 
     def update(self, other: "Fix"):
-        for field in fields(self):
-            self.__setattr__(field.name, other.__getattribute__(field.name))
+        for f in fields(self):
+            self.__setattr__(f.name, other.__getattribute__(f.name))
 
     def add_fix(self, fix: "Fix"):
         new_code = fix.new_code
@@ -1121,9 +1121,9 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
         dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.dest_off
 
         if isinstance(mach, MachineCode):
-            for field, value in mach.fields.items():
+            for field_name, value in mach.fields.items():
                 if value is not None:
-                    mach.fields[field] = sections[code_section].offset_to_rva(value)
+                    mach.fields[field_name] = sections[code_section].offset_to_rva(value)
             mach.origin_address = hook_rva
 
         if dest_off is not None:
