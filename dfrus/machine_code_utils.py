@@ -9,7 +9,7 @@ from .opcodes import push_reg, Reg, xor_rm_reg, cmp_rm_imm, jcc_short, Cond, inc
 MAX_LEN = 0x100
 
 
-def mach_strlen(code_chunk: Iterable[int]) -> bytes:
+def mach_strlen(code_chunk: Iterable) -> bytes:
     """
         push ecx
         xor ecx, ecx
@@ -36,7 +36,7 @@ def mach_strlen(code_chunk: Iterable[int]) -> bytes:
     m.byte(inc_reg | Reg.ecx.code)  # inc ecx
     m.byte(jmp_short).relative_reference("@@", size=1)  # jmp @b
     m.label("success")
-    m.bytes(code_chunk)
+    m.add_bytes(bytes(code_chunk))
     m.label("skip")
     m.byte(pop_reg | Reg.ecx.code)  # pop ecx
     return m.build()

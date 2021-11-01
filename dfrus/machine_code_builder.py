@@ -27,7 +27,7 @@ from .binio import to_unsigned
 class MachineCodeItem:
     size: int
     name: Optional[str] = None
-    value: Union[int, bytes] = None
+    value: Optional[Union[int, bytes]] = None
     position: Optional[int] = None
 
     """
@@ -64,8 +64,7 @@ class MachineCodeBuilder:
         self._labels[name] = self._cursor
         return self
 
-    def bytes(self, *args, **kwargs) -> "MachineCodeBuilder":
-        value = bytes(*args, **kwargs)
+    def add_bytes(self, value: bytes) -> "MachineCodeBuilder":
         return self._add_item(MachineCodeItem(value=value, size=len(value)))
 
     def relative_reference(self, name: str, size: int) -> "MachineCodeBuilder":
@@ -100,10 +99,16 @@ class MachineCodeBuilder:
         Set values of the corresponding fields or get values of all fields if no parameters are passed
         """
         if not kwargs:
-            return {field.name: field.value for field in self._fields.values()}
+            return {
+                field.name: field.value
+                for field in self._fields.values()
+                if field.name and isinstance(field.value, int)
+            }
 
         for field_name, value in kwargs.items():
             self._set_value(field_name, value)
+
+        return None
 
     def build(self) -> bytes:
         # Fill-in label references (eg. addresses of internal jumps)
@@ -126,3 +131,6 @@ class MachineCodeBuilder:
                     buffer.write(value.to_bytes(item.size, signed=False, byteorder=self.byteorder))
 
         return buffer.getvalue()
+
+    def __iter(self) -> bytes:
+        return self.build()

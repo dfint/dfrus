@@ -31,14 +31,14 @@ def test_machinecode_1():
     assert m.build() == bytes.fromhex('C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00')
 
 
-def test_machinecode_2():
+def test_machinecode_absolute_references():
     # Test getting addresses of absolute references
     m = MachineCodeBuilder()
-    m.bytes(123)
+    m.add_bytes(bytes(123))
     m.absolute_reference("b", size=4)
-    m.bytes(12345)
+    m.add_bytes(bytes(12345))
     m.absolute_reference("a", size=4)
-    m.bytes(10)
+    m.add_bytes(bytes(10))
 
     m.origin_address = 0
     m.values(a=0xDEAD, b=0xBEEF)
