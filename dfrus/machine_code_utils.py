@@ -1,10 +1,9 @@
-from typing import Iterable
+from typing import Iterable, Tuple
 
-from .binio import to_dword, from_dword
+from .binio import from_dword
 from .disasm import join_byte, Operand
 from .machine_code_assembler import MachineCodeAssembler
-from .opcodes import Reg, xor_rm_reg, cmp_rm_imm, Cond, inc_reg, pushad, \
-    mov_rm_reg, mov_reg_imm, Prefix, movsd, popad, mov_acc_mem, x0f_movups, lea
+from .opcodes import *
 
 MAX_LEN = 0x100
 
@@ -42,40 +41,31 @@ def mach_strlen(code_chunk: Iterable) -> bytes:
     return m.build()
 
 
-def mach_memcpy(src, dest: Operand, count):
-    mach = bytearray()
-    mach.append(pushad)  # pushad
-    new_references = set()
+def mach_memcpy(src: int, dest: Operand, count) -> Tuple[bytes, Iterable[int]]:
     assert dest.index_reg is None
+
+    m = MachineCodeAssembler()
+
+    m.byte(pushad)  # pushad
+
     # If the destination address is not in edi yet, put it there
     if dest.base_reg != Reg.edi or dest.disp != 0:
         if dest.disp == 0:
-            # mov edi, reg
-            mach += bytes((mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)))
+            m.mov_reg_reg32(Reg.edi, dest.base_reg)  # mov edi, reg
         elif dest.base_reg is None:
-            # mov edi, imm32
-            mach.append(mov_reg_imm | 8 | Reg.edi.code)  # mov edi, ...
-            new_references.add(len(mach))
-            mach += to_dword(dest.disp)  # imm32
+            m.mov_reg_imm(Reg.edi, dest.disp)  # mov edi, imm32
         else:
-            # lea edi, [reg+imm]
-            mach += mach_lea(Reg.edi.code, dest)
+            m.lea(Reg.edi, dest)  # lea edi, [reg+imm]
 
-    mach.append(mov_reg_imm | 8 | Reg.esi.code)  # mov esi, ...
-    new_references.add(len(mach))
-    mach += to_dword(src)  # imm32
-
-    mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
-    mach += bytes((mov_reg_imm | Reg.cl.code, (count + 3) // 4))  # mov cl, (count+3)//4
-
-    mach += bytes((Prefix.rep, movsd))  # rep movsd
-
-    mach.append(popad)  # popad
-
-    return mach, new_references
+    m.mov_reg_imm(Reg.esi, src)  # mov esi, imm32
+    m.byte(xor_rm_reg | 1).modrm(3, Reg.ecx.code, Reg.ecx.code)  # xor ecx, ecx
+    m.mov_reg_imm(Reg.cl, (count + 3) // 4)  # mov cl, (count+3)//4
+    m.byte(Prefix.rep).byte(movsd)  # rep movsd
+    m.byte(popad)  # popad
+    return m.build(), m.absolute_references
 
 
-def match_mov_reg_imm32(b, reg, imm):
+def match_mov_reg_imm32(b: bytes, reg: Reg, imm: int) -> bool:
     assert len(b) == 5, b
     return b[0] == mov_reg_imm | 8 | int(reg) and from_dword(b[1:]) == imm
 
@@ -96,32 +86,3 @@ def get_start(s):
         i += 1
 
     return i
-
-
-def mach_lea(register: Reg, src: Operand) -> bytes:
-    m = MachineCodeAssembler()
-    m.byte(lea)
-
-    if src.disp == 0 and src.base_reg != Reg.ebp:
-        mode = 0
-    elif -0x80 <= src.disp < 0x80:
-        mode = 1
-    else:
-        mode = 2
-
-    if src.base_reg != Reg.esp:
-        m.modrm(mode, register.code, src.base_reg.code)
-    else:
-        if src.index_reg is None:
-            m.modrm(mode, register.code, 4).sib(0, 4, src.base_reg.code)
-        else:
-            assert src.index_reg != Reg.esp
-            m.modrm(mode, register.code, 4)
-            m.sib(src.scale, src.index_reg.code, src.base_reg.code)
-
-    if mode == 1:
-        m.byte(src.disp)
-    else:
-        m.dword(src.disp)
-
-    return m.build()

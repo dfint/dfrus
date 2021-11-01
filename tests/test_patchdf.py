@@ -2,9 +2,9 @@ from dataclasses import asdict
 
 import pytest
 
-from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata, Fix
 from dfrus.disasm import disasm
 from dfrus.opcodes import *
+from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata
 
 
 def convert_test_data_from_copypaste(s: str):
@@ -296,7 +296,7 @@ def test_mach_memcpy_stimulant():
         'rep movsd',
         'popad',
     ]
-    assert new_refs == {2, 7}
+    assert set(new_refs) == {2, 7}
 
 
 test_data_linen_apron = bytes.fromhex(

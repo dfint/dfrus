@@ -16,6 +16,7 @@ file.seek(m.origin_address)
 file.write(m.build())
 """
 import io
+import uuid
 from typing import List, Optional, Dict, Mapping, Union, Iterable
 
 from attr import dataclass
@@ -72,8 +73,16 @@ class MachineCodeBuilder:
         self._fields[name] = reference
         return self._add_item(reference)
 
-    def absolute_reference(self, name: str, size: int) -> "MachineCodeBuilder":
-        reference = MachineCodeItem(name=name, size=size, is_relative=False)
+    def absolute_reference(self,
+                           name: Optional[str] = None,
+                           value: Optional[int] = None,
+                           size: int = 4) \
+            -> "MachineCodeBuilder":
+
+        if name is None:
+            name = "unnamed_" + uuid.uuid1().hex
+
+        reference = MachineCodeItem(name=name, value=value, size=size, is_relative=False)
         self._fields[name] = reference
         return self._add_item(reference)
 

@@ -47,3 +47,19 @@ def test_machine_code_builder_absolute_references():
     field_values = m.values()
     found_refs = {b.index(field_values[ref_name].to_bytes(4, 'little')) for ref_name in 'ab'}
     assert found_refs == set(m.absolute_references)
+
+
+def test_machine_code_builder_absolute_references_2():
+    # Test getting addresses of absolute references
+    m = MachineCodeBuilder()
+    m.add_bytes(bytes(123))
+    m.absolute_reference(value=0xBEEF, size=4)
+    m.add_bytes(bytes(12345))
+    m.absolute_reference(value=0xDEAD, size=4)
+    m.add_bytes(bytes(10))
+
+    m.origin_address = 0
+
+    b = m.build()
+    found_refs = {b.index(value.to_bytes(4, 'little')) for value in (0xDEAD, 0xBEEF)}
+    assert found_refs == set(m.absolute_references)
