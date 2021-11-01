@@ -43,7 +43,6 @@ def mach_strlen(code_chunk: Iterable) -> bytes:
 
 def mach_memcpy(src: int, dest: Operand, count) -> Tuple[bytes, Iterable[int]]:
     assert dest.index_reg is None
-
     m = MachineCodeAssembler()
 
     m.byte(pushad)  # pushad
@@ -51,6 +50,7 @@ def mach_memcpy(src: int, dest: Operand, count) -> Tuple[bytes, Iterable[int]]:
     # If the destination address is not in edi yet, put it there
     if dest.base_reg != Reg.edi or dest.disp != 0:
         if dest.disp == 0:
+            assert dest.base_reg is not None
             m.mov_reg_reg32(Reg.edi, dest.base_reg)  # mov edi, reg
         elif dest.base_reg is None:
             m.mov_reg_imm(Reg.edi, dest.disp, True)  # mov edi, imm32

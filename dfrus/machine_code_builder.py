@@ -50,35 +50,36 @@ class MachineCodeBuilder:
         self._labels: Dict[str, int] = dict()
         self._cursor: int = 0
 
-    def _add_item(self, item: MachineCodeItem) -> "MachineCodeBuilder":
+    def _add_item(self, item: MachineCodeItem):
         item.position = self._cursor
         self._raw_list.append(item)
         self._cursor += self._raw_list[-1].size
         return self
 
-    def byte(self, value: int) -> "MachineCodeBuilder":
+    def byte(self, value: int):
         return self._add_item(MachineCodeItem(value=value, size=1))
 
-    def dword(self, value: int) -> "MachineCodeBuilder":
+    def dword(self, value: int):
         return self._add_item(MachineCodeItem(value=value, size=4))
 
-    def label(self, name: str) -> "MachineCodeBuilder":
+    def label(self, name: str):
         self._labels[name] = self._cursor
         return self
 
-    def add_bytes(self, value: bytes) -> "MachineCodeBuilder":
+    def add_bytes(self, value: bytes):
         return self._add_item(MachineCodeItem(value=value, size=len(value)))
 
-    def relative_reference(self, name: str, size: int) -> "MachineCodeBuilder":
+    def relative_reference(self, name: str, size: int):
         reference = MachineCodeItem(name=name, size=size, is_relative=True)
         self._fields[name] = reference
         return self._add_item(reference)
 
-    def absolute_reference(self,
-                           name: Optional[str] = None,
-                           value: Optional[int] = None,
-                           size: int = 4) \
-            -> "MachineCodeBuilder":
+    def absolute_reference(
+            self,
+            name: Optional[str] = None,
+            value: Optional[int] = None,
+            size: int = 4
+    ):
 
         if name is None:
             name = "unnamed_" + uuid.uuid1().hex
@@ -145,7 +146,7 @@ class MachineCodeBuilder:
     def __iter__(self) -> bytes:
         return self.build()
 
-    def __add__(self, other) -> "MachineCodeBuilder":
+    def __add__(self, other):
         assert isinstance(other, MachineCodeBuilder)
         new = MachineCodeBuilder()
 
@@ -159,7 +160,7 @@ class MachineCodeBuilder:
         new._fields.update(other._fields)
 
         new._labels.update(self._labels)
-        for name, index in other._labels:
+        for name, index in other._labels.items():
             new._labels[name] = index + self._cursor
 
         return new

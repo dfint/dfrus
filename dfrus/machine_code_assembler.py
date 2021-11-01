@@ -37,6 +37,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
         self.byte(mov_rm_reg | 1).modrm(3, src.code, dest.code)
 
     def lea(self, register: Reg, src: Operand):
+        assert src.base_reg is not None
         self.byte(lea)
 
         if src.disp == 0 and src.base_reg != Reg.ebp:
@@ -52,6 +53,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
             if src.index_reg is None:
                 self.modrm(mode, register.code, 4).sib(0, 4, src.base_reg.code)
             else:
+                assert src.scale is not None
                 assert src.index_reg != Reg.esp
                 self.modrm(mode, register.code, 4)
                 self.sib(src.scale, src.index_reg.code, src.base_reg.code)
