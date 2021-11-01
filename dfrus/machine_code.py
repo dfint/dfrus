@@ -1,5 +1,6 @@
-from dataclasses import dataclass
 from typing import Iterable, Sequence, Union, Any, MutableMapping
+
+from dataclasses import dataclass
 
 '''
 # Concept:
@@ -40,7 +41,7 @@ class MachineCode:
         self._raw_list = list(args)
         self.fields: MutableMapping[str, Any] = dict()
         self._labels: MutableMapping[str, int] = dict()
-        self._absolute_ref_indexes = []
+        self._absolute_ref_indices = list()
         i = 0
         for item in args:
             if item is None:
@@ -62,7 +63,7 @@ class MachineCode:
             elif isinstance(item, Reference):
                 self.fields[item.name] = None
                 if not item.is_relative:
-                    self._absolute_ref_indexes.append(i)
+                    self._absolute_ref_indices.append(i)
                 i += item.size
             else:
                 raise ValueError(f'Value unsupported by MachineCode: {item}')
@@ -108,9 +109,9 @@ class MachineCode:
     @property
     def absolute_references(self):
         if self.origin_address is None:
-            return iter(self._absolute_ref_indexes)
+            return iter(self._absolute_ref_indices)
         else:
-            return (self.origin_address + i for i in self._absolute_ref_indexes)
+            return (self.origin_address + i for i in self._absolute_ref_indices)
 
     def __iadd__(self, other):
         if isinstance(other, type(self)):
@@ -124,7 +125,7 @@ class MachineCode:
 
             self.fields.update(dict(other.fields))
 
-            self._absolute_ref_indexes.extend(item + self.code_length for item in other._absolute_ref_indexes)
+            self._absolute_ref_indices.extend(item + self.code_length for item in other._absolute_ref_indices)
 
             self.code_length += other.code_length
         elif isinstance(other, Iterable):
