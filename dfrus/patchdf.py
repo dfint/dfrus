@@ -1123,14 +1123,13 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
 
         hook_rva = new_section.offset_to_rva(new_section_offset)
 
-        dest_off = dict(mach.get_values()).get('dest', None) if isinstance(mach, MachineCodeBuilder) else fix.dest_off
+        dest_off = dict(mach.get_values()).get('dest', None) or fix.dest_off
 
-        if isinstance(mach, MachineCodeBuilder):
-            for field_name, value in mach.get_values():
-                if value is not None:
-                    mach.set_value(field_name, sections[code_section].offset_to_rva(value))
+        for field_name, value in mach.get_values():
+            if value is not None:
+                mach.set_value(field_name, sections[code_section].offset_to_rva(value))
 
-            mach.origin_address = hook_rva
+        mach.origin_address = hook_rva
 
         if dest_off is not None:
             dest_rva = sections[code_section].offset_to_rva(dest_off)
@@ -1139,15 +1138,15 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
             else:
                 disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement
                 # Add jump from the hook
-                mach += bytes((jmp_near,)) + to_dword(disp, signed=True)
+                mach.byte(jmp_near).relative_reference(disp)
 
         assert mach is not None
         # Write the hook to the new section
         new_section_offset = add_to_new_section(fn, new_section_offset, mach.build(), padding_byte=int3)
 
         # If there are absolute references in the code, add them to relocation table
-        if fix.added_relocs or isinstance(mach, MachineCodeBuilder) and list(mach.absolute_references):
-            new_refs = set(mach.absolute_references) if isinstance(mach, MachineCodeBuilder) else set()
+        if fix.added_relocs or list(mach.absolute_references):
+            new_refs = set(mach.absolute_references)
 
             if fix.added_relocs:
                 new_refs.update(fix.added_relocs)
