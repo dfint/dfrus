@@ -4,7 +4,7 @@ import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
 from operator import itemgetter
-from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
+from typing import Tuple, Optional, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
 from warnings import warn
 
 from dataclasses import dataclass, fields, field
@@ -51,8 +51,7 @@ class Fix:
     added_relocs: Iterable[int] = field(default_factory=list)
     deleted_relocs: Iterable[int] = field(default_factory=list)
     meta: Optional[Metadata] = None
-    op: Optional[Any] = None
-    fix: Optional[Any] = None
+    fix: Optional["Fix"] = None
 
     def update(self, other: "Fix"):
         for f in fields(self):
@@ -301,7 +300,6 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                         src_off=next_off + i + 1,
                         new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
                         dest_off=next_off + i + 5 + displacement,
-                        op=call_near
                     )
                     ret_value.meta = meta
                     return ret_value
@@ -328,7 +326,6 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             src_off=next_off + i + 1,
                             new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
                             dest_off=next_off + i + 5 + displacement,
-                            op=call_near
                         )
                         ret_value.meta = meta
                         return ret_value
