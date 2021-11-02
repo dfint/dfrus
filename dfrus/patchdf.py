@@ -55,7 +55,7 @@ class Fix:
     fix: Optional["Fix"] = None
 
     def update(self, other: "Fix"):
-        for f in fields(self):
+        for f in fields(self):  # FIXME: is this correct? Do we need to replace values of all the fields?
             self.__setattr__(f.name, other.__getattribute__(f.name))
 
     def add_fix(self, fix: "Fix"):
