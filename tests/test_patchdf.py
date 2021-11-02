@@ -1,10 +1,9 @@
+import pytest
 from dataclasses import asdict
 
-import pytest
-
-from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata, Fix
 from dfrus.disasm import disasm
 from dfrus.opcodes import *
+from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata
 
 
 def convert_test_data_from_copypaste(s: str):
@@ -286,8 +285,8 @@ def test_mach_memcpy_stimulant():
     string_addr = 0x123456
     newlen = len('стимулятор')
     count = newlen + 1
-    mach, new_refs = mach_memcpy(string_addr, dest, newlen + 1)
-    assert [str(line) for line in disasm(mach)] == [
+    mach = mach_memcpy(string_addr, dest, newlen + 1)
+    assert [str(line) for line in disasm(mach.build())] == [
         'pushad',
         'mov edi, 0x%X' % dest.disp,
         'mov esi, 0x%X' % string_addr,
@@ -296,7 +295,7 @@ def test_mach_memcpy_stimulant():
         'rep movsd',
         'popad',
     ]
-    assert new_refs == {2, 7}
+    assert set(mach.absolute_references) == {2, 7}
 
 
 test_data_linen_apron = bytes.fromhex(

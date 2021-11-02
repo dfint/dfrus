@@ -69,10 +69,15 @@ def to_signed(x: int, width: int) -> int:
 
 
 def to_unsigned(x: int, width: int) -> int:
+    """
+    Convert signed value into unsigned
+    :param x: original value
+    :param width in bits
+    """
     pow2w = 2 ** width
     if x < 0:
         x += pow2w
-    assert (x < pow2w)
+    assert 0 <= x < pow2w
     return x
 
 

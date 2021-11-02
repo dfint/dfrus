@@ -1,15 +1,15 @@
-from typing import Iterable
+from typing import Union
 
-from .binio import to_dword, from_dword
-from .disasm import join_byte, Operand
-from .machine_code import MachineCode, Reference
-from .opcodes import push_reg, Reg, xor_rm_reg, cmp_rm_imm, jcc_short, Cond, inc_reg, jmp_short, pop_reg, pushad, \
-    mov_rm_reg, mov_reg_imm, Prefix, movsd, popad, mov_acc_mem, x0f_movups, lea
+from .binio import from_dword
+from .disasm import Operand
+from .machine_code_assembler import MachineCodeAssembler
+from .machine_code_builder import MachineCodeBuilder
+from .opcodes import *
 
 MAX_LEN = 0x100
 
 
-def mach_strlen(code_chunk: Iterable[int]):
+def mach_strlen(code_chunk: Union[bytes, MachineCodeBuilder]) -> MachineCodeBuilder:
     """
         push ecx
         xor ecx, ecx
@@ -25,57 +25,48 @@ def mach_strlen(code_chunk: Iterable[int]):
     skip:
         pop ecx
     """
-    return MachineCode(
-        push_reg | Reg.ecx.code,  # push ecx
-        xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx),  # xor ecx, ecx
-        '@@:',
-        cmp_rm_imm, join_byte(0, 7, 4), join_byte(0, Reg.ecx, Reg.eax), 0x00,  # cmp byte [eax+ecx], 0
-        jcc_short | Cond.z, Reference.relative('success', size=1),  # jz success
-        cmp_rm_imm | 1, join_byte(3, 7, Reg.ecx), to_dword(MAX_LEN),  # cmp ecx, MAX_LEN
-        jcc_short | Cond.g, Reference.relative('skip', size=1),  # jg skip
-        inc_reg | Reg.ecx.code,  # inc ecx
-        jmp_short, Reference.relative('@@', size=1),  # jmp @b
-        'success:',
-        code_chunk,
-        'skip:',
-        pop_reg | Reg.ecx.code,  # pop ecx
-    )
+    m = MachineCodeAssembler()
+    m.push_reg(Reg.ecx)  # push ecx
+    m.byte(xor_rm_reg | 1).modrm(3, Reg.ecx, Reg.ecx)  # xor ecx, ecx
+    m.label("@@")
+    m.byte(cmp_rm_imm).modrm(0, 7, 4).sib(0, Reg.ecx, Reg.eax).byte(0x00)  # cmp byte [eax+ecx], 0
+    m.jump_conditional_short(Cond.z, "success")  # jz success
+    m.byte(cmp_rm_imm | 1).modrm(3, 7, Reg.ecx).dword(MAX_LEN)  # cmp ecx, MAX_LEN
+    m.jump_conditional_short(Cond.g, "skip")  # jg skip
+    m.byte(inc_reg | Reg.ecx.code)  # inc ecx
+    m.jump_short("@@")  # jmp @b
+    m.label("success")
+    m += code_chunk
+    m.label("skip")
+    m.pop_reg(Reg.ecx)  # pop ecx
+    return m
 
 
-def mach_memcpy(src, dest: Operand, count):
-    mach = bytearray()
-    mach.append(pushad)  # pushad
-    new_references = set()
+def mach_memcpy(src: int, dest: Operand, count) -> MachineCodeBuilder:
     assert dest.index_reg is None
+    m = MachineCodeAssembler()
+
+    m.byte(pushad)  # pushad
+
     # If the destination address is not in edi yet, put it there
     if dest.base_reg != Reg.edi or dest.disp != 0:
         if dest.disp == 0:
-            # mov edi, reg
-            mach += bytes((mov_rm_reg | 1, join_byte(3, dest.base_reg, Reg.edi)))
+            assert dest.base_reg is not None
+            m.mov_reg_reg32(Reg.edi, dest.base_reg)  # mov edi, reg
         elif dest.base_reg is None:
-            # mov edi, imm32
-            mach.append(mov_reg_imm | 8 | Reg.edi.code)  # mov edi, ...
-            new_references.add(len(mach))
-            mach += to_dword(dest.disp)  # imm32
+            m.mov_reg_imm(Reg.edi, dest.disp, True)  # mov edi, imm32
         else:
-            # lea edi, [reg+imm]
-            mach += mach_lea(Reg.edi, dest)
+            m.lea(Reg.edi, dest)  # lea edi, [reg+imm]
 
-    mach.append(mov_reg_imm | 8 | Reg.esi.code)  # mov esi, ...
-    new_references.add(len(mach))
-    mach += to_dword(src)  # imm32
-
-    mach += bytes((xor_rm_reg | 1, join_byte(3, Reg.ecx, Reg.ecx)))  # xor ecx, ecx
-    mach += bytes((mov_reg_imm | Reg.cl.code, (count + 3) // 4))  # mov cl, (count+3)//4
-
-    mach += bytes((Prefix.rep, movsd))  # rep movsd
-
-    mach.append(popad)  # popad
-
-    return mach, new_references
+    m.mov_reg_imm(Reg.esi, src, True)  # mov esi, imm32
+    m.byte(xor_rm_reg | 1).modrm(3, Reg.ecx.code, Reg.ecx.code)  # xor ecx, ecx
+    m.mov_reg_imm(Reg.cl, (count + 3) // 4)  # mov cl, (count+3)//4
+    m.byte(Prefix.rep).byte(movsd)  # rep movsd
+    m.byte(popad)  # popad
+    return m
 
 
-def match_mov_reg_imm32(b, reg, imm):
+def match_mov_reg_imm32(b: bytes, reg: Reg, imm: int) -> bool:
     assert len(b) == 5, b
     return b[0] == mov_reg_imm | 8 | int(reg) and from_dword(b[1:]) == imm
 
@@ -96,28 +87,3 @@ def get_start(s):
         i += 1
 
     return i
-
-
-def mach_lea(dest, src: Operand):
-    mach = bytearray()
-    mach.append(lea)
-    assert src.index_reg is None, 'mach_lea(): right operand with index register not implemented'
-
-    if src.disp == 0 and src.base_reg != Reg.ebp:
-        mode = 0
-    elif -0x80 <= src.disp < 0x80:
-        mode = 1
-    else:
-        mode = 2
-
-    if src.base_reg == Reg.esp:
-        mach.append(join_byte(mode, dest, 4))  # mod r/m byte
-        mach.append(join_byte(0, 4, src.base_reg))  # sib byte
-    else:
-        mach.append(join_byte(mode, dest, src.base_reg))  # just mod r/m byte
-
-    if mode == 1:
-        mach += src.disp.to_bytes(1, byteorder='little', signed=True)
-    else:
-        mach += src.disp.to_bytes(4, byteorder='little', signed=True)
-    return mach
