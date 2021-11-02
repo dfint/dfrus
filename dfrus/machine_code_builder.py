@@ -17,6 +17,7 @@ file.write(m.build())
 """
 import io
 import uuid
+from collections import defaultdict
 from copy import copy, deepcopy
 from typing import List, Optional, Dict, Mapping, Union, Iterable
 
@@ -51,7 +52,7 @@ class MachineCodeBuilder:
         self.origin_address = origin_address
         self.byteorder = byteorder
         self._raw_list: List[MachineCodeItem] = list()
-        self._fields: Dict[str, MachineCodeItem] = dict()
+        self._fields: Dict[str, List[MachineCodeItem]] = defaultdict(list)
         self._labels: Dict[str, int] = dict()
         self._cursor: int = 0
 
@@ -76,7 +77,7 @@ class MachineCodeBuilder:
 
     def relative_reference(self, name: str, size: int):
         reference = Reference.relative(name=name, size=size)
-        self._fields[name] = reference
+        self._fields[name].append(reference)
         return self._add_item(reference)
 
     def absolute_reference(
@@ -90,7 +91,7 @@ class MachineCodeBuilder:
             name = "unnamed_" + uuid.uuid1().hex
 
         reference = Reference.absolute(name=name, value=value, size=size)
-        self._fields[name] = reference
+        self._fields[name].append(reference)
         return self._add_item(reference)
 
     @property
@@ -103,12 +104,13 @@ class MachineCodeBuilder:
                 yield self.origin_address + item.position
 
     def _set_value(self, field_name: str, value: int) -> None:
-        field = self._fields[field_name]
+        fields = self._fields[field_name]
 
-        if isinstance(field, Reference) and field.is_relative:
-            value = value - (self.origin_address + field.position + field.size)
+        for field in fields:
+            if isinstance(field, Reference) and field.is_relative:
+                value = value - (self.origin_address + field.position + field.size)
 
-        field.value = value
+            field.value = value
 
     def values(self, **kwargs: int) -> Optional[Mapping[str, int]]:
         """
@@ -116,9 +118,9 @@ class MachineCodeBuilder:
         """
         if not kwargs:
             return {
-                field.name: field.value
-                for field in self._fields.values()
-                if field.name and isinstance(field.value, int)
+                fields[0].name: fields[0].value
+                for fields in self._fields.values()
+                if fields[0].name and isinstance(fields[0].value, int)
             }
 
         for field_name, value in kwargs.items():
