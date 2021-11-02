@@ -34,7 +34,7 @@ def mach_strlen(code_chunk: bytes) -> MachineCodeBuilder:
     m.byte(inc_reg | Reg.ecx.code)  # inc ecx
     m.jump_short("@@")  # jmp @b
     m.label("success")
-    m.add_bytes(code_chunk)
+    m.add_bytes(code_chunk)  # TODO: add support of MachineCodeBuilder chunks
     m.label("skip")
     m.pop_reg(Reg.ecx)  # pop ecx
     return m
