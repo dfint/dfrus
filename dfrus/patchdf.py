@@ -46,7 +46,6 @@ class Metadata:
 class Fix:
     new_code: Optional[Union[bytes, MachineCode]] = None
     pokes: Optional[dict] = None
-    poke: Any = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
     added_relocs: Iterable[int] = field(default_factory=list)
@@ -74,8 +73,6 @@ class Fix:
                 if isinstance(old_code, MachineCode):
                     assert not isinstance(new_code, MachineCode)
                     new_code = new_code + old_code
-                    if old_fix.poke and not fix.poke:
-                        fix.poke = old_fix.poke
                 else:
                     new_code = old_code + new_code
                 fix.new_code = new_code
