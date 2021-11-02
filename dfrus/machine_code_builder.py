@@ -147,22 +147,27 @@ class MachineCodeBuilder:
 
         return buffer.getvalue()
 
-    def __add__(self, other):
+    def __iadd__(self, other: Union["MachineCodeBuilder", bytes]):
         assert isinstance(other, (MachineCodeBuilder, bytes))
-        new = deepcopy(self)
 
         if isinstance(other, bytes):
-            new.add_bytes(other)
+            self.add_bytes(other)
         elif isinstance(other, MachineCodeBuilder):
             for name, index in other.labels.items():
-                new.labels[name] = index + new._cursor
+                self.labels[name] = index + self._cursor
 
             for item in other._raw_list:
                 item_copy = copy(item)
-                new._add_item(item_copy)
+                self._add_item(item_copy)
                 if item_copy.name is not None:
-                    new._fields[item_copy.name].append(item_copy)
+                    self._fields[item_copy.name].append(item_copy)
 
+        return self
+
+    def __add__(self, other: Union["MachineCodeBuilder", bytes]):
+        assert isinstance(other, (MachineCodeBuilder, bytes))
+        new = deepcopy(self)
+        new += other
         return new
 
     def __radd__(self, other: bytes):

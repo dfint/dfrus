@@ -1,3 +1,5 @@
+from typing import Union
+
 from .binio import from_dword
 from .disasm import Operand
 from .machine_code_assembler import MachineCodeAssembler
@@ -7,7 +9,7 @@ from .opcodes import *
 MAX_LEN = 0x100
 
 
-def mach_strlen(code_chunk: bytes) -> MachineCodeBuilder:
+def mach_strlen(code_chunk: Union[bytes, MachineCodeBuilder]) -> MachineCodeBuilder:
     """
         push ecx
         xor ecx, ecx
@@ -34,7 +36,7 @@ def mach_strlen(code_chunk: bytes) -> MachineCodeBuilder:
     m.byte(inc_reg | Reg.ecx.code)  # inc ecx
     m.jump_short("@@")  # jmp @b
     m.label("success")
-    m.add_bytes(code_chunk)  # TODO: add support of MachineCodeBuilder chunks
+    m += code_chunk
     m.label("skip")
     m.pop_reg(Reg.ecx)  # pop ecx
     return m
