@@ -99,9 +99,10 @@ class MachineCodeBuilder:
         """
         Get addresses of absolute references (to add them to the relocation table)
         """
-        for item in self._fields.values():
-            if isinstance(item, Reference) and not item.is_relative:
-                yield self.origin_address + item.position
+        for fields in self._fields.values():
+            for item in fields:
+                if isinstance(item, Reference) and not item.is_relative:
+                    yield self.origin_address + item.position
 
     def _set_value(self, field_name: str, value: int) -> None:
         fields = self._fields[field_name]
