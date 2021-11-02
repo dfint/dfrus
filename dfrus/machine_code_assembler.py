@@ -45,6 +45,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
             mode = 2
 
         if src.base_reg != Reg.esp:
+            assert src.base_reg is not None
             self.modrm(mode, register.code, src.base_reg.code)
         else:
             if src.index_reg is None:

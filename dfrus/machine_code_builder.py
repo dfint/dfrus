@@ -32,13 +32,18 @@ class MachineCodeItem:
     value: Optional[Union[int, bytes]] = None
     position: Optional[int] = None
 
-    """
-    :is_relative
-    * True for relative reference,
-    * False for absolute reference,
-    * None for everything else
-    """
-    is_relative: Optional[bool] = None
+
+@dataclass
+class Reference(MachineCodeItem):
+    is_relative: bool = False
+
+    @classmethod
+    def relative(cls, name, size=4):
+        return cls(name=name, size=size, is_relative=True)
+
+    @classmethod
+    def absolute(cls, value=None, name=None, size=4):
+        return cls(value=value, name=name, size=size, is_relative=False)
 
 
 class MachineCodeBuilder:
@@ -70,7 +75,7 @@ class MachineCodeBuilder:
         return self._add_item(MachineCodeItem(value=value, size=len(value)))
 
     def relative_reference(self, name: str, size: int):
-        reference = MachineCodeItem(name=name, size=size, is_relative=True)
+        reference = Reference.relative(name=name, size=size)
         self._fields[name] = reference
         return self._add_item(reference)
 
@@ -84,7 +89,7 @@ class MachineCodeBuilder:
         if name is None:
             name = "unnamed_" + uuid.uuid1().hex
 
-        reference = MachineCodeItem(name=name, value=value, size=size, is_relative=False)
+        reference = Reference.absolute(name=name, value=value, size=size)
         self._fields[name] = reference
         return self._add_item(reference)
 
@@ -94,13 +99,13 @@ class MachineCodeBuilder:
         Get addresses of absolute references (to add them to the relocation table)
         """
         for item in self._fields.values():
-            if item.is_relative is False:  # is absolute reference
+            if isinstance(item, Reference) and not item.is_relative:
                 yield self.origin_address + item.position
 
     def _set_value(self, field_name: str, value: int) -> None:
         field = self._fields[field_name]
 
-        if field.is_relative:
+        if isinstance(field, Reference) and field.is_relative:
             value = value - (self.origin_address + field.position + field.size)
 
         field.value = value
