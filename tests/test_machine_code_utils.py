@@ -1,7 +1,7 @@
 import pytest
 
 from dfrus.disasm import Operand, disasm
-from dfrus.machine_code_assembler import MachineCodeAssembler
+from dfrus.machine_code_assembler import asm
 from dfrus.machine_code_utils import mach_strlen
 from dfrus.opcodes import nop, Reg
 
@@ -33,8 +33,6 @@ def test_mach_strlen():
     #   "lea edi, [eax+4*esi+0x123]"),  # FIXME
 ])
 def test_lea(operands, expected_size, expected_disasm):
-    m = MachineCodeAssembler()
-    m.lea(*operands)
-    bs = m.build()
+    bs = asm().lea(*operands).build()
     assert len(bs) == expected_size
-    assert str(next(disasm(m.build()))) == expected_disasm
+    assert str(next(disasm(bs))) == expected_disasm

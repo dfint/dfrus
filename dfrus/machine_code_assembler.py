@@ -6,15 +6,19 @@ from dfrus.opcodes import *
 class MachineCodeAssembler(MachineCodeBuilder):
     def push_reg(self, register: Reg):
         self.byte(push_reg | register.code)
+        return self
 
     def pop_reg(self, register: Reg):
         self.byte(pop_reg | register.code)
+        return self
 
     def jump_conditional_short(self, condition: Cond, label: str):
         self.byte(jcc_short | condition).relative_reference(label, size=1)
+        return self
 
     def jump_short(self, label: str):
         self.byte(jmp_short).relative_reference(label, size=1)
+        return self
 
     def modrm(self, mode: int, register: int, register_memory: int) -> "MachineCodeAssembler":
         return self.byte(join_byte(mode, register, register_memory))
@@ -33,8 +37,11 @@ class MachineCodeAssembler(MachineCodeBuilder):
         else:
             self.add_bytes(immediate.to_bytes(register.size, byteorder='little'))
 
+        return self
+
     def mov_reg_reg32(self, dest: Reg, src: Reg):
         self.byte(mov_rm_reg | 1).modrm(3, src.code, dest.code)
+        return self
 
     def modrm_sib_compiler(self, register: Reg, src: Operand):
         if src.disp == 0 and src.base_reg != Reg.ebp:
@@ -66,6 +73,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def lea(self, register: Reg, src: Operand):
         assert src.base_reg is not None
         self.byte(lea).modrm_sib_compiler(register, src)
+        return self
 
 
 def asm():
