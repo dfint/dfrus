@@ -1018,13 +1018,13 @@ def add_strlens(fixes, functions, metadata):
                     dest_off = func.operand
                     assert src_off is not None
                     src_off += 1
-                    code_chunk = MachineCodeAssembler()
+                    code_chunk = None
                     if functions[dest_off].length == 'push':
                         # mov [esp+8], ecx
-                        code_chunk.byte(mov_rm_reg | 1).modrm(1, Reg.ecx, 4).sib(0, 4, Reg.esp).byte(8)
+                        code_chunk = asm().byte(mov_rm_reg | 1).modrm(1, Reg.ecx, 4).sib(0, 4, Reg.esp).byte(8)
                     elif functions[dest_off].length == 'edi':
                         # mov edi, ecx
-                        code_chunk.byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)
+                        code_chunk = asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)
 
                     if code_chunk:
                         new_code = mach_strlen(code_chunk.build())
