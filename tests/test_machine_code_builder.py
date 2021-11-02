@@ -47,7 +47,7 @@ def test_machine_code_builder_absolute_references():
     m.origin_address = 0
     m.values(a=0xDEAD, b=0xBEEF, c=0xF00)
 
-    b = bytes(m)
+    b = m.build()
     field_values = m.values()
     found_refs = {b.index(field_values[ref_name].to_bytes(4, 'little')) for ref_name in 'ab'}
     assert found_refs == set(m.absolute_references)
@@ -67,7 +67,7 @@ def test_machine_code_builder_absolute_references_2():
     m.origin_address = 0
     m.values(c=0xF00)
 
-    b = bytes(m)
+    b = m.build()
     found_refs = {b.index(value.to_bytes(4, 'little')) for value in (0xDEAD, 0xBEEF)}
     assert found_refs == set(m.absolute_references)
 

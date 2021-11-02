@@ -151,9 +151,6 @@ class MachineCodeBuilder:
 
         return buffer.getvalue()
 
-    def __iter__(self) -> bytes:
-        return self.build()
-
     def __add__(self, other):
         assert isinstance(other, (MachineCodeBuilder, bytes))
         new = deepcopy(self)
