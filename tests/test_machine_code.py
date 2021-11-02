@@ -4,7 +4,7 @@ from dfrus.machine_code import MachineCode, Reference
 from dfrus.opcodes import mov_rm_imm, Reg, call_near, mov_reg_imm, jmp_near
 
 
-def test_machinecode_1():
+def test_machine_code_1():
     """
     # Sample code:
     use32
@@ -34,7 +34,7 @@ def test_machinecode_1():
     assert bytes(code) == bytes.fromhex('C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00')
 
 
-def test_machinecode_2():
+def test_machine_code_2():
     # Test getting addresses of absolute references
     code = MachineCode(
         bytes(123),
