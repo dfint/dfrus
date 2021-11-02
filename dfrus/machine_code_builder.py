@@ -150,9 +150,7 @@ class MachineCodeBuilder:
     def __iadd__(self, other: Union["MachineCodeBuilder", bytes]):
         assert isinstance(other, (MachineCodeBuilder, bytes))
 
-        if isinstance(other, bytes):
-            self.add_bytes(other)
-        elif isinstance(other, MachineCodeBuilder):
+        if isinstance(other, MachineCodeBuilder):
             for name, index in other.labels.items():
                 self.labels[name] = index + self._cursor
 
@@ -161,6 +159,8 @@ class MachineCodeBuilder:
                 self._add_item(item_copy)
                 if item_copy.name is not None:
                     self._fields[item_copy.name].append(item_copy)
+        else:
+            self.add_bytes(other)
 
         return self
 
