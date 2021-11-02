@@ -16,10 +16,10 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def jump_short(self, label: str):
         return self.byte(jmp_short).relative_reference(label, size=1)
 
-    def modrm(self, mode: int, register: int, register_memory: int) -> "MachineCodeAssembler":
+    def modrm(self, mode: int, register: int, register_memory: int):
         return self.byte(join_byte(mode, register, register_memory))
 
-    def sib(self, scale: int, index_register: int, base_register: int) -> "MachineCodeAssembler":
+    def sib(self, scale: int, index_register: int, base_register: int):
         return self.byte(join_byte(scale, index_register, base_register))
 
     def mov_reg_imm(self, register: Reg, immediate: int, is_absolute_reference=False):
@@ -46,21 +46,23 @@ class MachineCodeAssembler(MachineCodeBuilder):
         else:
             mode = 2
 
-        if src.base_reg != Reg.esp:
-            assert src.base_reg is not None
+        if src.base_reg is None:
+            assert src.index_reg is None
+            self.modrm(0, register.code, 5)
+        elif src.index_reg is None and src.base_reg != Reg.esp:
             self.modrm(mode, register.code, src.base_reg.code)
         else:
             if src.index_reg is None:
                 self.modrm(mode, register.code, 4).sib(0, 4, src.base_reg.code)
             else:
-                assert src.scale is not None
-                assert src.index_reg != Reg.esp
+                scale = src.scale or 0
+                assert src.index_reg != Reg.esp  # ESP cannot be an index register
                 self.modrm(mode, register.code, 4)
-                self.sib(src.scale, src.index_reg.code, src.base_reg.code)
+                self.sib(scale, src.index_reg.code, src.base_reg.code)
 
         if mode == 1:
             self.byte(src.disp)
-        else:
+        elif mode == 2:
             self.dword(src.disp)
 
         return self

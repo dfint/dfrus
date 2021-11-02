@@ -1,5 +1,5 @@
 """
-Machine code builder. Possible replacement for the MachineCode class.
+Machine code builder. A replacement for the legacy MachineCode class. Base class for MachineCodeAssembler.
 
 # Concept:
 m = MachineCodeBuilder()
