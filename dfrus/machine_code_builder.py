@@ -115,8 +115,8 @@ class MachineCodeBuilder:
 
     def get_values(self) -> Iterable[Tuple[str, Optional[Union[int, bytes]]]]:
         for field_name, fields in self._fields.items():
-            if fields:
-                yield field_name, fields[0].value
+            assert fields
+            yield field_name, fields[0].value
 
     def set_values(self, **kwargs: int):
         """
