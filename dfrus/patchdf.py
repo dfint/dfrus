@@ -1018,7 +1018,6 @@ def add_strlens(fixes, functions, metadata):
                     dest_off = func.operand
                     assert src_off is not None
                     src_off += 1
-                    # code_chunk: Optional[Iterable[int]] = None
                     code_chunk = MachineCodeAssembler()
                     if functions[dest_off].length == 'push':
                         # mov [esp+8], ecx
