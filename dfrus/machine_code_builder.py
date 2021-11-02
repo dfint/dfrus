@@ -113,7 +113,7 @@ class MachineCodeBuilder:
 
             field.value = value
 
-    def get_values(self) -> Iterable[Tuple[str, int]]:
+    def get_values(self) -> Iterable[Tuple[str, Optional[Union[int, bytes]]]]:
         for field_name, fields in self._fields.items():
             if fields:
                 yield field_name, fields[0].value
