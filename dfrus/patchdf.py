@@ -13,7 +13,7 @@ from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
 from .disasm import disasm, DisasmLine, join_byte, Operand, align, OperandType
 from .extract_strings import extract_strings
-from .machine_code_assembler import MachineCodeAssembler
+from .machine_code_assembler import MachineCodeAssembler, asm
 from .machine_code_builder import MachineCodeBuilder
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
@@ -295,8 +295,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                 i = find_instruction(aft, call_near)
                 if i is not None:
                     displacement = from_dword(aft[i + 1:i + 5], signed=True)
-                    m = MachineCodeAssembler()
-                    m.byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
+                    m = asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
                     ret_value = Fix(
                         src_off=next_off + i + 1,
                         new_code=mach_strlen(m.build()),
@@ -312,7 +311,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
-                    m = MachineCodeAssembler().mov_reg_imm(Reg.edi, new_len)  # mov edi, new_len
+                    m = asm().mov_reg_imm(Reg.edi, new_len)  # mov edi, new_len
                     ret_value = Fix(
                         src_off=old_next + 1,
                         new_code=m,
@@ -324,8 +323,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         displacement = from_dword(aft[i + 1:i + 5], signed=True)
-                        m = MachineCodeAssembler()
-                        m.byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
+                        m = asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
                         ret_value = Fix(
                             src_off=next_off + i + 1,
                             new_code=mach_strlen(m.build()),
@@ -414,7 +412,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                 meta.length = 'ecx*4'
                                 ret_value = Fix(
                                     src_off=line.address + 1,
-                                    new_code=MachineCodeAssembler().mov_reg_imm(Reg.ecx, dword_count),
+                                    new_code=asm().mov_reg_imm(Reg.ecx, dword_count),
                                     dest_off=next_off_2 + skip
                                 )
                                 ret_value.meta = meta

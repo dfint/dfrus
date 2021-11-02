@@ -66,3 +66,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def lea(self, register: Reg, src: Operand):
         assert src.base_reg is not None
         self.byte(lea).modrm_sib_compiler(register, src)
+
+
+def asm():
+    return MachineCodeAssembler()
