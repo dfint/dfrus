@@ -17,7 +17,7 @@ file.write(m.build())
 """
 import io
 import uuid
-from copy import copy
+from copy import copy, deepcopy
 from typing import List, Optional, Dict, Mapping, Union, Iterable
 
 from attr import dataclass
@@ -152,20 +152,22 @@ class MachineCodeBuilder:
         return self.build()
 
     def __add__(self, other):
-        assert isinstance(other, MachineCodeBuilder)
-        new = MachineCodeBuilder()
+        assert isinstance(other, (MachineCodeBuilder, bytes))
+        new = deepcopy(self)
 
-        for item in self._raw_list:
-            new._add_item(copy(item))
+        if isinstance(other, bytes):
+            new.add_bytes(other)
+        elif isinstance(other, MachineCodeBuilder):
+            for name, index in other._labels.items():
+                new._labels[name] = index + new._cursor
 
-        for item in other._raw_list:
-            new._add_item(copy(item))
+            for item in other._raw_list:
+                new._add_item(copy(item))
 
-        new._fields.update(self._fields)
-        new._fields.update(other._fields)
-
-        new._labels.update(self._labels)
-        for name, index in other._labels.items():
-            new._labels[name] = index + self._cursor
+            new._fields.update(other._fields)
 
         return new
+
+    def __radd__(self, other: bytes):
+        assert isinstance(other, bytes)
+        return MachineCodeBuilder().add_bytes(other) + self
