@@ -1,3 +1,5 @@
+import pytest
+
 from dfrus.disasm import join_byte
 from dfrus.machine_code_builder import MachineCodeBuilder
 from dfrus.opcodes import mov_rm_imm, Reg, call_near, mov_reg_imm, jmp_near
@@ -39,11 +41,13 @@ def test_machine_code_builder_absolute_references():
     m.add_bytes(bytes(12345))
     m.absolute_reference("a", size=4)
     m.add_bytes(bytes(10))
+    m.relative_reference("c", size=4)
+    m.add_bytes(bytes(321))
 
     m.origin_address = 0
-    m.values(a=0xDEAD, b=0xBEEF)
+    m.values(a=0xDEAD, b=0xBEEF, c=0xF00)
 
-    b = m.build()
+    b = bytes(m)
     field_values = m.values()
     found_refs = {b.index(field_values[ref_name].to_bytes(4, 'little')) for ref_name in 'ab'}
     assert found_refs == set(m.absolute_references)
@@ -57,9 +61,20 @@ def test_machine_code_builder_absolute_references_2():
     m.add_bytes(bytes(12345))
     m.absolute_reference(value=0xDEAD, size=4)
     m.add_bytes(bytes(10))
+    m.relative_reference("c", size=4)
+    m.add_bytes(bytes(321))
 
     m.origin_address = 0
+    m.values(c=0xF00)
 
-    b = m.build()
+    b = bytes(m)
     found_refs = {b.index(value.to_bytes(4, 'little')) for value in (0xDEAD, 0xBEEF)}
     assert found_refs == set(m.absolute_references)
+
+
+def test_undefined_value():
+    m = MachineCodeBuilder()
+    m.relative_reference(name="a", size=4)
+
+    with pytest.raises(ValueError):
+        m.build()
