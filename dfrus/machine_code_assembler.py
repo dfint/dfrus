@@ -36,10 +36,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def mov_reg_reg32(self, dest: Reg, src: Reg):
         self.byte(mov_rm_reg | 1).modrm(3, src.code, dest.code)
 
-    def lea(self, register: Reg, src: Operand):
-        assert src.base_reg is not None
-        self.byte(lea)
-
+    def modrm_sib_compiler(self, register: Reg, src: Operand):
         if src.disp == 0 and src.base_reg != Reg.ebp:
             mode = 0
         elif -0x80 <= src.disp < 0x80:
@@ -62,3 +59,9 @@ class MachineCodeAssembler(MachineCodeBuilder):
             self.byte(src.disp)
         else:
             self.dword(src.disp)
+
+        return self
+
+    def lea(self, register: Reg, src: Operand):
+        assert src.base_reg is not None
+        self.byte(lea).modrm_sib_compiler(register, src)
