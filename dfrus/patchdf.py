@@ -61,22 +61,11 @@ class Fix:
     def add_fix(self, fix: "Fix"):
         new_code = fix.new_code
         assert new_code is not None
-        old_fix = self
-        if not self:
+        old_code = self.new_code
+        assert old_code is not None and new_code is not None
+        if new_code.build() not in old_code.build():  # FIXME: probably this check needs to be optimized
+            fix.new_code = new_code + old_code
             self.update(fix)
-        else:
-            old_code = old_fix.new_code
-            assert old_code is not None
-            if new_code.build() in old_code.build():
-                pass  # Fix is already added, do nothing
-            else:
-                if isinstance(old_code, MachineCodeBuilder):
-                    assert not isinstance(new_code, MachineCodeBuilder)
-                    new_code = new_code + old_code
-                else:
-                    new_code = old_code + new_code
-                fix.new_code = new_code
-                self.update(fix)
 
 
 def get_fix_for_moves(get_length_info: "GetLengthResult", newlen, string_address, meta: Metadata) -> Fix:
