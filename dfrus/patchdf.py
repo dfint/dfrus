@@ -4,7 +4,7 @@ import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
 from operator import itemgetter
-from typing import Tuple, Optional, Any, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
+from typing import Tuple, Optional, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
 from warnings import warn
 
 from dataclasses import dataclass, fields, field
@@ -47,14 +47,12 @@ class Metadata:
 class Fix:
     new_code: Optional[MachineCodeBuilder] = None
     pokes: Optional[Mapping[int, bytes]] = None
-    poke: Any = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
     added_relocs: Iterable[int] = field(default_factory=list)
     deleted_relocs: Iterable[int] = field(default_factory=list)
     meta: Optional[Metadata] = None
-    op: Optional[Any] = None
-    fix: Optional[Any] = None
+    fix: Optional["Fix"] = None
 
     def update(self, other: "Fix"):
         for f in fields(self):
@@ -75,8 +73,6 @@ class Fix:
                 if isinstance(old_code, MachineCodeBuilder):
                     assert not isinstance(new_code, MachineCodeBuilder)
                     new_code = new_code + old_code
-                    if old_fix.poke and not fix.poke:
-                        fix.poke = old_fix.poke
                 else:
                     new_code = old_code + new_code
                 fix.new_code = new_code
@@ -305,7 +301,6 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                         src_off=next_off + i + 1,
                         new_code=mach_strlen(m.build()),
                         dest_off=next_off + i + 5 + displacement,
-                        op=call_near
                     )
                     ret_value.meta = meta
                     return ret_value
@@ -335,7 +330,6 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             src_off=next_off + i + 1,
                             new_code=mach_strlen(m.build()),
                             dest_off=next_off + i + 5 + displacement,
-                            op=call_near
                         )
                         ret_value.meta = meta
                         return ret_value
