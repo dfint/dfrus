@@ -28,7 +28,7 @@ def test_machine_code_builder_1():
     m.byte(jmp_near).relative_reference("return_addr", size=4)  # jmp near return_addr
 
     m.origin_address = 0x123456
-    m.values(func=0x222222, return_addr=0x777777)
+    m.set_values(func=0x222222, return_addr=0x777777)
 
     assert m.build() == bytes.fromhex('C7 46 14 0F 00 00 00 E8 C0 ED 0F 00 BF 0F 00 00 00 E9 0B 43 65 00')
 
@@ -45,10 +45,10 @@ def test_machine_code_builder_absolute_references():
     m.add_bytes(bytes(321))
 
     m.origin_address = 0
-    m.values(a=0xDEAD, b=0xBEEF, c=0xF00)
+    m.set_values(a=0xDEAD, b=0xBEEF, c=0xF00)
 
     b = m.build()
-    field_values = m.values()
+    field_values = dict(m.get_values())
     found_refs = {b.index(field_values[ref_name].to_bytes(4, 'little')) for ref_name in 'ab'}
     assert found_refs == set(m.absolute_references)
 
@@ -65,7 +65,7 @@ def test_machine_code_builder_absolute_references_2():
     m.add_bytes(bytes(321))
 
     m.origin_address = 0
-    m.values(c=0xF00)
+    m.set_values(c=0xF00)
 
     b = m.build()
     found_refs = {b.index(value.to_bytes(4, 'little')) for value in (0xDEAD, 0xBEEF)}
@@ -78,3 +78,20 @@ def test_undefined_value():
 
     with pytest.raises(ValueError):
         m.build()
+
+
+def test_add_bytes():
+    m = MachineCodeBuilder()
+    m.dword(0xDEADBEEF)
+    m += b'1234'
+    bs = m.build()
+    assert bs == 0xDEADBEEF.to_bytes(4, 'little') + b'1234'
+
+
+def test_radd_bytes():
+    m = MachineCodeBuilder()
+    m1 = b'1234' + m.absolute_reference(value=0xDEADBEEF).label("some_label").absolute_reference(value=0xF00)
+    bs = m1.build()
+    assert bs == b'1234' + 0xDEADBEEF.to_bytes(4, 'little') + 0xF00.to_bytes(4, 'little')
+    assert set(m1.absolute_references) == {4, 8}
+    assert m1.labels["some_label"] == 8

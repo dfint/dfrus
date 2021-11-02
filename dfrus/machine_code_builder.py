@@ -19,7 +19,7 @@ import io
 import uuid
 from collections import defaultdict
 from copy import copy, deepcopy
-from typing import List, Optional, Dict, Mapping, Union, Iterable
+from typing import List, Optional, Dict, Union, Iterable, Tuple
 
 from attr import dataclass
 
@@ -53,7 +53,7 @@ class MachineCodeBuilder:
         self.byteorder = byteorder
         self._raw_list: List[MachineCodeItem] = list()
         self._fields: Dict[str, List[MachineCodeItem]] = defaultdict(list)
-        self._labels: Dict[str, int] = dict()
+        self.labels: Dict[str, int] = dict()
         self._cursor: int = 0
 
     def _add_item(self, item: MachineCodeItem):
@@ -69,7 +69,7 @@ class MachineCodeBuilder:
         return self._add_item(MachineCodeItem(value=value, size=4))
 
     def label(self, name: str):
-        self._labels[name] = self._cursor
+        self.labels[name] = self._cursor
         return self
 
     def add_bytes(self, value: bytes):
@@ -113,25 +113,21 @@ class MachineCodeBuilder:
 
             field.value = value
 
-    def values(self, **kwargs: int) -> Optional[Mapping[str, int]]:
+    def get_values(self) -> Iterable[Tuple[str, int]]:
+        for field_name, fields in self._fields.items():
+            if fields:
+                yield field_name, fields[0].value
+
+    def set_values(self, **kwargs: int):
         """
         Set values of the corresponding fields or get values of all fields if no parameters are passed
         """
-        if not kwargs:
-            return {
-                fields[0].name: fields[0].value
-                for fields in self._fields.values()
-                if fields[0].name and isinstance(fields[0].value, int)
-            }
-
         for field_name, value in kwargs.items():
             self._set_value(field_name, value)
 
-        return None
-
     def build(self) -> bytes:
         # Fill-in label references (eg. addresses of internal jumps)
-        for name, value in self._labels.items():
+        for name, value in self.labels.items():
             self._set_value(name, self.origin_address + value)
 
         # Build byte buffer
@@ -158,13 +154,14 @@ class MachineCodeBuilder:
         if isinstance(other, bytes):
             new.add_bytes(other)
         elif isinstance(other, MachineCodeBuilder):
-            for name, index in other._labels.items():
-                new._labels[name] = index + new._cursor
+            for name, index in other.labels.items():
+                new.labels[name] = index + new._cursor
 
             for item in other._raw_list:
-                new._add_item(copy(item))
-
-            new._fields.update(other._fields)
+                item_copy = copy(item)
+                new._add_item(item_copy)
+                if item_copy.name is not None:
+                    new._fields[item_copy.name].append(item_copy)
 
         return new
 
