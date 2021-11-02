@@ -13,7 +13,8 @@ from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
 from .disasm import disasm, DisasmLine, join_byte, Operand, align, OperandType
 from .extract_strings import extract_strings
-from .machine_code import MachineCode, Reference
+from .machine_code_assembler import MachineCodeAssembler
+from .machine_code_builder import MachineCodeBuilder
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
 from .patch_charmap import patch_unicode_table, get_encoder
@@ -44,8 +45,8 @@ class Metadata:
 
 @dataclass
 class Fix:
-    new_code: Optional[Union[bytes, MachineCode]] = None
-    pokes: Optional[dict] = None
+    new_code: Optional[MachineCodeBuilder] = None
+    pokes: Optional[Mapping[int, bytes]] = None
     poke: Any = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
@@ -68,11 +69,11 @@ class Fix:
         else:
             old_code = old_fix.new_code
             assert old_code is not None
-            if bytes(new_code) in bytes(old_code):
+            if new_code.build() in old_code.build():
                 pass  # Fix is already added, do nothing
             else:
-                if isinstance(old_code, MachineCode):
-                    assert not isinstance(new_code, MachineCode)
+                if isinstance(old_code, MachineCodeBuilder):
+                    assert not isinstance(new_code, MachineCodeBuilder)
                     new_code = new_code + old_code
                     if old_fix.poke and not fix.poke:
                         fix.poke = old_fix.poke
@@ -85,23 +86,20 @@ class Fix:
 def get_fix_for_moves(get_length_info: "GetLengthResult", newlen, string_address, meta: Metadata) -> Fix:
     added_relocs = get_length_info.added_relocs
 
-    mach, new_refs = mach_memcpy(string_address, get_length_info.dest, newlen + 1)
+    mach = mach_memcpy(string_address, get_length_info.dest, newlen + 1)
     if get_length_info.saved_mach:
         mach = get_length_info.saved_mach + mach  # If there is "lea edi, [dest]", put it before the new code
-        new_refs = {item + len(get_length_info.saved_mach) for item in new_refs}
 
-    added_relocs.update(new_refs)
+    added_relocs.update(mach.absolute_references)
 
     proc = None
     if len(mach) > get_length_info.length:
         # if memcpy code is to long, try to write it into the new section and make call to it
-        if isinstance(mach, bytes):
-            mach = bytearray(mach)
-
-        mach.append(ret_near)
+        mach.byte(ret_near)
         proc = mach
 
-        mach = bytes((call_near,)) + bytes(4)  # leave zeros instead of displacement for now
+        mach = MachineCodeBuilder()
+        mach.byte(call_near).relative_reference("call_address")
         if len(mach) > get_length_info.length:
             # Too tight here, even for a procedure call
             meta.fixed = 'no'
@@ -109,8 +107,8 @@ def get_fix_for_moves(get_length_info: "GetLengthResult", newlen, string_address
             return Fix(meta=meta)
 
     # Write replacement code
-    mach = mach.ljust(get_length_info.length, nop.to_bytes(1, 'little'))
-    pokes = {0: mach}
+    mach.add_bytes(nop.to_bytes(1, 'little') * (get_length_info.length - len(mach)))
+    pokes = {0: mach.build()}
 
     # Nop-out old instructions
     if get_length_info.nops:
@@ -233,27 +231,26 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
                                 # Restore the cap length value of stl-string if needed
                                 # mov dword [esi+14h], oldlen
+                                fix_cap: Union[bytes, MachineCodeBuilder]
                                 if mov_esp_edi:
-                                    fix_cap = MachineCode(mov_rm_imm | 1, join_byte(1, 0, Reg.esi), 0x14,
-                                                          to_dword(old_len))
+                                    fix_cap = MachineCodeBuilder()
+                                    fix_cap.byte(mov_rm_imm | 1).modrm(1, 0, Reg.esi).byte(0x14).dword(old_len)
                                 else:
-                                    fix_cap = MachineCode()
+                                    fix_cap = bytes()
 
                                 assert line.operands is not None
 
-                                new_code = MachineCode(
-                                    fix_cap,
-                                    call_near, Reference.relative(name='func'),  # call near func
-                                    # Restore original edi value for the case if it is used further in the code:
-                                    mov_reg_imm | 8 | Reg.edi.code, to_dword(old_len),  # mov edi, old_len
-                                    jmp_near, Reference.relative(name='return_addr'),  # jmp near return_addr
-                                    func=line.operands[0].value,
-                                    return_addr=line.address + 5
-                                )
+                                new_code = fix_cap + MachineCodeAssembler()
+                                new_code.byte(call_near).relative_reference(name='func')  # call near func
+                                # Restore original edi value for the case if it is used further in the code:
+                                new_code.mov_reg_imm(Reg.edi, old_len)  # mov edi, old_len
+                                new_code.byte(jmp_near).relative_reference(name="return_addr")  # jmp near return_addr
+                                new_code.set_values(func=line.operands[0].value, return_addr=line.address + 5)
+
                                 ret_value = Fix(
                                     src_off=line.address + 1,
                                     new_code=new_code,
-                                    pokes={line.address: jmp_near}  # Replace call with jump
+                                    pokes={line.address: bytes([jmp_near])}  # Replace call with jump
                                 )
                                 ret_value.meta = meta
                                 return ret_value
@@ -272,9 +269,10 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
+                    new_code = MachineCodeBuilder().byte(push_imm8).byte(new_len)
                     ret_value = Fix(
                         src_off=old_next + 1,
-                        new_code=bytes((push_imm8, new_len)),
+                        new_code=new_code,
                         dest_off=next_off + 2
                     )
                     ret_value.meta = meta
@@ -283,11 +281,12 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         displacement = from_dword(aft[i + 1:i + 5], signed=True)
+                        m = MachineCodeAssembler()
+                        # mov [ESP+8], ECX
+                        m.byte(mov_rm_reg | 1).modrm(1, Reg.ecx, 4).sib(0, 4, Reg.esp).byte(8)
                         ret_value = Fix(
                             src_off=next_off + i + 1,
-                            new_code=mach_strlen(
-                                (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
-                            ),  # mov [ESP+8], ECX
+                            new_code=mach_strlen(m.build()),
                             dest_off=next_off + i + 5 + displacement
                         )
                         ret_value.meta = meta
@@ -300,9 +299,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                 i = find_instruction(aft, call_near)
                 if i is not None:
                     displacement = from_dword(aft[i + 1:i + 5], signed=True)
+                    m = MachineCodeAssembler()
+                    m.byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
                     ret_value = Fix(
                         src_off=next_off + i + 1,
-                        new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
+                        new_code=mach_strlen(m.build()),
                         dest_off=next_off + i + 5 + displacement,
                         op=call_near
                     )
@@ -316,9 +317,10 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
+                    m = MachineCodeAssembler().mov_reg_imm(Reg.edi, new_len)  # mov edi, new_len
                     ret_value = Fix(
                         src_off=old_next + 1,
-                        new_code=bytes((mov_reg_imm | 8 | Reg.edi.code,)) + to_dword(new_len),
+                        new_code=m,
                         dest_off=next_off + 5
                     )
                     ret_value.meta = meta
@@ -327,9 +329,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         displacement = from_dword(aft[i + 1:i + 5], signed=True)
+                        m = MachineCodeAssembler()
+                        m.byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
                         ret_value = Fix(
                             src_off=next_off + i + 1,
-                            new_code=mach_strlen((mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))),  # mov edi, ecx
+                            new_code=mach_strlen(m.build()),
                             dest_off=next_off + i + 5 + displacement,
                             op=call_near
                         )
@@ -416,7 +420,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                 meta.length = 'ecx*4'
                                 ret_value = Fix(
                                     src_off=line.address + 1,
-                                    new_code=bytes((mov_reg_imm | 8 | Reg.ecx.code,)) + to_dword(dword_count),
+                                    new_code=MachineCodeAssembler().mov_reg_imm(Reg.ecx, dword_count),
                                     dest_off=next_off_2 + skip
                                 )
                                 ret_value.meta = meta
@@ -976,7 +980,7 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                     continue
                 elif fix.new_code:
                     new_code = fix.new_code
-                    assert isinstance(new_code, (bytes, bytearray, MachineCode))
+                    assert isinstance(new_code, (bytes, bytearray, MachineCodeBuilder))
                     src_off = fix.src_off
                     assert src_off is not None
                     fixes[src_off].add_fix(fix)
@@ -1022,15 +1026,17 @@ def add_strlens(fixes, functions, metadata):
                     dest_off = func.operand
                     assert src_off is not None
                     src_off += 1
-                    code_chunk: Optional[Iterable[int]] = None
+                    # code_chunk: Optional[Iterable[int]] = None
+                    code_chunk = MachineCodeAssembler()
                     if functions[dest_off].length == 'push':
                         # mov [esp+8], ecx
-                        code_chunk = (mov_rm_reg | 1, join_byte(1, Reg.ecx, 4), join_byte(0, 4, Reg.esp), 8)
+                        code_chunk.byte(mov_rm_reg | 1).modrm(1, Reg.ecx, 4).sib(0, 4, Reg.esp).byte(8)
                     elif functions[dest_off].length == 'edi':
-                        code_chunk = (mov_reg_rm | 1, join_byte(3, Reg.edi, Reg.ecx))  # mov edi, ecx
+                        # mov edi, ecx
+                        code_chunk.byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)
 
                     if code_chunk:
-                        new_code = mach_strlen(code_chunk)
+                        new_code = mach_strlen(code_chunk.build())
                         assert isinstance(dest_off, int)
                         fix = Fix(src_off=src_off, new_code=new_code, dest_off=dest_off)
                         fixes[src_off].add_fix(fix)
@@ -1117,18 +1123,19 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
 
         hook_rva = new_section.offset_to_rva(new_section_offset)
 
-        dest_off = mach.fields.get('dest', None) if isinstance(mach, MachineCode) else fix.dest_off
+        dest_off = dict(mach.get_values()).get('dest', None) if isinstance(mach, MachineCodeBuilder) else fix.dest_off
 
-        if isinstance(mach, MachineCode):
-            for field_name, value in mach.fields.items():
+        if isinstance(mach, MachineCodeBuilder):
+            for field_name, value in mach.get_values():
                 if value is not None:
-                    mach.fields[field_name] = sections[code_section].offset_to_rva(value)
+                    mach.set_value(field_name, sections[code_section].offset_to_rva(value))
+
             mach.origin_address = hook_rva
 
         if dest_off is not None:
             dest_rva = sections[code_section].offset_to_rva(dest_off)
-            if isinstance(mach, MachineCode):
-                mach.fields['dest'] = dest_rva
+            if isinstance(mach, MachineCodeBuilder):
+                mach.set_values(dest=dest_rva)
             else:
                 disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement
                 # Add jump from the hook
@@ -1136,11 +1143,11 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
 
         assert mach is not None
         # Write the hook to the new section
-        new_section_offset = add_to_new_section(fn, new_section_offset, bytes(mach), padding_byte=int3)
+        new_section_offset = add_to_new_section(fn, new_section_offset, mach.build(), padding_byte=int3)
 
         # If there are absolute references in the code, add them to relocation table
-        if fix.added_relocs or isinstance(mach, MachineCode) and list(mach.absolute_references):
-            new_refs = set(mach.absolute_references) if isinstance(mach, MachineCode) else set()
+        if fix.added_relocs or isinstance(mach, MachineCodeBuilder) and list(mach.absolute_references):
+            new_refs = set(mach.absolute_references) if isinstance(mach, MachineCodeBuilder) else set()
 
             if fix.added_relocs:
                 new_refs.update(fix.added_relocs)

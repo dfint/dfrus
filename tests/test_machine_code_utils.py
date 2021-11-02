@@ -7,7 +7,7 @@ from dfrus.opcodes import nop, Reg
 
 
 def test_mach_strlen():
-    code = mach_strlen([nop])
+    code = mach_strlen(bytes([nop]))
     expected = (
         "51 "  # push ecx
         "31 C9 "  # xor ecx, ecx
@@ -20,7 +20,7 @@ def test_mach_strlen():
         "90 "  # nop
         "59"  # pop ecx
     )
-    assert code == bytes.fromhex(expected)
+    assert code.build() == bytes.fromhex(expected)
 
 
 @pytest.mark.parametrize("operands,expected_size,expected_disasm", [

@@ -104,7 +104,7 @@ class MachineCodeBuilder:
                 if isinstance(item, Reference) and not item.is_relative:
                     yield self.origin_address + item.position
 
-    def _set_value(self, field_name: str, value: int) -> None:
+    def set_value(self, field_name: str, value: int) -> None:
         fields = self._fields[field_name]
 
         for field in fields:
@@ -123,12 +123,12 @@ class MachineCodeBuilder:
         Set values of the corresponding fields or get values of all fields if no parameters are passed
         """
         for field_name, value in kwargs.items():
-            self._set_value(field_name, value)
+            self.set_value(field_name, value)
 
     def build(self) -> bytes:
         # Fill-in label references (eg. addresses of internal jumps)
         for name, value in self.labels.items():
-            self._set_value(name, self.origin_address + value)
+            self.set_value(name, self.origin_address + value)
 
         # Build byte buffer
         buffer = io.BytesIO()
@@ -168,3 +168,6 @@ class MachineCodeBuilder:
     def __radd__(self, other: bytes):
         assert isinstance(other, bytes)
         return MachineCodeBuilder().add_bytes(other) + self
+
+    def __len__(self):
+        return self._cursor

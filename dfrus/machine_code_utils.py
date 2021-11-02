@@ -1,14 +1,13 @@
-from typing import Iterable, Tuple
-
 from .binio import from_dword
 from .disasm import Operand
 from .machine_code_assembler import MachineCodeAssembler
+from .machine_code_builder import MachineCodeBuilder
 from .opcodes import *
 
 MAX_LEN = 0x100
 
 
-def mach_strlen(code_chunk: Iterable) -> bytes:
+def mach_strlen(code_chunk: bytes) -> MachineCodeBuilder:
     """
         push ecx
         xor ecx, ecx
@@ -35,13 +34,13 @@ def mach_strlen(code_chunk: Iterable) -> bytes:
     m.byte(inc_reg | Reg.ecx.code)  # inc ecx
     m.jump_short("@@")  # jmp @b
     m.label("success")
-    m.add_bytes(bytes(code_chunk))
+    m.add_bytes(code_chunk)
     m.label("skip")
     m.pop_reg(Reg.ecx)  # pop ecx
-    return m.build()
+    return m
 
 
-def mach_memcpy(src: int, dest: Operand, count) -> Tuple[bytes, Iterable[int]]:
+def mach_memcpy(src: int, dest: Operand, count) -> MachineCodeBuilder:
     assert dest.index_reg is None
     m = MachineCodeAssembler()
 
@@ -62,7 +61,7 @@ def mach_memcpy(src: int, dest: Operand, count) -> Tuple[bytes, Iterable[int]]:
     m.mov_reg_imm(Reg.cl, (count + 3) // 4)  # mov cl, (count+3)//4
     m.byte(Prefix.rep).byte(movsd)  # rep movsd
     m.byte(popad)  # popad
-    return m.build(), m.absolute_references
+    return m
 
 
 def match_mov_reg_imm32(b: bytes, reg: Reg, imm: int) -> bool:
