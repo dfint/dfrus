@@ -1,10 +1,11 @@
-import argparse
 import os.path
 import sys
 import warnings
 from contextlib import contextmanager
 from shutil import copy
 from typing import Sequence, Tuple, Union, Dict, Iterable
+
+import click
 
 from .dictionary_loaders import load_trans_file
 from .patchdf import fix_df_exe
@@ -49,8 +50,8 @@ def destination_file_context(src, dest):
     try:
         copy(src, dest)
     except IOError as ex:
-        print("Failed.")
-        raise ex
+        print(f"Failed: {ex}")
+        sys.exit()
     else:
         print("Success.")
     
@@ -112,42 +113,43 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
             fix_df_exe(fn, pe, codepage, original_codepage, trans_dict, debug)
 
 
-def init_argparser():
-    parser = argparse.ArgumentParser(
-            add_help=True,
-            description='A patcher for the hardcoded strings of the Dwarf Fortress')
-    parser.add_argument('-p', '--dfpath', dest='path',
-                        default='Dwarf Fortress.exe',
-                        help='path to the DF directory or to the Dwarf Fortress.exe itself, '
-                             'default="Dwarf Fortress.exe"')
-    parser.add_argument('-n', '--destname', dest='dest',
-                        default='Dwarf Fortress Patched.exe',
-                        help='name of the patched DF executable, default="Dwarf Fortress Patched.exe"')
-    parser.add_argument('-d', '--dict', default='dict.csv', dest='dictionary',
-                        help='path to the dictionary file, default=dict.csv')
-    parser.add_argument('--debug', action='store_true', help='enable debugging mode')
-    parser.add_argument('-c', '--codepage', help='enable given codepage by name')
-    parser.add_argument('-oc', '--original_codepage', default='cp437',
-                        help='specify original codepage of strings in the executable')
-    parser.add_argument('-s', '--slice', help='slice the original dictionary, eg. 0:100',
-                        type=lambda s: tuple(int(x) for x in s.split(':')))
+class SliceParam(click.ParamType):
+    name = 'slice'
 
-    return parser
+    def convert(self, value, param, ctx):
+        try:
+            return tuple(int(x) for x in value.split(':'))
+        except ValueError:
+            self.fail(f"{value!r} is not a valid slice", param, ctx)
 
 
-def _main():
-    parser = init_argparser()
-    args = parser.parse_args(sys.argv[1:])
+SLICE_PARAM = SliceParam()
+
+
+@click.command()
+@click.option('-p', '--dfpath', 'path', default="Dwarf Fortress.exe",
+              help='path to the DF directory or to the Dwarf Fortress.exe itself')
+@click.option('-n', '--destname', 'dest', default='Dwarf Fortress Patched.exe',
+              help='name of the patched DF executable')
+@click.option('-d', '--dict', 'dictionary', default='dict.csv',
+              help='path to the dictionary file, default=dict.csv')
+@click.option('--debug', is_flag=True, help='enable debugging mode')
+@click.option('-c', '--codepage', 'codepage', help='enable given codepage by name')
+@click.option('-oc', '--original-codepage', 'original_codepage', default='cp437',
+              help='specify original codepage of strings in the executable')
+@click.option('-s', '--slice', 'dict_slice', help='slice the original dictionary, eg. 0:100', type=SLICE_PARAM)
+def _main(path, dest, dictionary, debug, codepage, original_codepage, dict_slice):
+    """A patcher for the hardcoded strings of the Dwarf Fortress"""
 
     print("Loading translation file...")
 
     try:
-        with open(args.dictionary, encoding='utf-8') as trans:
+        with open(dictionary, encoding='utf-8') as trans:
             trans_table = list(load_trans_file(trans))
     except FileNotFoundError:
-        print('Error: "%s" file not found.' % args.dictionary)
+        print('Error: "%s" file not found.' % dictionary)
     else:
-        run(args.path, args.dest, trans_table, args.codepage, args.original_codepage, args.slice, args.debug)
+        run(path, dest, trans_table, codepage, original_codepage, dict_slice, debug)
 
 
 if __name__ == "__main__":
