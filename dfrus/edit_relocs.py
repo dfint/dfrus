@@ -60,17 +60,17 @@ def common(file: BinaryIO, functions: Iterable[Callable[[Set[int]], Set[int]]]):
     assert set(pe.relocation_table) == relocs
 
 
-def update(items: Sequence[int], relocs: Set[int]) -> Set[int]:
+def add_items(items: Sequence[int], relocs: Set[int]) -> Set[int]:
     relocs.update(items)
     return relocs
 
 
-def difference(items: Sequence[int], relocs: Set[int]) -> Set[int]:
+def remove_items(items: Sequence[int], relocs: Set[int]) -> Set[int]:
     relocs.difference(items)
     return relocs
 
 
-def discard_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
+def remove_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
     if len(items) < 2:
         print('"-*" operation needs 2 arguments. Operation skipped.')
         return relocs
@@ -88,7 +88,7 @@ def discard_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
         return set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
 
 
-def main():
+def _main():
     cmd = sys.argv
 
     # cmd.extend(["d:\Games\df_40_13_win_s\Dwarf Fortress 1.exe", "-*", "0x3fdaa0", "0x3fdb1f"])
@@ -105,11 +105,11 @@ def main():
         functions = []
         for op, items in args:
             if op == '+':
-                functions.append(partial(update, items))
+                functions.append(partial(add_items, items))
             elif op == '-':
-                functions.append(partial(difference, items))
+                functions.append(partial(remove_items, items))
             elif op == '-*':
-                functions.append(partial(discard_range, items))
+                functions.append(partial(remove_range, items))
             else:
                 print('Wrong operation: "%s". Skipped.' % cmd[2])
 
@@ -118,4 +118,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    _main()

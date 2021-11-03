@@ -3,11 +3,10 @@ import sys
 import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
+from dataclasses import dataclass, fields, field
 from operator import itemgetter
 from typing import Tuple, Optional, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
 from warnings import warn
-
-from dataclasses import dataclass, fields, field
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
@@ -1127,7 +1126,7 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
             if fix.added_relocs:
                 new_refs.update(fix.added_relocs)
 
-            relocs_to_add.update(hook_rva + item for item in new_refs)
+            relocs_to_add.add_items(hook_rva + item for item in new_refs)
 
         if fix.pokes:
             for off, b in fix.pokes.items():
