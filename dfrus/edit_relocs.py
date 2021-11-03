@@ -1,10 +1,12 @@
 import sys
 from ast import literal_eval
+from functools import partial
+from typing import Callable, Set, BinaryIO, Mapping, Sequence, Iterable
 
 from .peclasses import PortableExecutable, RelocationTable
 
 
-def group_args(args):
+def group_args(args) -> Mapping[str, Sequence[int]]:
     operators = {'+', '-', '-*'}
     op = None
     list_start = None
@@ -27,6 +29,65 @@ def group_args(args):
     yield op, args[list_start:]
 
 
+def common(file: BinaryIO, functions: Iterable[Callable[[Set[int]], Set[int]]]):
+    pe = PortableExecutable(file)
+    data_directory = pe.data_directory
+    sections = pe.section_table
+    reloc_rva, reloc_size = data_directory.basereloc
+    reloc_off = sections.rva_to_offset(reloc_rva)
+    relocs = set(pe.relocation_table)
+
+    for function in functions:
+        relocs = function(relocs)
+
+    new_relocation_table = RelocationTable.build(relocs)
+    new_size = new_relocation_table.size
+    assert new_size <= reloc_size
+
+    file.seek(reloc_off)
+    new_relocation_table.to_file(file)
+
+    if new_size < reloc_size:
+        # Clear empty bytes after the relocation table
+        file.seek(reloc_off + new_size)
+        file.write(bytes(reloc_size - new_size))
+
+    # Update data directory table
+    data_directory.basereloc.size = new_size
+    data_directory.rewrite()
+
+    pe.reread()
+    assert set(pe.relocation_table) == relocs
+
+
+def update(items: Sequence[int], relocs: Set[int]) -> Set[int]:
+    relocs.update(items)
+    return relocs
+
+
+def difference(items: Sequence[int], relocs: Set[int]) -> Set[int]:
+    relocs.difference(items)
+    return relocs
+
+
+def discard_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
+    if len(items) < 2:
+        print('"-*" operation needs 2 arguments. Operation skipped.')
+        return relocs
+    elif len(items) > 2:
+        print('"-*" operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}.'.format(
+            *items[:2]))
+    lower_bound, upper_bound = items[:2]
+    relocs_in_range = list(filter(lambda x: lower_bound <= x <= upper_bound, relocs))
+    if not relocs_in_range:
+        print("No relocations in range.")
+        return relocs
+    else:
+        print("These relocations will be removed: %s" % ', '
+              .join(hex(x) for x in sorted(relocs_in_range)))
+        return set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
+
+
 def main():
     cmd = sys.argv
 
@@ -41,55 +102,19 @@ def main():
     else:
         args = list(group_args(cmd[2:]))
 
+        functions = []
+        for op, items in args:
+            if op == '+':
+                functions.append(partial(update, items))
+            elif op == '-':
+                functions.append(partial(difference, items))
+            elif op == '-*':
+                functions.append(partial(discard_range, items))
+            else:
+                print('Wrong operation: "%s". Skipped.' % cmd[2])
+
         with open(cmd[1], 'r+b') as fn:
-            peobj = PortableExecutable(fn)
-            data_directory = peobj.data_directory
-            sections = peobj.section_table
-            reloc_rva, reloc_size = data_directory.basereloc
-            reloc_off = sections.rva_to_offset(reloc_rva)
-            relocs = set(peobj.relocation_table)
-
-            for op, items in args:
-                if op == '+':
-                    relocs.update(items)
-                elif op == '-':
-                    relocs.discard(items)
-                elif op == '-*':
-                    if len(items) < 2:
-                        print('"-*" operation needs 2 arguments. Operation skipped.')
-                        continue
-                    elif len(items) > 2:
-                        print('"-*" operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}.'.format(
-                            *items[:2]))
-                    lower_bound, upper_bound = items[:2]
-                    relocs_in_range = list(filter(lambda x: lower_bound <= x <= upper_bound, relocs))
-                    if not relocs_in_range:
-                        print("No relocations in range.")
-                    else:
-                        print("These relocations will be removed: %s" % ', '
-                              .join(hex(x)for x in sorted(relocs_in_range)))
-                        relocs = set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
-                else:
-                    print('Wrong operation: "%s". Skipped.' % cmd[2])
-
-            new_relocation_table = RelocationTable.build(relocs)
-            new_size = new_relocation_table.size
-            assert new_size <= reloc_size
-
-            fn.seek(reloc_off)
-            new_relocation_table.to_file(fn)
-
-            if new_size < reloc_size:
-                # Clear empty bytes after the relocation table
-                fn.seek(reloc_off + new_size)
-                fn.write(bytes(reloc_size - new_size))
-
-            # Update data directory table
-            data_directory.basereloc.size = new_size
-            data_directory.rewrite()
-
-            peobj.reread()
-            assert set(peobj.relocation_table) == relocs
+            common(fn, functions)
 
 
 if __name__ == '__main__':
