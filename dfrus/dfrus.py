@@ -127,11 +127,11 @@ SLICE_PARAM = SliceParam()
 
 
 @click.command()
-@click.option('-p', '--dfpath', 'path', default="Dwarf Fortress.exe",
+@click.option('-p', '--dfpath', 'path', default="Dwarf Fortress.exe", type=click.Path(exists=True, file_okay=True),
               help='path to the DF directory or to the Dwarf Fortress.exe itself')
 @click.option('-n', '--destname', 'dest', default='Dwarf Fortress Patched.exe',
               help='name of the patched DF executable')
-@click.option('-d', '--dict', 'dictionary', default='dict.csv',
+@click.option('-d', '--dict', 'dictionary', default='dict.csv', type=click.Path(exists=True, file_okay=True),
               help='path to the dictionary file, default=dict.csv')
 @click.option('--debug', is_flag=True, help='enable debugging mode')
 @click.option('-c', '--codepage', 'codepage', help='enable given codepage by name')
