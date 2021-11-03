@@ -21,3 +21,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 dfrus = 'dfrus.dfrus:_main'
+extract_strings = 'dfrus.extract_strings:_main'

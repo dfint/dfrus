@@ -2,6 +2,8 @@ import sys
 from collections import Counter
 from typing import Tuple
 
+import click
+
 from .cross_references import get_cross_references
 from .disasm import align
 from .peclasses import PortableExecutable
@@ -43,7 +45,7 @@ def check_string(buf: bytes, encoding: str) -> Tuple[int, int]:
             break
         elif current_byte.isalpha():
             number_of_letters += 1
-    
+
     return string_length, number_of_letters
 
 
@@ -56,12 +58,12 @@ def check_string_array(buf, offset, encoding='cp437'):
                 yield offset + start, buf[start:end], i - start - 1
                 start = None
                 end = None
-            
-            if not is_allowed(c) or not possible_to_decode(buf[i:i+1], encoding):
+
+            if not is_allowed(c) or not possible_to_decode(buf[i:i + 1], encoding):
                 if start:
                     start = None
                 continue
-            
+
             if start is None:
                 start = i
                 end = None
@@ -77,7 +79,7 @@ def count_zeros(buf):
     for i, item in enumerate(buf):
         if item:
             return i
-    
+
     return len(buf)
 
 
@@ -85,12 +87,12 @@ def find_next_string_xref(s_xrefs, i, obj_off):
     i += 1
     if i >= len(s_xrefs):
         return -1
-    
+
     while s_xrefs[i] <= obj_off:
         i += 1
         if i >= len(s_xrefs):
             return -1
-    
+
     return s_xrefs[i]
 
 
@@ -99,14 +101,14 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
     current_string = None
     s_xrefs = sorted(xrefs)
     for i, obj_off in enumerate(s_xrefs):
-        if prev_string is not None and obj_off <= prev_string[0]+len(prev_string[1]):
+        if prev_string is not None and obj_off <= prev_string[0] + len(prev_string[1]):
             continue  # it's not the beginning of the string
-        
+
         fn.seek(obj_off)
         buf = fn.read(blocksize)
-        
+
         s_len, letters = check_string(buf, encoding)
-        
+
         if s_len and letters > 0:
             if not arrays:
                 s = buf[:s_len].decode(encoding=encoding)
@@ -116,7 +118,7 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
             else:
                 upper_bound = find_next_string_xref(s_xrefs, i, obj_off + s_len) - obj_off
                 buf = buf[:upper_bound]
-                
+
                 string_array = list(check_string_array(buf, obj_off, encoding))
                 if not all(cap_len == string_array[0][2] for _, _, cap_len in string_array):
                     # cap_len = align(len(s) + 1)
@@ -128,7 +130,7 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
                     for off, s, cap_len in string_array:
                         current_string = (off, s.decode(encoding=encoding), cap_len)
                         yield current_string
-            
+
             prev_string = current_string
 
 
@@ -140,44 +142,38 @@ def myrepr(s):
     return text
 
 
-def main():
-    if len(sys.argv) < 3:
-        print('Usage:\nextract_strings.py [--ascii] "Dwarf Fortress.exe" output.txt [encoding]', file=sys.stderr)
-    else:
-        try:
-            ascii_only = '--ascii' in sys.argv
-            if ascii_only:
-                sys.argv.remove('--ascii')
-            
-            with open(sys.argv[1], "r+b") as file:
-                pe = PortableExecutable(file)
+@click.command()
+@click.option('--ascii', 'ascii_only', is_flag=True, default=False, help="Extract only ascii based strings")
+@click.argument('executable', type=click.File("rb"))
+@click.argument('output_file', type=click.Path(exists=False))
+@click.argument('encoding', default="cp437")
+def _main(ascii_only, executable, output_file, encoding):
+    """
+    Extract strings embedded into a portable executable file (exe)
+    """
+    pe = PortableExecutable(executable)
 
-                xrefs = get_cross_references(file,
-                                             pe.relocation_table,
-                                             pe.section_table,
-                                             pe.optional_header.image_base)
+    xrefs = get_cross_references(executable,
+                                 pe.relocation_table,
+                                 pe.section_table,
+                                 pe.optional_header.image_base)
 
-                encoding = 'cp437' if len(sys.argv) <= 3 else sys.argv[3]
-                strings = list(extract_strings(file, xrefs, encoding=encoding, arrays=True))
-                count = Counter(x[1] for x in strings)
-                with open(sys.argv[2], 'wt', encoding=encoding, errors='strict') as dump:
-                    for offset, s, cap_len in strings:
-                        if count[s] >= 1:
-                            if ascii_only and any(ord(c) >= 0x80 for c in s):
-                                # Skip non-ascii characters
-                                continue
-                            
-                            assert cap_len >= len(s)
-                            s = s.replace('\r', '\\r')
-                            s = s.replace('\t', '\\t')
-                            print(hex(offset), myrepr(s), cap_len, xrefs[offset])
-                            print(s, file=dump)
-                            count[s] = 0
-        except OSError:
-            print("Failed to open '%s'" % sys.argv[1], file=sys.stderr)
-            input("Press Enter...")
-            sys.exit()
+    strings = list(extract_strings(executable, xrefs, encoding=encoding, arrays=True))
+    count = Counter(x[1] for x in strings)
+    with open(output_file, 'wt', encoding=encoding, errors='strict') as dump:
+        for offset, s, cap_len in strings:
+            if count[s] >= 1:
+                if ascii_only and any(ord(c) >= 0x80 for c in s):
+                    # Skip non-ascii characters
+                    continue
+
+                assert cap_len >= len(s)
+                s = s.replace('\r', '\\r')
+                s = s.replace('\t', '\\t')
+                print(hex(offset), myrepr(s), cap_len, xrefs[offset])
+                print(s, file=dump)
+                count[s] = 0
 
 
 if __name__ == "__main__":
-    main()
+    _main()
