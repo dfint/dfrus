@@ -13,7 +13,7 @@ from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
 from .disasm import disasm, DisasmLine, join_byte, Operand, align, OperandType
 from .extract_strings import extract_strings
-from .machine_code_assembler import MachineCodeAssembler, asm
+from .machine_code_assembler import asm
 from .machine_code_builder import MachineCodeBuilder
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
@@ -83,22 +83,22 @@ def get_fix_for_moves(get_length_info: "GetLengthResult", newlen, string_address
         mach.byte(ret_near)
         proc = mach
 
-        mach = MachineCodeBuilder()
-        mach.byte(call_near).relative_reference("call_address")
+        mach = asm().call_near("call_address")
         if len(mach) > get_length_info.length:
             # Too tight here, even for a procedure call
             meta.fixed = 'no'
             meta.cause = 'to tight to call'
             return Fix(meta=meta)
 
+    mach.duplicate_byte(nop, get_length_info.length - len(mach))
+
     # Write replacement code
-    mach.add_bytes(nop.to_bytes(1, 'little') * (get_length_info.length - len(mach)))
     pokes = {0: mach.build()}
 
     # Nop-out old instructions
     if get_length_info.nops:
         for off, count in get_length_info.nops.items():
-            pokes[off] = bytes(nop for _ in range(count))
+            pokes[off] = asm().duplicate_byte(nop, count).build()
 
     if proc:
         fix = Fix(
@@ -214,7 +214,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                 # mov edi, oldlen
                                 # jmp near return_addr
 
-                                m = MachineCodeAssembler()
+                                m = asm()
 
                                 if mov_esp_edi:
                                     # Restore the cap length value of stl-string if needed
@@ -251,10 +251,9 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
-                    new_code = MachineCodeBuilder().byte(push_imm8).byte(new_len)
                     ret_value = Fix(
                         src_off=old_next + 1,
-                        new_code=new_code,
+                        new_code=asm().push_imm8(new_len),
                         dest_off=next_off + 2
                     )
                     ret_value.meta = meta
@@ -276,7 +275,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
                 meta.length = 'edi'
-                # There's no code in DF that passes this condition. Leaved just in case.
+                # There's no code in DF that passes this condition. Left just in case.
                 # TODO: Drop it
                 i = find_instruction(aft, call_near)
                 if i is not None:
@@ -959,8 +958,6 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                     # This is probably a bound of an array, not a string reference
                     continue
                 elif fix.new_code:
-                    new_code = fix.new_code
-                    assert isinstance(new_code, (bytes, bytearray, MachineCodeBuilder))
                     src_off = fix.src_off
                     assert src_off is not None
                     fixes[src_off].add_fix(fix)
@@ -1112,12 +1109,12 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
 
         if dest_off is not None:
             dest_rva = sections[code_section].offset_to_rva(dest_off)
-            if isinstance(mach, MachineCodeBuilder):
+            mach.origin_address = hook_rva
+            if 'dest' in mach.get_values():
                 mach.set_values(dest=dest_rva)
             else:
-                disp = dest_rva - (hook_rva + len(mach) + 5)  # 5 is a size of jmp near + displacement
                 # Add jump from the hook
-                mach.byte(jmp_near).relative_reference(disp)
+                mach.byte(jmp_near).relative_reference(dest_rva)
 
         assert mach is not None
         # Write the hook to the new section

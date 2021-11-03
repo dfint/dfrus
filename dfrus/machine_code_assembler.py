@@ -70,6 +70,12 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def lea(self, register: Reg, src: Operand):
         return self.byte(lea).modrm_sib_compiler(register, src)
 
+    def push_imm8(self, new_len):
+        return self.byte(push_imm8).byte(new_len)
 
-def asm():
+    def call_near(self, label: str):
+        return self.byte(call_near).relative_reference(label)
+
+
+def asm() -> MachineCodeAssembler:
     return MachineCodeAssembler()

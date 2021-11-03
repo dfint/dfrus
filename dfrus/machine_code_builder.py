@@ -75,6 +75,9 @@ class MachineCodeBuilder:
     def add_bytes(self, value: bytes):
         return self._add_item(MachineCodeItem(value=value, size=len(value)))
 
+    def duplicate_byte(self, b: int, n: int):
+        return self.add_bytes(b.to_bytes(1, "little") * n)
+
     def relative_reference(self, name: str, size: int):
         reference = Reference.relative(name=name, size=size)
         self._fields[name].append(reference)

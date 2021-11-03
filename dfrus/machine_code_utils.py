@@ -42,7 +42,7 @@ def mach_strlen(code_chunk: Union[bytes, MachineCodeBuilder]) -> MachineCodeBuil
     return m
 
 
-def mach_memcpy(src: int, dest: Operand, count) -> MachineCodeBuilder:
+def mach_memcpy(src: int, dest: Operand, count) -> MachineCodeAssembler:
     assert dest.index_reg is None
     m = MachineCodeAssembler()
 

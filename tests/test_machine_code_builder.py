@@ -95,3 +95,10 @@ def test_radd_bytes():
     assert bs == b'1234' + 0xDEADBEEF.to_bytes(4, 'little') + 0xF00.to_bytes(4, 'little')
     assert set(m1.absolute_references) == {4, 8}
     assert m1.labels["some_label"] == 8
+
+
+def test_duplicate_byte():
+    value = 90
+    count = 100
+    bs = MachineCodeBuilder().duplicate_byte(value, count).build()
+    assert len(bs) == count and all(b == value for b in bs)
