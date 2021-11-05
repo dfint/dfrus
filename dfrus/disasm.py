@@ -1,7 +1,6 @@
-from enum import auto
-from typing import Optional, Tuple, Any, Iterator
-
 from dataclasses import dataclass, asdict
+from enum import auto
+from typing import Optional, Tuple, Iterator
 
 from .binio import to_signed
 from .opcodes import *
@@ -134,7 +133,7 @@ class OperandType(Enum):
 
 @dataclass
 class Operand:
-    value: Any = None
+    value: Optional[int] = None
     reg: Optional[Reg] = None
     base_reg: Optional[Reg] = None
     index_reg: Optional[Reg] = None

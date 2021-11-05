@@ -225,7 +225,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                 m.mov_reg_imm(Reg.edi, old_len)  # mov edi, old_len
                                 m.byte(jmp_near).relative_reference(name="return_addr")  # jmp near return_addr
 
-                                assert line.operands is not None
+                                assert line.operands is not None and line.operands[0].value is not None
                                 m.set_values(func=line.operands[0].value, return_addr=line.address + 5)
 
                                 ret_value = Fix(
@@ -386,6 +386,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                         elif line_data[0] == jmp_near:
                             assert line.operands is not None
                             next_off_2 = line.operands[0].value
+                            assert next_off_2 is not None
                             aft = read_bytes(fn, offset, count_after)
 
                             skip = None
@@ -716,7 +717,11 @@ def get_length(data: bytes,
                                                           OperandType.immediate_value}]
 
                     for ref in abs_refs:
-                        value = ref.disp if ref.get_type() is OperandType.absolute_memory_reference else ref.value
+                        if ref.get_type() is OperandType.absolute_memory_reference:
+                            value = ref.disp
+                        else:
+                            assert ref.value is not None
+                            value = ref.value
 
                         if ref.get_type() is OperandType.immediate_value and not valid_reference(value):
                             continue
