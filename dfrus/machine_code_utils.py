@@ -1,10 +1,10 @@
 from typing import Union
 
 from .binio import from_dword
-from .disasm import Operand
 from .machine_code_assembler import MachineCodeAssembler
 from .machine_code_builder import MachineCodeBuilder
 from .opcodes import *
+from .operand import MemoryReference, RelativeMemoryReference, AbsoluteMemoryReference
 
 MAX_LEN = 0x100
 
@@ -42,14 +42,18 @@ def mach_strlen(code_chunk: Union[bytes, MachineCodeBuilder]) -> MachineCodeBuil
     return m
 
 
-def mach_memcpy(src: int, dest: Operand, count) -> MachineCodeAssembler:
-    assert dest.index_reg is None
+def mach_memcpy(src: int, dest: MemoryReference, count) -> MachineCodeAssembler:
+    # dest != [reg1 + scale*reg2 + disp]
+    assert not (isinstance(dest, RelativeMemoryReference) and dest.index_reg is not None)
+
     m = MachineCodeAssembler()
 
     m.byte(pushad)  # pushad
 
     # If the destination address is not in edi yet, put it there
-    if dest.base_reg != Reg.edi or dest.disp != 0:
+    if isinstance(dest, AbsoluteMemoryReference):
+        m.mov_reg_imm(Reg.edi, dest.disp, True)  # mov edi, imm32
+    elif dest.base_reg != Reg.edi or dest.disp != 0:
         if dest.disp == 0:
             assert dest.base_reg is not None
             m.mov_reg_reg32(Reg.edi, dest.base_reg)  # mov edi, reg

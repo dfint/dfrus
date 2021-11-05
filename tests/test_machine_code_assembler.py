@@ -1,8 +1,9 @@
 import pytest
 
-from dfrus.disasm import disasm, RelativeMemoryReference
+from dfrus.disasm import disasm
 from dfrus.machine_code_assembler import asm
 from dfrus.opcodes import Reg
+from dfrus.operand import RelativeMemoryReference
 
 
 @pytest.mark.parametrize("operands, bytes_result, expected_disasm", [

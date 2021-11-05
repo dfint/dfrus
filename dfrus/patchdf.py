@@ -10,13 +10,14 @@ from warnings import warn
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
-from .disasm import disasm, DisasmLine, join_byte, Operand, align, OperandType, RelativeMemoryReference, \
-    RegisterOperand, ImmediateValueOperand, AbsoluteMemoryReference
+from .disasm import disasm, DisasmLine, join_byte, align
 from .extract_strings import extract_strings
 from .machine_code_assembler import asm
 from .machine_code_builder import MachineCodeBuilder
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
+from .operand import (OperandType, Operand, ImmediateValueOperand, RegisterOperand, MemoryReference,
+                      RelativeMemoryReference, AbsoluteMemoryReference)
 from .patch_charmap import patch_unicode_table, get_encoder
 from .peclasses import Section, RelocationTable, PortableExecutable
 from .search_charmap import search_charmap
@@ -493,7 +494,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 class GetLengthResult:
     deleted_relocs: Set[int]
     added_relocs: Set[int]
-    dest: Operand
+    dest: MemoryReference
     length: int
     saved_mach: bytes
     nops: Mapping[int, int] = field(default_factory=dict)
@@ -589,26 +590,31 @@ def get_length(data: bytes,
                             deleted_relocs.add(offset + local_offset)
                             added_relocs.add(len(saved_mach) + local_offset)
                         saved_mach += line.data
-            elif isinstance(left_operand, (RelativeMemoryReference, AbsoluteMemoryReference)):
+            elif isinstance(left_operand, MemoryReference):
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
-                if right_operand.get_type() in {OperandType.general_purpose_register,
-                                                OperandType.xmm_register}:
-
-                    assert isinstance(right_operand, RegisterOperand)
+                if (isinstance(right_operand, RegisterOperand)
+                        and right_operand.reg.type in {RegType.general, RegType.xmm}):
                     if reg_state[right_operand.reg.parent] is None or reg_state[right_operand.reg.parent] < 0:
                         # It can be a part of a copying code of another string. Leave it as is.
                         not_moveable_after = not_moveable_after or offset
                         reg_state[right_operand.reg.parent] = None  # Mark the register as free
                     else:
-                        assert left_operand.index_reg is None
+                        assert not (isinstance(left_operand, RelativeMemoryReference)
+                                    and left_operand.index_reg is not None)
 
                         if reg_state[right_operand.reg.parent] == 0:
-                            raise ValueError('Copying of a string to several diferent locations not supported.')
+                            raise ValueError('Copying of a string to several different locations not supported.')
 
-                        if (dest is None or (dest.get_type() == left_operand.get_type() and
-                                             dest.base_reg == left_operand.base_reg and
-                                             dest.disp > left_operand.disp)):
+                        if dest is None:
                             dest = left_operand
+                        elif (isinstance(dest, RelativeMemoryReference)
+                              and isinstance(left_operand, RelativeMemoryReference)
+                              and dest.base_reg == left_operand.base_reg
+                              and dest.disp > left_operand.disp):
+                            dest = left_operand
+                        # elif (isinstance(dest, AbsoluteMemoryReference)
+                        #       and isinstance(left_operand, AbsoluteMemoryReference)):
+                        #     dest = left_operand
 
                         if left_operand.get_type() is OperandType.absolute_memory_reference:
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
@@ -633,7 +639,7 @@ def get_length(data: bytes,
                         # deleted_relocs.add(offset + local_offset)
                         # added_relocs.add(len(saved_mach) + local_offset)
 
-                    if left_operand.get_type() == OperandType.absolute_memory_reference:
+                    if isinstance(left_operand, AbsoluteMemoryReference):
                         value = left_operand.disp
                         local_offset = line.data.index(to_dword(value))
                         deleted_relocs.add(offset + local_offset)
@@ -652,7 +658,7 @@ def get_length(data: bytes,
             assert isinstance(left_operand, RegisterOperand)
             assert isinstance(right_operand, RelativeMemoryReference)
             reg_state[left_operand.reg.parent] = -1
-            if (dest is not None
+            if (dest is not None and isinstance(dest, RelativeMemoryReference)
                     and dest.base_reg == right_operand.base_reg
                     and dest.disp == right_operand.disp):
 

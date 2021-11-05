@@ -1,10 +1,10 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, asdict
-from enum import auto
 from typing import Optional, Tuple, Iterator
 
 from .binio import to_signed
 from .opcodes import *
+from .operand import (Operand, ImmediateValueOperand, RegisterOperand, RelativeMemoryReference,
+                      AbsoluteMemoryReference)
 
 
 def align(n, edge=4):
@@ -33,7 +33,7 @@ class ModRM:
     @classmethod
     def split(cls, x):
         return cls(*split_byte(x))
-    
+
     def __int__(self):
         return join_byte(self.mode, self.reg, self.regmem)
 
@@ -46,11 +46,11 @@ class Sib:
     scale: int
     index_reg: int
     base_reg: int
-    
+
     @classmethod
     def split(cls, x):
         return cls(*split_byte(x))
-    
+
     def __int__(self):
         return join_byte(self.scale, self.index_reg, self.base_reg)
 
@@ -114,277 +114,8 @@ regs = (
     ("bh", "di", "edi"),
 )
 
-seg_regs = ("es", "cs", "ss", "ds", "fs", "gs")
 seg_prefixes = {Prefix.seg_es: Reg.es, Prefix.seg_cs: Reg.cs, Prefix.seg_ss: Reg.ss, Prefix.seg_ds: Reg.ds,
                 Prefix.seg_fs: Reg.fs, Prefix.seg_gs: Reg.gs}
-
-
-op_sizes = {1: "byte", 2: "word", 4: "dword", 8: "qword", 16: "dqword"}
-
-
-class OperandType(Enum):
-    immediate_value = auto()
-    general_purpose_register = auto()
-    xmm_register = auto()
-    segment_register = auto()
-    absolute_memory_reference = auto()
-    relative_memory_reference = auto()
-    unknown = auto()
-
-
-class Operand(ABC):
-    @abstractmethod
-    def get_type(self) -> OperandType:
-        return OperandType.unknown
-
-    def get_data_size(self) -> Optional[int]:
-        raise NotImplementedError()
-
-    def set_data_size(self, value: Optional[int]):
-        raise NotImplementedError()
-
-    @property
-    def data_size(self) -> Optional[int]:
-        return self.get_data_size()
-
-    @data_size.setter
-    def data_size(self, value: Optional[int]):
-        self.set_data_size(value)
-
-
-@dataclass
-class ImmediateValueOperand(Operand):
-    value: int
-
-    def get_type(self) -> OperandType:
-        return OperandType.immediate_value
-
-    def __str__(self):
-        if self.value >= 0:
-            return asmhex(self.value)
-        else:
-            return '-' + asmhex(-self.value)
-
-
-@dataclass
-class RegisterOperand(Operand):
-    reg: Reg
-
-    def get_type(self) -> OperandType:
-        if self.reg.type == RegType.general:
-            return OperandType.general_purpose_register
-        elif self.reg.type == RegType.xmm:
-            return OperandType.xmm_register
-        elif self.reg.type == RegType.segment:
-            return OperandType.segment_register
-        else:
-            raise ValueError("Unknown register type")
-
-    def get_data_size(self) -> Optional[int]:
-        return self.reg.size
-
-    def set_data_size(self, new_size):
-        assert new_size is None or 1 <= new_size
-
-        if self.reg is not None:
-            assert self.reg.type == RegType.general, 'Do not change non-general register size explicitly'
-            self.reg = Reg((RegType.general, self.reg.code, new_size))
-
-    def __str__(self):
-        return self.reg.name
-
-
-@dataclass
-class RelativeMemoryReference(Operand):
-    base_reg: Optional[Reg] = None
-    index_reg: Optional[Reg] = None
-    seg_prefix: Optional[Reg] = None
-    scale: Optional[int] = None
-    disp: int = 0
-    _data_size: Optional[int] = None
-
-    def get_type(self) -> OperandType:
-        return OperandType.relative_memory_reference
-
-    def get_data_size(self) -> Optional[int]:
-        return self._data_size
-
-    def set_data_size(self, value: Optional[int]):
-        self._data_size = value
-
-    def __str__(self):
-        if self.base_reg is None and self.index_reg is None:
-            result = asmhex(self.disp)
-        else:
-            result = ""
-            if self.base_reg is not None:
-                result = self.base_reg.name
-                if self.index_reg is not None:
-                    result += "+"
-
-            if self.index_reg is not None:
-                if self.scale:
-                    result += "%d*" % (1 << self.scale)
-
-                result += self.index_reg.name
-
-            if self.disp or not result:
-                if self.disp >= 0:
-                    if not result:
-                        result += asmhex(self.disp)
-                    else:
-                        result += '+' + asmhex(self.disp)
-                else:
-                    result += '-' + asmhex(-self.disp)
-
-        if self.seg_prefix is None:
-            result = "[%s]" % result
-        else:
-            result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
-
-        data_size = self.get_data_size()
-        if data_size is not None:
-            result = op_sizes[data_size] + ' ' + result
-
-        return result
-
-
-@dataclass
-class AbsoluteMemoryReference(Operand):
-    disp: int
-    seg_prefix: Optional[Reg] = None
-    _data_size: Optional[int] = None
-
-    def get_type(self) -> OperandType:
-        return OperandType.absolute_memory_reference
-
-    def get_data_size(self) -> Optional[int]:
-        return self._data_size
-
-    def set_data_size(self, value: Optional[int]):
-        self._data_size = value
-
-    def __str__(self):
-        result = asmhex(self.disp)
-
-        if self.seg_prefix is None:
-            result = "[%s]" % result
-        else:
-            result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
-
-        data_size = self.get_data_size()
-        if data_size is not None:
-            result = op_sizes[data_size] + ' ' + result
-
-        return result
-
-
-# @dataclass
-# class Operand:
-#     value: Optional[int] = None
-#     reg: Optional[Reg] = None
-#     base_reg: Optional[Reg] = None
-#     index_reg: Optional[Reg] = None
-#     seg_prefix: Optional[Reg] = None
-#     scale: Optional[int] = None
-#     disp: int = 0
-#     _data_size: Optional[int] = None
-#
-#     def __post_init__(self):
-#         assert self.reg is None or isinstance(self.reg, Reg)
-#         assert self.base_reg is None or isinstance(self.base_reg, Reg)
-#         assert(self._data_size is None or 0 <= self._data_size <= 2)
-#         assert self.index_reg is None or isinstance(self.index_reg, Reg)
-#         if self.reg is not None:
-#             self._data_size = self.reg.size
-#
-#     def get_type(self) -> OperandType:
-#         if self.value is not None:
-#             return OperandType.immediate_value
-#         elif self.reg is not None:
-#             if self.reg.type == RegType.general:
-#                 return OperandType.general_purpose_register
-#             elif self.reg.type == RegType.xmm:
-#                 return OperandType.xmm_register
-#             elif self.reg.type == RegType.segment:
-#                 return OperandType.segment_register
-#         elif self.base_reg is None and self.index_reg is None:
-#             return OperandType.absolute_memory_reference
-#         else:
-#             return OperandType.relative_memory_reference
-#
-#         return OperandType.unknown
-#
-#     @property
-#     def data_size(self):
-#         return self._data_size
-#
-#     @data_size.setter
-#     def data_size(self, new_size):
-#         assert new_size is None or 1 <= new_size
-#
-#         if self.reg is not None:
-#             assert self.reg.type == RegType.general, 'Do not change non-general register size explicitly'
-#             self.reg = Reg((RegType.general, self.reg.code, new_size))
-#
-#         self._data_size = new_size
-#
-#     def __str__(self):
-#         if self.value is not None:
-#             if self.value >= 0:
-#                 return asmhex(self.value)
-#             else:
-#                 return '-' + asmhex(-self.value)
-#         elif self.reg is not None:
-#             return self.reg.name
-#         else:
-#             if self.base_reg is None and self.index_reg is None:
-#                 result = asmhex(self.disp)
-#             else:
-#                 result = ""
-#                 if self.base_reg is not None:
-#                     result = self.base_reg.name
-#                     if self.index_reg is not None:
-#                         result += "+"
-#
-#                 if self.index_reg is not None:
-#                     if self.scale:
-#                         result += "%d*" % (1 << self.scale)
-#
-#                     result += self.index_reg.name
-#
-#                 if self.disp or not result:
-#                     if self.disp >= 0:
-#                         if not result:
-#                             result += asmhex(self.disp)
-#                         else:
-#                             result += '+' + asmhex(self.disp)
-#                     else:
-#                         result += '-' + asmhex(-self.disp)
-#
-#             if self.seg_prefix is None:
-#                 result = "[%s]" % result
-#             else:
-#                 result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
-#
-#             if self.data_size is not None:
-#                 result = op_sizes[self.data_size] + ' ' + result
-#
-#             return result
-#
-#     def __repr__(self):
-#         args_list = [
-#             ('0x{:x}', 'value'), ('{}', 'reg'), ('{}', 'base_reg'), ('{}', 'index_reg'), ('{}', 'scale'),
-#             ('0x{:x}', 'disp'), ('{}', 'data_size'), ('{!r}', 'seg_prefix')
-#         ]
-#         return 'Operand({})'.format(', '.join(('{}=' + fmt).format(argname, getattr(self, argname))
-#                                               for fmt, argname in args_list if getattr(self, argname) is not None))
-#
-#     def __int__(self):
-#         if (self.value is None or self.reg is not None or
-#                 self.base_reg is not None or self.index_reg is not None):
-#             raise ValueError('Failed to represent Operand as integer: %s' % self)
-#         return self.value
 
 
 def create_operand1_from_modrm(analisys_result: ModRmAnalysisResult, size=4) -> Operand:
@@ -476,14 +207,6 @@ op_FE_width_acc_imm = {add_acc_imm: 'add', sub_acc_imm: 'sub', or_acc_imm: 'or',
 op_shifts_rolls = ("rol", "ror", "rcl", "rcr", "shl", "shr", "sal", "sar")
 
 
-def asmhex(n):
-    assert(n >= 0)
-    if n < 0xA:
-        return str(n)
-    else:
-        return '0x{:X}'.format(n)
-
-
 @dataclass(repr=False)
 class DisasmLine:
     address: int
@@ -500,7 +223,7 @@ class DisasmLine:
 
         if self.prefix is not None:
             text = self.prefix.name + ' ' + text
-        
+
         return text
 
     def __repr__(self):
@@ -550,7 +273,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             i += 1
             immediate = int.from_bytes(bytes(s[i:i+2]), byteorder='little')
             i += 2
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='retn',
+            line = DisasmLine(start_address + j, data=s[j:i], mnemonic='retn',
                               operands=(ImmediateValueOperand(immediate),), prefix=rep_prefix)
         elif s[i] in {call_near, jmp_near}:
             if i > j:
@@ -559,7 +282,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             i += 1
             immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
             i += 4
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic=op_nomask[s[j]],
+            line = DisasmLine(start_address + j, data=s[j:i], mnemonic=op_nomask[s[j]],
                               operands=(ImmediateValueOperand(immediate),), prefix=rep_prefix)
         elif s[i] == jmp_short or s[i] & 0xF0 == jcc_short:
             if i > j:
@@ -570,7 +293,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
                 mnemonic = "jmp short"
             else:
                 mnemonic = 'j%s short' % Cond(s[i] & 0x0F).name
-            line = DisasmLine(start_address+j, data=s[i:i+2], mnemonic=mnemonic,
+            line = DisasmLine(start_address + j, data=s[i:i+2], mnemonic=mnemonic,
                               operands=(ImmediateValueOperand(immediate),), prefix=rep_prefix)
             i += 2
         elif s[i] == lea:
@@ -722,7 +445,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             else:
                 immediate = int.from_bytes(s[i:i+4], byteorder='little')
                 i += 4
-            line = DisasmLine(start_address+j, data=s[j:i], mnemonic='push',
+            line = DisasmLine(start_address + j, data=s[j:i], mnemonic='push',
                               operands=(ImmediateValueOperand(immediate),), prefix=rep_prefix)
         elif s[i] & 0xFE in op_FE_width_acc_imm:
             mnemonic = op_FE_width_acc_imm[s[i] & 0xFE]
@@ -804,7 +527,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
                 condition = s[i] & 0x0F
                 mnemonic = "set%s" % Cond(condition).name
-                reg_op = RegisterOperand(Reg((RegType.general, s[i+1] & 7, 1)))
+                reg_op = RegisterOperand(Reg((RegType.general, s[i + 1] & 7, 1)))
                 i += 2
                 line = DisasmLine(start_address+j,
                                   data=s[j:i],
@@ -818,7 +541,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
                 i += 1
                 immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 i += 4
-                line = DisasmLine(start_address+j,
+                line = DisasmLine(start_address + j,
                                   data=s[j:i],
                                   mnemonic=mnemonic,
                                   operands=(ImmediateValueOperand(immediate),),
