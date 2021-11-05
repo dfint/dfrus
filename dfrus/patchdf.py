@@ -16,7 +16,7 @@ from .machine_code_assembler import asm
 from .machine_code_builder import MachineCodeBuilder
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
-from .operand import (OperandType, ImmediateValueOperand, RegisterOperand, MemoryReference,
+from .operand import (ImmediateValueOperand, RegisterOperand, MemoryReference,
                       RelativeMemoryReference, AbsoluteMemoryReference)
 from .patch_charmap import patch_unicode_table, get_encoder
 from .peclasses import Section, RelocationTable, PortableExecutable
@@ -616,7 +616,7 @@ def get_length(data: bytes,
                         #       and isinstance(left_operand, AbsoluteMemoryReference)):
                         #     dest = left_operand
 
-                        if left_operand.get_type() is OperandType.absolute_memory_reference:
+                        if isinstance(left_operand, AbsoluteMemoryReference):
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
 
                         assert left_operand.data_size is not None or right_operand.data_size is not None
@@ -637,7 +637,7 @@ def get_length(data: bytes,
                         not_moveable_after = not_moveable_after or offset
                         continue
                         # value = right_operand.disp
-                        # if right_operand.get_type() is OperandType.absolute_memory_reference
+                        # if isinstance(right_operand, AbsoluteMemoryReference)
                         # else right_operand.value
                         # local_offset = line.data.rindex(to_dword(value))  # use rindex() to find the second operand
                         # deleted_relocs.add(offset + local_offset)
@@ -653,7 +653,7 @@ def get_length(data: bytes,
             else:
                 # Segment register etc.
                 raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' %
-                                 (left_operand, left_operand.get_type(), str(line)))
+                                 (left_operand, type(left_operand), str(line)))
         elif line.mnemonic == 'lea':
             assert line.operands is not None
             left_operand, right_operand = line.operands
@@ -740,7 +740,7 @@ def get_length(data: bytes,
                         else:
                             value = ref.value
 
-                        if ref.get_type() is OperandType.immediate_value and not valid_reference(value):
+                        if isinstance(ref, ImmediateValueOperand) and not valid_reference(value):
                             continue
 
                         local_offset = line.data.index(to_dword(value))

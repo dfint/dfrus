@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
@@ -29,10 +29,6 @@ class OperandType(Enum):
 
 
 class Operand(ABC):
-    @abstractmethod
-    def get_type(self) -> OperandType:
-        return OperandType.unknown
-
     def get_data_size(self) -> Optional[int]:
         raise NotImplementedError()
 
@@ -52,9 +48,6 @@ class Operand(ABC):
 class ImmediateValueOperand(Operand):
     value: int
 
-    def get_type(self) -> OperandType:
-        return OperandType.immediate_value
-
     def __str__(self):
         if self.value >= 0:
             return asmhex(self.value)
@@ -68,16 +61,6 @@ class ImmediateValueOperand(Operand):
 @dataclass
 class RegisterOperand(Operand):
     reg: Reg
-
-    def get_type(self) -> OperandType:
-        if self.reg.type == RegType.general:
-            return OperandType.general_purpose_register
-        elif self.reg.type == RegType.xmm:
-            return OperandType.xmm_register
-        elif self.reg.type == RegType.segment:
-            return OperandType.segment_register
-        else:
-            raise ValueError("Unknown register type")
 
     def get_data_size(self) -> Optional[int]:
         return self.reg.size
@@ -108,9 +91,6 @@ class RelativeMemoryReference(MemoryReference):
     index_reg: Optional[Reg] = None
     scale: int = 0
     _data_size: Optional[int] = None
-
-    def get_type(self) -> OperandType:
-        return OperandType.relative_memory_reference
 
     def get_data_size(self) -> Optional[int]:
         return self._data_size
@@ -159,9 +139,6 @@ class RelativeMemoryReference(MemoryReference):
 @dataclass
 class AbsoluteMemoryReference(MemoryReference):
     _data_size: Optional[int] = None
-
-    def get_type(self) -> OperandType:
-        return OperandType.absolute_memory_reference
 
     def get_data_size(self) -> Optional[int]:
         return self._data_size
