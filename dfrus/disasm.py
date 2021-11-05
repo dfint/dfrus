@@ -4,7 +4,7 @@ from typing import Optional, Tuple, Iterator
 from .binio import to_signed
 from .opcodes import *
 from .operand import (Operand, ImmediateValueOperand, RegisterOperand, RelativeMemoryReference,
-                      AbsoluteMemoryReference)
+                      AbsoluteMemoryReference, MemoryReference)
 
 
 def align(n, edge=4):
@@ -238,6 +238,10 @@ class BytesLine(DisasmLine):
 def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
     s = bytes(s)
     i = 0
+
+    operand1: Operand
+    operand2: Operand
+
     while i < len(s):
         j = i
         size_prefix = False
@@ -358,12 +362,16 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             operand1, operand2 = create_operands_from_modrm_or_sib(analysis_result)
             size = 1 << (flag_size*2-size_prefix)
             operand1.data_size = size
+
             if isinstance(operand2, RegisterOperand):
                 operand2.set_data_size(size)
-            if seg_prefix is not None:  # redundant check
+
+            if isinstance(operand2, MemoryReference) and seg_prefix is not None:
                 operand2.seg_prefix = seg_prefix
+
             if not dir_flag:
                 operand1, operand2 = operand2, operand1
+
             line = DisasmLine(start_address+j,
                               data=s[j:i],
                               mnemonic=mnemonic,
@@ -385,17 +393,18 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
                 analysis_result, i = analyse_modrm(s, i)
                 mnemonics = ["inc", "dec", "call", "call far", "jmp dword", "jmp far", "push dword"]
                 mnemonic = mnemonics[op]
-                operand1 = create_operand2_from_modrm_or_sib(analysis_result)
+                operand = create_operand2_from_modrm_or_sib(analysis_result)
                 if op < 2:
                     size = flag_size*2-size_prefix
-                    operand1.data_size = 1 << size
+                    operand.data_size = 1 << size
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                      operands=(operand1,), prefix=rep_prefix)
+                                      operands=(operand,), prefix=rep_prefix)
                 elif flag_size:
                     if seg_prefix:
-                        operand1.seg_prefix = seg_prefix
+                        assert isinstance(operand, MemoryReference)
+                        operand.seg_prefix = seg_prefix
                     line = DisasmLine(start_address+j, data=s[j:i], mnemonic=mnemonic,
-                                      operands=(operand1,), prefix=rep_prefix)
+                                      operands=(operand,), prefix=rep_prefix)
         elif s[i] & 0xFC == mov_acc_mem:
             dir_flag = s[i] & 2
             size_flag = s[i] & 1
@@ -421,7 +430,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             analysis_result, i = analyse_modrm(s, i+1)
 
             operand1 = RegisterOperand(Reg.segment(analysis_result.modrm.reg))
-            operand2: Operand = create_operand2_from_modrm_or_sib(analysis_result)
+            operand2 = create_operand2_from_modrm_or_sib(analysis_result)
 
             if not dir_flag:
                 operand1, operand2 = operand2, operand1

@@ -16,7 +16,7 @@ from .machine_code_assembler import asm
 from .machine_code_builder import MachineCodeBuilder
 from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
 from .opcodes import *
-from .operand import (OperandType, Operand, ImmediateValueOperand, RegisterOperand, MemoryReference,
+from .operand import (OperandType, ImmediateValueOperand, RegisterOperand, MemoryReference,
                       RelativeMemoryReference, AbsoluteMemoryReference)
 from .patch_charmap import patch_unicode_table, get_encoder
 from .peclasses import Section, RelocationTable, PortableExecutable
@@ -509,7 +509,7 @@ def get_length(data: bytes,
                oldlen: int,
                original_string_address: int = None,
                reg_state: dict = None,
-               dest: Optional[Operand] = None) -> GetLengthResult:
+               dest: Optional[MemoryReference] = None) -> GetLengthResult:
 
     def belongs_to_the_string(ref_value):
         osa = original_string_address
@@ -619,7 +619,11 @@ def get_length(data: bytes,
                         if left_operand.get_type() is OperandType.absolute_memory_reference:
                             deleted_relocs.add(offset + line.data.index(to_dword(left_operand.disp)))
 
-                        copied_len += left_operand.data_size or right_operand.data_size
+                        assert left_operand.data_size is not None or right_operand.data_size is not None
+                        if left_operand.data_size:
+                            copied_len += left_operand.data_size
+                        elif right_operand.data_size:
+                            copied_len += right_operand.data_size
 
                         if not is_moveable():
                             nops[offset] = len(line.data)

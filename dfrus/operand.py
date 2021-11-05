@@ -169,6 +169,9 @@ class AbsoluteMemoryReference(MemoryReference):
     def set_data_size(self, value: Optional[int]):
         self._data_size = value
 
+    def __int__(self):
+        return self.disp
+
     def __str__(self):
         result = asmhex(self.disp)
 

@@ -5,6 +5,7 @@ from typing import Optional, Union, BinaryIO, Callable
 
 from .binio import read_bytes
 from .disasm import disasm, DisasmLine
+from .operand import AbsoluteMemoryReference
 
 count_after = 0x100
 
@@ -42,40 +43,46 @@ def trace_code(fn: BinaryIO,
             elif stop_cond(line):  # Stop when the stop_cond returns True
                 return line
             elif line.mnemonic.startswith('jmp'):
-                assert line.operands is not None
+                assert line.operands
+                operand = line.operands[0]
+                assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_jmp is Trace.not_follow:
                     pass
                 elif trace_config.trace_jmp is Trace.follow:
-                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_config)
+                    return trace_code(fn, int(operand), stop_cond, trace_config)
                 elif trace_config.trace_jmp is Trace.stop:
                     return line
                 elif trace_config.trace_jmp is Trace.forward_only:
-                    if int(line.operands[0]) > line.address:
-                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_config)
+                    if int(operand) > line.address:
+                        return trace_code(fn, int(operand), stop_cond, trace_config)
             elif line.mnemonic.startswith('j'):
-                assert line.operands is not None
+                assert line.operands
+                operand = line.operands[0]
+                assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_jcc is Trace.not_follow:
                     pass
                 elif trace_config.trace_jcc is Trace.follow:
-                    return trace_code(fn, int(line.operands[0]), stop_cond, trace_config)
+                    return trace_code(fn, int(operand), stop_cond, trace_config)
                 elif trace_config.trace_jcc is Trace.stop:
                     return line
                 elif trace_config.trace_jcc is Trace.forward_only:
-                    if int(line.operands[0]) > line.address:
-                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_config)
+                    if int(operand) > line.address:
+                        return trace_code(fn, int(operand), stop_cond, trace_config)
             elif line.mnemonic.startswith('call'):
-                assert line.operands is not None
+                assert line.operands
+                operand = line.operands[0]
+                assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_call is Trace.not_follow:
                     pass
                 elif trace_config.trace_call is Trace.follow:
-                    returned = trace_code(fn, int(line.operands[0]), stop_cond, trace_config)
+                    returned = trace_code(fn, int(operand), stop_cond, trace_config)
                     if returned is None or not returned.mnemonic.startswith('ret'):
                         return returned
                 elif trace_config.trace_call is Trace.stop:
                     return line
                 elif trace_config.trace_call is Trace.forward_only:
-                    if int(line.operands[0]) > line.address:
-                        return trace_code(fn, int(line.operands[0]), stop_cond, trace_config)
+                    if int(operand) > line.address:
+                        return trace_code(fn, int(operand), stop_cond, trace_config)
             elif line.mnemonic.startswith('ret'):
                 return line
 
@@ -98,14 +105,11 @@ def which_func(fn, offset, stop_cond=lambda _: False) -> FunctionInformation:
     elif str(disasm_line).startswith('rep'):
         return FunctionInformation(str(disasm_line))
     elif disasm_line.mnemonic.startswith('call'):
-        assert disasm_line.operands is not None and len(disasm_line.operands) == 1
-        try:
-            return FunctionInformation(disasm_line.mnemonic,
-                                       disasm_line.address,
-                                       int(disasm_line.operands[0]))
-        except ValueError:
-            return FunctionInformation(disasm_line.mnemonic + ' indirect',
-                                       disasm_line.address,
-                                       str(disasm_line.operands[0]))
+        assert disasm_line.operands
+        operand = disasm_line.operands[0]
+        if isinstance(operand, AbsoluteMemoryReference):
+            return FunctionInformation(disasm_line.mnemonic, disasm_line.address, int(operand))
+        else:
+            return FunctionInformation(disasm_line.mnemonic + ' indirect', disasm_line.address, str(operand))
     else:
         return FunctionInformation('not reached')

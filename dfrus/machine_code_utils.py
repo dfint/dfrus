@@ -4,7 +4,7 @@ from .binio import from_dword
 from .machine_code_assembler import MachineCodeAssembler
 from .machine_code_builder import MachineCodeBuilder
 from .opcodes import *
-from .operand import MemoryReference, RelativeMemoryReference, AbsoluteMemoryReference
+from .operand import MemoryReference, RelativeMemoryReference
 
 MAX_LEN = 0x100
 
@@ -51,9 +51,7 @@ def mach_memcpy(src: int, dest: MemoryReference, count) -> MachineCodeAssembler:
     m.byte(pushad)  # pushad
 
     # If the destination address is not in edi yet, put it there
-    if isinstance(dest, AbsoluteMemoryReference):
-        m.mov_reg_imm(Reg.edi, dest.disp, True)  # mov edi, imm32
-    elif dest.base_reg != Reg.edi or dest.disp != 0:
+    if isinstance(dest, RelativeMemoryReference) and (dest.base_reg != Reg.edi or dest.disp != 0):
         if dest.disp == 0:
             assert dest.base_reg is not None
             m.mov_reg_reg32(Reg.edi, dest.base_reg)  # mov edi, reg
@@ -61,6 +59,8 @@ def mach_memcpy(src: int, dest: MemoryReference, count) -> MachineCodeAssembler:
             m.mov_reg_imm(Reg.edi, dest.disp, True)  # mov edi, imm32
         else:
             m.lea(Reg.edi, dest)  # lea edi, [reg+imm]
+    else:  # isinstance(dest, AbsoluteMemoryReference)
+        m.mov_reg_imm(Reg.edi, dest.disp, True)  # mov edi, imm32
 
     m.mov_reg_imm(Reg.esi, src, True)  # mov esi, imm32
     m.byte(xor_rm_reg | 1).modrm(3, Reg.ecx.code, Reg.ecx.code)  # xor ecx, ecx
