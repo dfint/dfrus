@@ -2,7 +2,7 @@ import bisect
 from array import array
 from ctypes import Structure, c_char, c_ushort, c_uint, sizeof, c_ubyte
 from itertools import zip_longest
-from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type
+from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type, TypeVar
 
 from .disasm import align
 
@@ -26,7 +26,7 @@ class CTypesField:
         setattr(obj, self.private_name, value)
 
 
-TStructure = Type["TStructure"]
+TStructure = TypeVar("TStructure")
 
 
 def read_structure(cls: Type[TStructure], file: BinaryIO, offset=None) -> TStructure:
@@ -40,7 +40,7 @@ def read_structure(cls: Type[TStructure], file: BinaryIO, offset=None) -> TStruc
 
 class ImageDosHeader(Structure):
     _fields_ = []
-    e_magic = CTypesField(c_char * 2)
+    e_magic: bytes = CTypesField(c_char * 2)
     e_cblp = CTypesField(c_ushort)
     e_cp = CTypesField(c_ushort)
     e_crlc = CTypesField(c_ushort)
@@ -185,7 +185,7 @@ class Section(Structure):
         return local_offset + self.pointer_to_raw_data
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.name}, flags=0x{self.characteristics:X}, " \
+        return f"{self.__class__.__name__}({self.name!r}, flags=0x{self.characteristics:X}, " \
                f"pstart=0x{self.pointer_to_raw_data:X}, psize=0x{self.size_of_raw_data:X}, " \
                f"vstart=0x{self.virtual_address:X}, vsize=0x{self.virtual_size:X})"
 
@@ -377,16 +377,16 @@ class PortableExecutable:
         return self._relocation_table
 
     def info(self):
+        entry_point = self.image_optional_header.address_of_entry_point + self.image_optional_header.image_base
         return (
-            'DOS signature: %s\n' % self.image_dos_header.e_magic +
-            'e_lfanew: 0x%x\n' % self.image_dos_header.e_lfanew +
-            'PE signature: %s\n' % self.image_nt_headers.signature +
-            'Entry point address: 0x%x\n' % (self.image_optional_header.address_of_entry_point +
-                                             self.image_optional_header.image_base) +
-            '%s\n' % self.image_file_header +
-            '%s\n' % self.image_optional_header +
-            '%s\n' % self.image_data_directory +
-            '%s\n' % self.section_table
+            f'DOS signature: {self.image_dos_header.e_magic!r}\n'
+            f'e_lfanew: 0x{self.image_dos_header.e_lfanew:x}\n'
+            f'PE signature: {self.image_nt_headers.signature!r}\n'
+            f'Entry point address: 0x{entry_point}\n'
+            f'{self.image_file_header}\n'
+            f'{self.image_optional_header}\n'
+            f'{self.image_data_directory}\n'
+            f'{self.section_table}\n'
         )
 
 
