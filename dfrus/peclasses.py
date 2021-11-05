@@ -2,7 +2,7 @@ import bisect
 from array import array
 from ctypes import Structure, c_char, c_ushort, c_uint, sizeof, c_ubyte
 from itertools import zip_longest
-from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type, SupportsBytes
+from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type
 
 from .disasm import align
 
@@ -78,7 +78,7 @@ class DataDirectory(Structure):
     size = CTypesField(c_uint)
 
 
-class ImageDataDirectory(Structure, SupportsBytes):
+class ImageDataDirectory(Structure):
     _fields_ = []
     export = CTypesField(DataDirectory)
     import_directory = CTypesField(DataDirectory)
@@ -140,7 +140,7 @@ class ImageNTHeaders(Structure):
     image_optional_header: ImageOptionalHeader = CTypesField(ImageOptionalHeader)
 
 
-class Section(Structure, SupportsBytes):
+class Section(Structure):
     # ImageSectionHeader
     IMAGE_SCN_CNT_CODE = 0x00000020
     IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
@@ -163,9 +163,16 @@ class Section(Structure, SupportsBytes):
     number_of_linenumbers = CTypesField(c_ushort)
     characteristics = CTypesField(c_uint)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.name: bytes = self.name.strip(b'\0')
+    @staticmethod
+    def new(name: bytes, flags: int, pstart: int, psize: int, vstart: int, vsize: int):
+        self = Section()
+        self.name = name
+        self.characteristics = flags
+        self.pointer_to_raw_data = pstart
+        self.size_of_raw_data = psize
+        self.virtual_address = vstart
+        self.virtual_size = vsize
+        return self
 
     def offset_to_rva(self, offset):
         local_offset = offset - self.pointer_to_raw_data
@@ -387,9 +394,6 @@ def main():
     with open("/home/insolor/Projects/Dwarf Fortress/df/df_42_06_win_s/Dwarf Fortress.exe", 'rb') as file:
         pe = PortableExecutable(file)
         print(pe.info())
-        assert pe.section_table.which_section(offset=pe.section_table[0].pointer_to_raw_data - 1) == -1
-        assert pe.section_table.which_section(offset=pe.section_table[0].pointer_to_raw_data) == 0
-        assert pe.section_table.which_section(offset=pe.section_table[0].pointer_to_raw_data + 1) == 0
 
 
 if __name__ == "__main__":

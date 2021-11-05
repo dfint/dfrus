@@ -807,14 +807,14 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
         return
 
     # New section prototype
-    new_section = Section(
+    new_section = Section.new(
         name=b'.new',
-        virtual_size=0,  # for now
-        rva=align(last_section.virtual_address + last_section.virtual_size,
-                  pe.image_optional_header.section_alignment),
-        physical_size=0xFFFFFFFF,  # for now
-        physical_offset=align(last_section.pointer_to_raw_data +
-                              last_section.size_of_raw_data, pe.image_optional_header.file_alignment),
+        vstart=align(last_section.virtual_address + last_section.virtual_size,
+                     pe.image_optional_header.section_alignment),
+        vsize=0,  # for now
+        pstart=align(last_section.pointer_to_raw_data +
+                     last_section.size_of_raw_data, pe.image_optional_header.file_alignment),
+        psize=0xFFFFFFFF,  # for now
         flags=Section.IMAGE_SCN_CNT_INITIALIZED_DATA | Section.IMAGE_SCN_MEM_READ | Section.IMAGE_SCN_MEM_EXECUTE
     )
 
