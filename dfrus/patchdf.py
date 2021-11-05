@@ -785,7 +785,7 @@ def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_by
 def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str], debug=False):
     print("Finding cross-references...")
 
-    image_base = pe.optional_header.image_base
+    image_base = pe.image_optional_header.image_base
     sections = pe.section_table
 
     # Getting addresses of all relocatable entries
@@ -810,15 +810,15 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     new_section = Section(
         name=b'.new',
         virtual_size=0,  # for now
-        rva=align(last_section.rva + last_section.virtual_size,
-                  pe.optional_header.section_alignment),
+        rva=align(last_section.virtual_address + last_section.virtual_size,
+                  pe.image_optional_header.section_alignment),
         physical_size=0xFFFFFFFF,  # for now
-        physical_offset=align(last_section.physical_offset +
-                              last_section.physical_size, pe.optional_header.file_alignment),
+        physical_offset=align(last_section.pointer_to_raw_data +
+                              last_section.size_of_raw_data, pe.image_optional_header.file_alignment),
         flags=Section.IMAGE_SCN_CNT_INITIALIZED_DATA | Section.IMAGE_SCN_MEM_READ | Section.IMAGE_SCN_MEM_EXECUTE
     )
 
-    new_section_offset = new_section.physical_offset
+    new_section_offset = new_section.pointer_to_raw_data
 
     # --------------------------------------------------------
     print("Translating...")
@@ -886,7 +886,7 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
         relocatable_items = set(relocation_table)
 
     # Add new section to the executable
-    if new_section_offset > new_section.physical_offset:
+    if new_section_offset > new_section.pointer_to_raw_data:
         add_new_section(pe, new_section, new_section_offset)
 
     # Check if the patched file is not broken
@@ -961,7 +961,7 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
             # Fix string length for each reference
             for ref in refs:
                 ref_rva = sections.offset_to_rva(ref)
-                if 0 <= (ref - sections[code_section].physical_offset) < sections[code_section].physical_size:
+                if 0 <= (ref - sections[code_section].pointer_to_raw_data) < sections[code_section].size_of_raw_data:
                     try:
                         fix = fix_len(fn, offset=ref, old_len=len(string), new_len=len(translation),
                                       string_address=string_address,
@@ -1057,11 +1057,11 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     sections = pe.section_table
     reloc_table = RelocationTable.build(relocation_table)
     new_size = reloc_table.size
-    data_directory = pe.data_directory
+    data_directory = pe.image_data_directory
     relocation_table_offset = sections.rva_to_offset(data_directory.basereloc.virtual_address)
     relocation_table_size = data_directory.basereloc.size
     relocation_section = sections[sections.which_section(offset=relocation_table_offset)]
-    if new_size <= relocation_section.physical_size:
+    if new_size <= relocation_section.size_of_raw_data:
         file.seek(relocation_table_offset)
         reloc_table.to_file(file)
 
@@ -1072,7 +1072,7 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
 
         # Update data directory table
         data_directory.basereloc.size = new_size
-        data_directory.rewrite()
+        pe.rewrite_data_directory()
     else:
         # Write relocation table to the new section
         with io.BytesIO() as buffer:
@@ -1080,7 +1080,7 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
 
             data_directory.basereloc.size = new_size
             data_directory.basereloc.virtual_address = new_section.offset_to_rva(new_section_offset)
-            data_directory.rewrite()
+            pe.rewrite_data_directory()
             new_section_offset = add_to_new_section(file, new_section_offset, buffer.getvalue())
     return new_section_offset, relocation_table
 
@@ -1088,26 +1088,26 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
 def add_new_section(pe: PortableExecutable, new_section, new_section_offset):
     fn = pe.file
     sections = pe.section_table
-    section_alignment = pe.optional_header.section_alignment
-    file_alignment = pe.optional_header.file_alignment
+    section_alignment = pe.image_optional_header.section_alignment
+    file_alignment = pe.image_optional_header.file_alignment
     file_size = align(new_section_offset, file_alignment)
-    new_section.physical_size = file_size - new_section.physical_offset
+    new_section.size_of_raw_data = file_size - new_section.pointer_to_raw_data
     print("Adding new data section...")
     # Align file size
     if file_size > new_section_offset:
         fn.seek(file_size - 1)
         fn.write(b'\0')
     # Set the new section virtual size
-    new_section.virtual_size = new_section_offset - new_section.physical_offset
+    new_section.virtual_size = new_section_offset - new_section.pointer_to_raw_data
     # Write the new section info
-    fn.seek(pe.nt_headers.offset + pe.nt_headers.sizeof() + len(sections) * Section.sizeof())
+    fn.seek(pe.image_nt_headers.offset + pe.image_nt_headers.sizeof() + len(sections) * Section.sizeof())
     new_section.write(fn)
     # Fix number of sections
-    pe.file_header.number_of_sections = len(sections) + 1
+    pe.image_file_header.number_of_sections = len(sections) + 1
     # Fix ImageSize field of the PE header
-    pe.optional_header.size_of_image = align(new_section.rva + new_section.virtual_size, section_alignment)
-    pe.file_header.rewrite()
-    pe.optional_header.rewrite()
+    pe.image_optional_header.size_of_image = align(new_section.virtual_address + new_section.virtual_size, section_alignment)
+    pe.image_file_header.rewrite()
+    pe.image_optional_header.rewrite()
 
 
 def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections):

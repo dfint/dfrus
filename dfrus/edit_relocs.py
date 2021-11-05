@@ -32,7 +32,7 @@ def group_args(args) -> Iterator[Tuple[str, Sequence[int]]]:
 
 def common(file: BinaryIO, functions: Iterable[Callable[[Set[int]], Set[int]]]):
     pe = PortableExecutable(file)
-    data_directory = pe.data_directory
+    data_directory = pe.image_data_directory
     sections = pe.section_table
     reloc_rva, reloc_size = data_directory.basereloc
     reloc_off = sections.rva_to_offset(reloc_rva)
@@ -55,7 +55,7 @@ def common(file: BinaryIO, functions: Iterable[Callable[[Set[int]], Set[int]]]):
 
     # Update data directory table
     data_directory.basereloc.size = new_size
-    data_directory.rewrite()
+    pe.rewrite_data_directory()
 
     pe.reread()
     assert set(pe.relocation_table) == relocs

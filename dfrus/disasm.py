@@ -630,9 +630,9 @@ def _main(argv):
     else:
         with open(argv[1], "r+b") as fn:
             pe = PortableExecutable(fn)
-            image_base = pe.optional_header.image_base
+            image_base = pe.image_optional_header.image_base
             sections = pe.section_table
-            entry_point = pe.optional_header.address_of_entry_point
+            entry_point = pe.image_optional_header.address_of_entry_point
             entry_point_offset = sections.rva_to_offset(entry_point)
             fn.seek(entry_point_offset)
             mach = fn.read(0x500)

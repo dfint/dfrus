@@ -1,247 +1,147 @@
-#! python3
 import bisect
-import struct
 from array import array
-from collections import OrderedDict
+from ctypes import Structure, c_char, c_ushort, c_uint, sizeof, c_ubyte
 from itertools import zip_longest
-from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional
+from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type, SupportsBytes
 
 from .disasm import align
 
 
-class Structure:
-    _struct = struct.Struct('L')
+class CTypesField:
+    def __init__(self, c_type):
+        self.c_type = c_type
 
-    @classmethod
-    def sizeof(cls):
-        return cls._struct.size
+    def __set_name__(self, owner, name):
+        self.public_name = name
+        self.private_name = '_' + name
+        # if not hasattr(owner, "_fields_"):
+        #     setattr(owner, "_fields_", [])
+        owner._fields_.append((self.private_name, self.c_type))
 
-    _field_names: Tuple[str, ...] = ('foo',)
-    _formatters = '%x'.split()
-    _wrap = True
+    def __get__(self, obj, objtype=None):
+        value = getattr(obj, self.private_name)
+        return value
 
-    def __init__(self, *args, **kwargs):
-        if len(args) > 0:
-            assert len(args) > 0
-            assert len(args) == len(self._field_names),\
-                'len(args)==%d, len(_field_names)==%d' % (len(args), len(self._field_names))
-            self._raw = None
-            self._offset = None
-            self._file = None
-            self._items = OrderedDict(zip(self._field_names, args))
-        elif len(kwargs) > 0:
-            assert all(field in kwargs for field in self._field_names)
-            assert all(key in self._field_names for key in kwargs)
-            self._raw = None
-            self._offset = None
-            self._file = None
-            self._items = OrderedDict(zip(self._field_names, (kwargs[key] for key in self._field_names)))
+    def __set__(self, obj, value):
+        setattr(obj, self.private_name, value)
 
-    @classmethod
-    def from_bytes(cls, buffer):
-        new_obj = cls(cls._struct.unpack(buffer))
-        new_obj._raw = buffer
-        return new_obj
 
-    @classmethod
-    def read(cls, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-        else:
-            offset = file.tell()
-        raw = file.read(cls.sizeof())
-        new_obj = cls(*cls._struct.unpack(raw))
-        new_obj._raw = raw
-        new_obj._file = file
-        new_obj._offset = offset
-        return new_obj
+TStructure = Type["TStructure"]
 
-    def __getattr__(self, attr):
-        if attr.startswith('_'):
-            return super().__getattribute__(attr)
-        else:
-            return self._items[attr]
 
-    def __setattr__(self, attr, value):
-        if attr.startswith('_'):
-            super().__setattr__(attr, value)
-        elif attr in self._items:
-            self._items[attr] = value
-        else:
-            raise AttributeError("%s class hasn't %s attribute" % (self.__class__.__name__, attr))
+def read_structure(cls: Type[TStructure], file: BinaryIO, offset=None) -> TStructure:
+    if offset is not None:
+        file.seek(offset)
 
-    def __getitem__(self, item):
-        return self._items[item]
-
-    def __iter__(self):
-        return iter(self._items.values())
-
-    def __bytes__(self):
-        return self._struct.pack(*self)
-
-    def write(self, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-
-        file.write(bytes(self))
-
-    def rewrite(self):
-        if self._file is not None and self._offset is not None:
-            self.write(self._file, self._offset)
-        else:
-            raise ValueError('The structure was not read from a file')
-
-    def diff(self, other):
-        for field_name, formatter in zip(self._field_names, self._formatters):
-            if self[field_name] != other[field_name]:
-                yield field_name, formatter, (self[field_name], other[field_name])
-
-    def __repr__(self):
-        if self._wrap:
-            return (self.__class__.__name__ + '(\n\t%s\n)' %
-                    ',\n\t'.join('%s=%s' % (name, self._formatters[i] % self._items[name])
-                                 for i, name in enumerate(self._field_names)))
-        else:
-            return (self.__class__.__name__ + '(%s)' %
-                    ', '.join('%s=%s' % (name, self._formatters[i] % self._items[name])
-                              for i, name in enumerate(self._field_names)))
+    raw = file.read(sizeof(cls))
+    new_obj = cls.from_buffer_copy(raw)
+    return new_obj
 
 
 class ImageDosHeader(Structure):
-    _struct = struct.Struct('2s 13H 8x 2H 20x I')
-    assert _struct.size == 0x40
-    _field_names = (
-        'e_magic', 'e_cblp', 'e_cp', 'e_crlc', 'e_cparhdr', 'e_minalloc', 'e_maxalloc',
-        'e_ss', 'e_sp', 'e_csum', 'e_ip', 'e_cs', 'e_lfarlc', 'e_ovno', 'e_oemid', 'e_oeminfo', 'e_lfanew'
-    )
-    _formatters = ['%s'] + ['0x%x']*16
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.e_magic != b'MZ':
-            raise ValueError('IMAGE_DOS_HEADER wrong signature: %r' % self.e_magic)
+    _fields_ = []
+    e_magic = CTypesField(c_char * 2)
+    e_cblp = CTypesField(c_ushort)
+    e_cp = CTypesField(c_ushort)
+    e_crlc = CTypesField(c_ushort)
+    e_cparhdr = CTypesField(c_ushort)
+    e_minalloc = CTypesField(c_ushort)
+    e_maxalloc = CTypesField(c_ushort)
+    e_ss = CTypesField(c_ushort)
+    e_sp = CTypesField(c_ushort)
+    e_csum = CTypesField(c_ushort)
+    e_ip = CTypesField(c_ushort)
+    e_cs = CTypesField(c_ushort)
+    e_lfarlc = CTypesField(c_ushort)
+    e_ovno = CTypesField(c_ushort)
+    e_res = CTypesField(c_ushort * 4)
+    e_oemid = CTypesField(c_ushort)
+    e_oeminfo = CTypesField(c_ushort)
+    e_res2 = CTypesField(c_ushort * 10)
+    e_lfanew = CTypesField(c_uint)
 
 
 class ImageFileHeader(Structure):
-    _struct = struct.Struct('2H 3I 2H')
-    _field_names = ('machine', 'number_of_sections', 'timedate_stamp', 'pointer_to_symbol_table',
-                    'number_of_symbols', 'size_of_optional_header', 'characteristics')
-    _formatters = '0x%x %d 0x%x 0x%x %d 0x%x 0x%x'.split()
-
-
-class DataDirectoryEntry:
-    __slots__ = ('virtual_address', 'size')
-    _struct = struct.Struct('2I')
-
-    @classmethod
-    def sizeof(cls):
-        return cls._struct.size
-
-    def __init__(self, virtual_address, size):
-        self.virtual_address = virtual_address
-        self.size = size
-
-    def __iter__(self):
-        yield self.virtual_address
-        yield self.size
-
-    @classmethod
-    def iter_unpack(cls, data):
-        return (cls(*x) for x in cls._struct.iter_unpack(data))
-
-    @classmethod
-    def unpack(cls, data):
-        return cls(*(cls._struct.unpack(data)))
-
-    def __bytes__(self):
-        return self._struct.pack(*self)
-
-    def __eq__(self, other):
-        return all(x == y for x, y in zip(self, other))
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(virtual_address=%s, size=%s)' % tuple(hex(x) for x in self)
+    _fields_ = []
+    machine = CTypesField(c_ushort)
+    number_of_sections = CTypesField(c_ushort)
+    timedate_stamp = CTypesField(c_uint)
+    pointer_to_symbol_table = CTypesField(c_uint)
+    number_of_symbols = CTypesField(c_uint)
+    size_of_optional_header = CTypesField(c_ushort)
+    characteristics = CTypesField(c_ushort)
 
 
 class DataDirectory(Structure):
-    _number_of_directory_entries = 16
+    _fields_ = []
+    virtual_address = CTypesField(c_uint)
+    size = CTypesField(c_uint)
 
-    @classmethod
-    def sizeof(cls):
-        return DataDirectoryEntry.sizeof() * cls._number_of_directory_entries
 
-    _field_names = (
-        'export', 'import', 'resource', 'exception', 'security', 'basereloc', 'debug', 'copyright',
-        'globalptr', 'tls', 'load_config', 'bound_import', 'iat', 'delay_import', 'com_descriptor'
-    )
-
-    _formatters = ['%s'] * _number_of_directory_entries
-
-    @classmethod
-    def read(cls, file, offset=None):
-        if offset is not None:
-            file.seek(offset)
-        else:
-            offset = file.tell()
-
-        raw = file.read(cls.sizeof())
-        obj = cls(*list(DataDirectoryEntry.iter_unpack(raw))[:-1])
-        obj._raw = raw
-        obj._file = file
-        obj._offset = offset
-        return obj
-
-    def __bytes__(self):
-        return bytes(b''.join(bytes(self._items[field]) for field in self._field_names) +
-                     bytes(DataDirectoryEntry.sizeof()))
+class ImageDataDirectory(Structure, SupportsBytes):
+    _fields_ = []
+    export = CTypesField(DataDirectory)
+    import_directory = CTypesField(DataDirectory)
+    resource = CTypesField(DataDirectory)
+    exception = CTypesField(DataDirectory)
+    security = CTypesField(DataDirectory)
+    basereloc = CTypesField(DataDirectory)
+    debug = CTypesField(DataDirectory)
+    copyright = CTypesField(DataDirectory)
+    globalptr = CTypesField(DataDirectory)
+    tls = CTypesField(DataDirectory)
+    load_config = CTypesField(DataDirectory)
+    bound_import = CTypesField(DataDirectory)
+    iat = CTypesField(DataDirectory)
+    delay_import = CTypesField(DataDirectory)
+    com_descriptor = CTypesField(DataDirectory)
+    reserved = CTypesField(DataDirectory)
 
 
 class ImageOptionalHeader(Structure):
-    _struct = struct.Struct('H B B 9I 6H 4I 2H 6I')
-    _field_names = (
-        'magic', 'major_linker_version', 'minor_linker_version', 'size_of_code',
-        'size_of_initialized_data', 'size_of_uninitialized_data', 'address_of_entry_point', 'base_of_code',
-        'base_of_data', 'image_base', 'section_alignment', 'file_alignment',
-        'major_operating_system_version', 'minor_operating_system_version',
-        'major_image_version', 'minor_image_version',
-        'major_subsystem_version', 'minor_subsystem_version',
-        'win32_version_value', 'size_of_image', 'size_of_headers', 'check_sum',
-        'subsystem', 'dll_characteristics', 'size_of_stack_reserve', 'size_of_stack_commit',
-        'size_of_heap_reserve', 'size_of_heap_commit', 'loader_flags', 'number_of_rva_and_sizes'
-    )
-
-    _formatters = '''
-        0x%x %d %d 0x%x
-        0x%x 0x%x 0x%x 0x%x
-        0x%x 0x%x 0x%x 0x%x
-        %d %d
-        %d %d
-        %d %d
-        %d 0x%x 0x%x 0x%x
-        %d 0x%x 0x%x 0x%x
-        0x%x 0x%x 0x%x 0x%x
-    '''.split()
-
-
-class ImageNTHeaders:
-    _size_of_signature = 4
-
-    @classmethod
-    def sizeof(cls):
-        return cls._size_of_signature + ImageFileHeader.sizeof() + ImageOptionalHeader.sizeof() + DataDirectory.sizeof()
-
-    def __init__(self, file, offset):
-        self.offset = offset
-        file.seek(offset)
-        self.signature = file.read(self._size_of_signature)
-        if self.signature != b'PE\0\0':
-            raise ValueError('IMAGE_NT_HEADERS wrong signature: %r' % self.signature)
-        self.file_header = ImageFileHeader.read(file)
-        self.optional_header = ImageOptionalHeader.read(file)
-        self.data_directory = DataDirectory.read(file)
+    _fields_ = []
+    magic = CTypesField(c_ushort)
+    major_linker_version = CTypesField(c_ubyte)
+    minor_linker_version = CTypesField(c_ubyte)
+    size_of_code = CTypesField(c_uint)
+    size_of_initialized_data = CTypesField(c_uint)
+    size_of_uninitialized_data = CTypesField(c_uint)
+    address_of_entry_point = CTypesField(c_uint)
+    base_of_code = CTypesField(c_uint)
+    base_of_data = CTypesField(c_uint)
+    image_base = CTypesField(c_uint)
+    section_alignment = CTypesField(c_uint)
+    file_alignment = CTypesField(c_uint)
+    major_operating_system_version = CTypesField(c_ushort)
+    minor_operating_system_version = CTypesField(c_ushort)
+    major_image_version = CTypesField(c_ushort)
+    minor_image_version = CTypesField(c_ushort)
+    major_subsystem_version = CTypesField(c_ushort)
+    minor_subsystem_version = CTypesField(c_ushort)
+    win32_version_value = CTypesField(c_uint)
+    size_of_image = CTypesField(c_uint)
+    size_of_headers = CTypesField(c_uint)
+    check_sum = CTypesField(c_uint)
+    subsystem = CTypesField(c_ushort)
+    dll_characteristics = CTypesField(c_ushort)
+    size_of_stack_reserve = CTypesField(c_uint)
+    size_of_stack_commit = CTypesField(c_uint)
+    size_of_heap_reserve = CTypesField(c_uint)
+    size_of_heap_commit = CTypesField(c_uint)
+    loader_flags = CTypesField(c_uint)
+    number_of_rva_and_sizes = CTypesField(c_uint)
+    image_data_directory: ImageDataDirectory = CTypesField(ImageDataDirectory)
 
 
-class Section(Structure):
+class ImageNTHeaders(Structure):
+    _fields_ = []
+    signature: bytes = CTypesField(c_char * 4)
+    image_file_header: ImageFileHeader = CTypesField(ImageFileHeader)
+    image_optional_header: ImageOptionalHeader = CTypesField(ImageOptionalHeader)
+
+
+class Section(Structure, SupportsBytes):
+    # ImageSectionHeader
     IMAGE_SCN_CNT_CODE = 0x00000020
     IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
     IMAGE_SCN_CNT_UNINITIALIZED_DATA = 0x00000080
@@ -251,100 +151,82 @@ class Section(Structure):
     IMAGE_SCN_MEM_READ = 0x40000000
     IMAGE_SCN_MEM_WRITE = 0x80000000
 
-    _struct = struct.Struct('8s4I12xI')
-    _field_names = ('name', 'virtual_size', 'rva', 'physical_size', 'physical_offset', 'flags')
-    _formatters = '%s 0x%x 0x%x 0x%x 0x%x 0x%x'.split()
-    _wrap = False
+    _fields_ = []
+    name: bytes = CTypesField(c_char * 8)
+    virtual_size = CTypesField(c_uint)
+    virtual_address = CTypesField(c_uint)
+    size_of_raw_data = CTypesField(c_uint)
+    pointer_to_raw_data = CTypesField(c_uint)
+    pointer_to_relocations = CTypesField(c_uint)
+    pointer_to_linenumbers = CTypesField(c_uint)
+    number_of_relocations = CTypesField(c_ushort)
+    number_of_linenumbers = CTypesField(c_ushort)
+    characteristics = CTypesField(c_uint)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name: bytes = self.name.strip(b'\0')
 
     def offset_to_rva(self, offset):
-        local_offset = offset - self.physical_offset
-        assert 0 <= local_offset < self.physical_size
-        return local_offset + self.rva
-
-    def rva_to_offset(self, rva):
-        local_offset = rva - self.rva
-        assert 0 <= local_offset < self.virtual_size
-        return local_offset + self.physical_offset
-
-    def __eq__(self, other):
-        return type(self) == type(other) and all(x == y for x, y in zip(self, other))
-
-    def __str__(self):
-        shortened = {
-            'virtual_size': 'vsize',
-            'physical_size': 'psize',
-            'physical_offset': 'poffset',
-        }
-
-        return (self.__class__.__name__ + '(%s)' %
-                ', '.join('%s=%s' % (shortened.get(name, default=name), self._formatters[i] % self._items[name])
-                          for i, name in enumerate(self._field_names)))
-
-
-class ImageSectionHeader(Structure):
-    _struct = struct.Struct('8s 6I 2H I')
-
-    _field_names = (
-        'name', 'physical_address', 'virtual_address', 'size_of_raw_data', 'pointer_to_raw_data',
-        'pointer_to_relocations', 'pointer_to_linenumbers', 'number_of_relocations', 'number_of_linenumbers',
-        'characteristics'
-    )
-    _formatters = '''
-        %s 0x%x 0x%x 0x%x 0x%x
-        0x%x 0x%x %d %d 0x%x
-    '''.split()
-
-    def offset_to_rva(self, offset):
-        return offset - self.pointer_to_raw_data + self.virtual_address
+        local_offset = offset - self.pointer_to_raw_data
+        assert 0 <= local_offset < self.size_of_raw_data
+        return local_offset + self.virtual_address
 
     def rva_to_offset(self, virtual_address):
-        return virtual_address - self.virtual_address + self.pointer_to_raw_data
+        local_offset = virtual_address - self.virtual_address
+        assert 0 <= local_offset < self.virtual_size
+        return local_offset + self.pointer_to_raw_data
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.name}, flags=0x{self.characteristics:X}, " \
+               f"pstart=0x{self.pointer_to_raw_data:X}, psize=0x{self.size_of_raw_data:X}, " \
+               f"vstart=0x{self.virtual_address:X}, vsize=0x{self.virtual_size:X})"
 
 
 class Key(Sequence):
-    def __init__(self, iterable, key):
-        self.iterable = iterable
+    def __init__(self, sequence: Sequence, key):
+        self.sequence = sequence
         self.key = key
 
     def __len__(self):
-        return len(self.iterable)
+        return len(self.sequence)
 
     def __getitem__(self, i):
-        return self.key(self.iterable[i])
+        return self.key(self.sequence[i])
 
 
-class SectionTable(list):
-    def __init__(self, sections):
-        super().__init__(sections)
+class SectionTable(Sequence[Section]):
+    def __init__(self, sections: Sequence[Section]):
+        self._sections: Sequence[Section] = sections
+
         # Make auxiliary objects to perform bisection search among physical offsets and rvas:
-        self._offset_key = Key(self, lambda x: x.physical_offset)
-        self._rva_key = Key(self, lambda x: x.rva)
-        assert all(x.rva < self[i + 1].rva for i, x in enumerate(self[:-1]))
-        assert all(x.physical_offset < self[i + 1].physical_offset for i, x in enumerate(self[:-1]))
+        self._offset_key = Key(self, lambda x: x.pointer_to_raw_data)
+        self._rva_key = Key(self, lambda x: x.virtual_address)
+
+        assert all(x.virtual_address < self._sections[i + 1].virtual_address
+                   for i, x in enumerate(self._sections[:-1]))
+        assert all(x.pointer_to_raw_data < self._sections[i + 1].pointer_to_raw_data
+                   for i, x in enumerate(self[:-1]))
 
     @classmethod
     def read(cls, file, offset, number):
         file.seek(offset)
-        return cls([Section.read(file) for _ in range(number)])
+        return cls([read_structure(Section, file) for _ in range(number)])
 
     def write(self, file, offset=None):
         if offset is not None:
             file.seek(offset)
 
-        for section in self:
+        for section in self._sections:
             file.write(bytes(section))
 
     def offset_to_rva(self, offset):
         i = bisect.bisect(self._offset_key, offset) - 1
-        return self[i].offset_to_rva(offset)
+        return self._sections[i].offset_to_rva(offset)
 
     def rva_to_offset(self, rva):
         i = bisect.bisect(self._rva_key, rva) - 1
-        return self[i].rva_to_offset(rva)
+        return self._sections[i].rva_to_offset(rva)
 
     def which_section(self, offset=None, rva=None):
         if offset is not None:
@@ -355,15 +237,24 @@ class SectionTable(list):
             return None
 
     def diff(self, other):
-        for left, right in zip_longest(self, other):
+        for left, right in zip_longest(self._sections, other):
             if left != right:
                 yield left, right
 
     def __repr__(self):
-        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self)
+        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self._sections)
 
     def __str__(self):
-        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(str(x) for x in self)
+        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(str(x) for x in self._sections)
+
+    def __getitem__(self, item):
+        return self._sections[item]
+
+    def __len__(self):
+        return len(self._sections)
+
+    def __iter__(self):
+        return iter(self._sections)
 
 
 class RelocationTable:
@@ -428,25 +319,31 @@ class RelocationTable:
 
 class PortableExecutable:
     file: BinaryIO
-    dos_header: ImageDosHeader
-    nt_headers: ImageNTHeaders
-    file_header: ImageFileHeader
-    optional_header: ImageOptionalHeader
-    data_directory: DataDirectory
+    image_dos_header: ImageDosHeader
+    image_nt_headers: ImageNTHeaders
+    image_file_header: ImageFileHeader
+    image_optional_header: ImageOptionalHeader
+    image_data_directory: ImageDataDirectory
     _section_table: Optional[SectionTable]
     _relocation_table: Optional[RelocationTable]
 
     def read_file(self, file):
         self.file = file
         self.file.seek(0)
-        self.dos_header = ImageDosHeader.read(file)
-        assert self.dos_header.sizeof() == 0x40
-        self.nt_headers = ImageNTHeaders(file, self.dos_header.e_lfanew)
-        self.file_header = self.nt_headers.file_header
-        self.optional_header = self.nt_headers.optional_header
-        self.data_directory = self.nt_headers.data_directory
+        self.image_dos_header = read_structure(ImageDosHeader, file)
+        assert self.image_dos_header.e_magic == b"MZ"
+        self.image_nt_headers = read_structure(ImageNTHeaders, file, self.image_dos_header.e_lfanew)
+        assert self.image_nt_headers.signature == b"PE"
+        self.image_file_header = self.image_nt_headers.image_file_header
+        self.image_optional_header = self.image_nt_headers.image_optional_header
+        self.image_data_directory = self.image_optional_header.image_data_directory
         self._section_table = None
         self._relocation_table = None
+
+    def rewrite_data_directory(self):
+        offset = self.image_dos_header.e_lfanew + sizeof(ImageNTHeaders) - sizeof(ImageDataDirectory)
+        self.file.seek(offset)
+        self.file.write(bytes(self.image_data_directory))
 
     def reread(self):
         self.read_file(self.file)
@@ -457,42 +354,42 @@ class PortableExecutable:
     @property
     def section_table(self):
         if self._section_table is None:
-            n = self.file_header.number_of_sections
-            offset = self.nt_headers.offset + self.nt_headers.sizeof()
+            n = self.image_file_header.number_of_sections
+            offset = self.image_dos_header.e_lfanew + sizeof(self.image_nt_headers)
             self._section_table = SectionTable.read(self.file, offset, n)
         return self._section_table
 
     @property
     def relocation_table(self) -> RelocationTable:
         if self._relocation_table is None:
-            rva = self.data_directory.basereloc.virtual_address
+            rva = self.image_data_directory.basereloc.virtual_address
             offset = self.section_table.rva_to_offset(rva)
-            size = self.data_directory.basereloc.size
+            size = self.image_data_directory.basereloc.size
             self.file.seek(offset)
             self._relocation_table = RelocationTable.from_file(self.file, size)
         return self._relocation_table
 
     def info(self):
         return (
-            'DOS signature: %s\n' % self.dos_header.e_magic +
-            'e_lfanew: 0x%x\n' % self.dos_header.e_lfanew +
-            'PE signature: %s\n' % self.nt_headers.signature +
-            'Entry point address: 0x%x\n' % (self.optional_header.address_of_entry_point +
-                                             self.optional_header.image_base) +
-            '%s\n' % self.file_header +
-            '%s\n' % self.optional_header +
-            '%s\n' % self.data_directory +
+            'DOS signature: %s\n' % self.image_dos_header.e_magic +
+            'e_lfanew: 0x%x\n' % self.image_dos_header.e_lfanew +
+            'PE signature: %s\n' % self.image_nt_headers.signature +
+            'Entry point address: 0x%x\n' % (self.image_optional_header.address_of_entry_point +
+                                             self.image_optional_header.image_base) +
+            '%s\n' % self.image_file_header +
+            '%s\n' % self.image_optional_header +
+            '%s\n' % self.image_data_directory +
             '%s\n' % self.section_table
         )
 
 
 def main():
-    with open(r"d:\Games\df_40_24_win_s\Dwarf Fortress.exe", 'rb') as file:
+    with open("/home/insolor/Projects/Dwarf Fortress/df/df_42_06_win_s/Dwarf Fortress.exe", 'rb') as file:
         pe = PortableExecutable(file)
         print(pe.info())
-        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset - 1) == -1
-        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset) == 0
-        assert pe.section_table.which_section(offset=pe.section_table[0].physical_offset + 1) == 0
+        assert pe.section_table.which_section(offset=pe.section_table[0].pointer_to_raw_data - 1) == -1
+        assert pe.section_table.which_section(offset=pe.section_table[0].pointer_to_raw_data) == 0
+        assert pe.section_table.which_section(offset=pe.section_table[0].pointer_to_raw_data + 1) == 0
 
 
 if __name__ == "__main__":

@@ -156,7 +156,7 @@ def _main(ascii_only, executable, output_file, encoding):
     xrefs = get_cross_references(executable,
                                  pe.relocation_table,
                                  pe.section_table,
-                                 pe.optional_header.image_base)
+                                 pe.image_optional_header.image_base)
 
     strings = list(extract_strings(executable, xrefs, encoding=encoding, arrays=True))
     count = Counter(x[1] for x in strings)

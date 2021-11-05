@@ -107,7 +107,7 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
             except ValueError:
                 raise ValueError("'{}' is broken".format(df2))
             
-            if pe.file_header['machine'] != 0x014C:
+            if pe.image_file_header.machine != 0x014C:
                 raise ValueError("Only 32-bit versions are supported.")
             
             fix_df_exe(fn, pe, codepage, original_codepage, trans_dict, debug)

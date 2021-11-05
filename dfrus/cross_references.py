@@ -14,16 +14,16 @@ def get_cross_references(file: BinaryIO,
         -> Mapping[int, List[int]]:
 
     xrefs = defaultdict(list)
-    code_section_end_rva = sections[code].rva + sections[code].virtual_size
+    code_section_end_rva = sections[code].virtual_address + sections[code].virtual_size
     # Read all the file sections:
-    base_offset = sections[code].physical_offset
-    size = sections[-1].physical_offset + sections[-1].physical_size - base_offset
+    base_offset = sections[code].pointer_to_raw_data
+    size = sections[-1].pointer_to_raw_data + sections[-1].size_of_raw_data - base_offset
     buffer = read_bytes(file, base_offset, size)
     for reloc in relocation_table:
         reloc_off = sections.rva_to_offset(reloc)
         local_off = reloc_off - base_offset
         obj_rva = from_dword(buffer[local_off:local_off+4]) - image_base
-        reloc += sections[code].physical_offset
+        reloc += sections[code].pointer_to_raw_data
         if code_section_end_rva < obj_rva:
             obj_off = sections.rva_to_offset(obj_rva)
             if obj_off is not None:
