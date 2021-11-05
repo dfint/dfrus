@@ -1,5 +1,5 @@
 from collections import namedtuple
-from enum import IntEnum, Enum
+from enum import IntEnum, Enum, auto
 
 
 class Cond(IntEnum):
@@ -23,8 +23,11 @@ class Cond(IntEnum):
     nle = g
 
 
-class RegType(IntEnum):
-    general, segment, mm, xmm = range(4)
+class RegType(Enum):
+    general = auto()
+    segment = auto()
+    mm = auto()
+    xmm = auto()
 
 
 RegData = namedtuple("RegData", "type,code,size")
