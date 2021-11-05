@@ -106,7 +106,7 @@ class MemoryReference(Operand, ABC):
 class RelativeMemoryReference(MemoryReference):
     base_reg: Optional[Reg] = None
     index_reg: Optional[Reg] = None
-    scale: Optional[int] = None
+    scale: int = 0
     _data_size: Optional[int] = None
 
     def get_type(self) -> OperandType:
@@ -154,9 +154,6 @@ class RelativeMemoryReference(MemoryReference):
             result = op_sizes[data_size] + ' ' + result
 
         return result
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self})"
 
 
 @dataclass

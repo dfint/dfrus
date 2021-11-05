@@ -56,7 +56,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
             if src.index_reg is None:
                 self.modrm(mode, register.code, 4).sib(0, 4, src.base_reg.code)
             else:
-                scale = src.scale or 0
+                scale = src.scale
                 assert src.index_reg != Reg.esp  # ESP cannot be an index register
                 self.modrm(mode, register.code, 4)
                 self.sib(scale, src.index_reg.code, src.base_reg.code)

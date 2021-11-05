@@ -1,12 +1,10 @@
-from dataclasses import asdict
-
 import pytest
 
 from dfrus.disasm import disasm
 from dfrus.opcodes import *
 from dfrus.operand import RelativeMemoryReference, AbsoluteMemoryReference
-from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata, \
-    GetLengthResult
+from dfrus.patchdf import (get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata,
+                           GetLengthResult)
 
 test_data_1 = bytes.fromhex(
     '8B 0D 50 4B 52 00 '    # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
@@ -19,13 +17,12 @@ test_data_1 = bytes.fromhex(
 
 def test_get_length():
     result = get_length(test_data_1, 7)
-    assert str(result) == str(GetLengthResult(
+    assert result == GetLengthResult(
         deleted_relocs={2, 9},
-        added_relocs=set(),
         dest=RelativeMemoryReference(base_reg=Reg.esp, disp=0x20),
         length=21,
         saved_mach=b'\x8b\xf0',  # mov esi, eax
-    ))
+    )
 
 
 # 40253b !   mov         ecx, [strz_DOWN_PLANTS_5406cc]
@@ -40,24 +37,29 @@ def test_get_length():
 # 40256a !   mov         [ebp-464h], eax
 # 402570 !   call        sub_4544e0
 test_data_push = bytes.fromhex(
-    '8B 0D CC 06 54 00 A1 C8  06 54 00 8B 15 D0 06 54 '
-    '00 89 8D 94 FB FF FF 89  85 90 FB FF FF A1 D4 06 '
-    '54 00 8D 8D 90 FB FF FF  51 89 95 98 FB FF FF 89 '
-    '85 9C FB FF FF E8 6B 1F  05 00 '
+    '8B 0D CC 06 54 00 '
+    'A1 C8 06 54 00 '
+    '8B 15 D0 06 54 00 '
+    '89 8D 94 FB FF FF '
+    '89 85 90 FB FF FF '
+    'A1 D4 06 54 00 '
+    '8D 8D 90 FB FF FF '
+    '51 '
+    '89 95 98 FB FF FF '
+    '89 85 9C FB FF FF '
+    'E8 6B 1F 05 00 '
 )
 
 
 def test_get_length_push():
     result = get_length(test_data_push, 15)
-    assert str(result) == str(GetLengthResult(
+    assert result == GetLengthResult(
         deleted_relocs={2, 7, 13, 30},
-        added_relocs=set(),
         dest=RelativeMemoryReference(base_reg=Reg.ecx),
         length=40,
         saved_mach=bytes.fromhex('8D 8D 90 FB FF FF'),  # lea ecx, [ebp-470h] ; push ecx
         nops={41: 6, 47: 6},
-        pokes=dict(),
-    ))
+    )
 
 
 # 414111 !   mov         edx, [strz_after_a_while_543e38]
@@ -86,13 +88,13 @@ test_data_abs_ref = bytes.fromhex(
 
 def test_get_length_abs_ref():
     result = get_length(test_data_abs_ref, 13)
-    assert str(result) == str(GetLengthResult(
+    assert result == GetLengthResult(
         deleted_relocs={2, 7, 13, 19, 25, 30, 36, 42, 48},
         added_relocs={2},
         dest=AbsoluteMemoryReference(0x617990),
         length=52,
         saved_mach=bytes.fromhex('2B 0D E0 82 D6 0A '),  # sub ecx, [0ad682e0h]
-    ))
+    )
 
 
 # 428605 !   mov         eax, [strz_nausea_5452c4]
@@ -112,15 +114,10 @@ test_data_abs_ref_simple = bytes.fromhex(
 
 def test_get_length_abs_ref_simple():
     result = get_length(test_data_abs_ref_simple, 6)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={1, 8, 14, 19, 26, 32},
-        added_relocs=set(),
-        dest='[0xAE19178]',
+        dest=AbsoluteMemoryReference(0xAE19178),
         length=36,
-        saved_mach=bytes(),
-        nops=dict(),
-        pokes=dict()
     )
 
 
@@ -152,15 +149,12 @@ def test_get_length_nausea():
         'B9 0A 00 00 00 '  # mov ecx, 0Ah
     )
     result = get_length(test_data_nausea, len('nausea'))
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={3, 45, 52, 59, 65, 72},
-        added_relocs=set(),
-        dest='[0x62BC5C]',
+        dest=AbsoluteMemoryReference(0x62BC5C),
         length=12,
         saved_mach=saved,
         nops={43: 6, 50: 6, 56: 7, 63: 6, 69: 7},
-        pokes=dict(),
     )
 
 
@@ -184,15 +178,12 @@ def test_get_length_whimper_gnaw_intersection():
         '0F 95 C2 '  # setnz dl
     )
     result = get_length(test_data_whimper_gnaw_intersection, len('whimper'), 0x541F00)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={2, 9, 17, 35},
-        added_relocs=set(),
-        dest='[0x68FF258]',
+        dest=AbsoluteMemoryReference(0x68FF258),
         length=21,
         saved_mach=saved,
         nops={33: 6},
-        pokes=dict(),
     )
 
 
@@ -218,17 +209,12 @@ test_data_tanning_tan_intersection = bytes.fromhex(
 
 
 def test_get_length_tanning_tan_intersection():
-    saved = bytes()
     result = get_length(test_data_tanning_tan_intersection, len('Tanning'), 0x55ABB8)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={2, 13},
-        added_relocs=set(),
-        dest='[esp+0xD40]',
+        dest=RelativeMemoryReference(base_reg=Reg.esp, disp=+0xD40),
         length=6,
-        saved_mach=saved,
         nops={11: 6, 36: 7, 54: 7},
-        pokes=dict(),
     )
 
 
@@ -250,15 +236,12 @@ test_data_stimulant = bytes.fromhex(
 def test_get_length_stimulant():
     saved = bytes.fromhex('B9 0A 00 00 00')  # mov ecx, 0Ah
     result = get_length(test_data_stimulant, len('stimulant'), 0x54645c)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={2, 25, 31, 38, 44, 51},
-        added_relocs=set(),
-        dest='[0x62C927]',
+        dest=AbsoluteMemoryReference(0x62C927),
         length=11,
         saved_mach=saved,
         nops={23: 6, 29: 6, 35: 7, 42: 6, 48: 7},
-        pokes=dict(),
     )
 
 
@@ -297,15 +280,11 @@ test_data_linen_apron = bytes.fromhex(
 
 def test_get_length_linen_apron():
     result = get_length(test_data_linen_apron, len('Linen apron'), 0x550b18)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={2, 8, 13, 19, 25, 47},
-        added_relocs=set(),
-        dest='[0x6702DC9]',
+        dest=AbsoluteMemoryReference(0x6702DC9),
         length=29,
-        saved_mach=bytes(),
         nops={46: 5},
-        pokes=dict(),
     )
 
 
@@ -329,15 +308,11 @@ test_data_smoked = bytes.fromhex(
 
 def test_get_length_smoked():
     result = get_length(test_data_smoked, len('smoked %s'), 0x545B60)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={2, 7, 14, 60, 65, 72},
-        added_relocs=set(),
-        dest='[0x189A325]',
+        dest=AbsoluteMemoryReference(0x189A325),
         length=18,
-        saved_mach=bytes(),
         nops={58: 6, 64: 5, 69: 7},
-        pokes=dict(),
     )
 
 
@@ -390,15 +365,11 @@ test_data_mild_low_pressure = bytes.fromhex(
 
 def test_get_length_mild_low_pressure():
     result = get_length(test_data_mild_low_pressure, len('mild low pressure'), 0x57AC80)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={2, 8, 14, 33, 39, 58, 64, 83, 90, 288},
-        added_relocs=set(),
-        dest='[0xAE1AABE]',
+        dest=AbsoluteMemoryReference(0xAE1AABE),
         length=18,
-        saved_mach=bytes(),
         nops={31: 6, 37: 6, 56: 6, 62: 6, 81: 6, 87: 7, 285: 7},
-        pokes=dict(),
     )
 
 
@@ -427,15 +398,13 @@ def test_get_length_tribesman():
         '2b 0d e0 82 d6 0a'         # sub         ecx, [0ad682e0]
     )
     result = get_length(test_data_tribesman, len('for some time'), 0x543d74)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         deleted_relocs={2, 7, 17, 23, 31, 40},
         added_relocs={6, 12},
-        dest='[esi]',
+        dest=RelativeMemoryReference(base_reg=Reg.esi),
         length=44,
         saved_mach=saved,
         nops={47: 3, 50: 4},
-        pokes=dict()
     )
 
 
@@ -456,14 +425,12 @@ test_data_tribesman_peasant_intersection = bytes.fromhex(
 
 def test_get_length_tribesman_peasant_intersection():
     result = get_length(test_data_tribesman_peasant_intersection, len('tribesman'), 0x54bfdc)
-    assert str(result) == str(GetLengthResult(
+    assert result == GetLengthResult(
         deleted_relocs={2, 8, 14},
-        added_relocs=set(),
         dest=RelativeMemoryReference(base_reg=Reg.ebp, disp=-0x70),  # [ebp-0x70]
         length=22,
-        saved_mach=bytes(),
         pokes={23: 0x0C+6},
-    ))
+    )
 
 
 test_data_has_arrived = bytes.fromhex(
@@ -483,15 +450,11 @@ test_data_has_arrived = bytes.fromhex(
 
 def test_get_length_has_arrived():
     result = get_length(test_data_has_arrived, len(' has arrived.'), 0x00F12F00)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         length=5,
-        dest='[ecx]',
+        dest=RelativeMemoryReference(base_reg=Reg.ecx),
         nops={12: 2, 14: 5, 19: 3, 22: 5, 27: 3, 30: 6, 36: 4},
         deleted_relocs={1, 15, 23, 32},
-        saved_mach=bytes(),
-        added_relocs=set(),
-        pokes=dict(),
     )
 
 
@@ -503,15 +466,10 @@ test_data_select_item = bytes.fromhex(
 
 def test_get_length_select_item():
     result = get_length(test_data_select_item, len('  Select Item: '), 0x00EAF944)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         length=len(test_data_select_item),
         deleted_relocs={3},
-        dest='[ebx+0x52C]',
-        saved_mach=bytes(),
-        added_relocs=set(),
-        pokes=dict(),
-        nops=dict(),
+        dest=RelativeMemoryReference(base_reg=Reg.ebx, disp=0x52C),
     )
 
 
@@ -531,15 +489,11 @@ test_data_dnwwap = bytes.fromhex(
 
 def test_dnwwap():
     result = get_length(test_data_dnwwap, len('Design New World with Advanced Parameters'), 0x0EBDD44)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert result == GetLengthResult(
         length=len(test_data_dnwwap),
-        dest='[edx]',
+        dest=RelativeMemoryReference(base_reg=Reg.edx),
         deleted_relocs={3, 21, 33, 44},
         saved_mach=bytes.fromhex('8d9610010000 8bca'),
-        added_relocs=set(),
-        nops=dict(),
-        pokes=dict()
     )
 
 
@@ -581,18 +535,13 @@ test_data_create_new_world = bytes.fromhex(
 def test_create_new_world():
     original_string_address = 0xf2a8b8
     result = get_length(test_data_create_new_world, len("Create New World!"), original_string_address)
-    result_dict = asdict(result)
-    result_dict['dest'] = str(result.dest)
     new_len = len("Создать новый мир!")
 
-    assert result_dict == dict(
+    assert result == GetLengthResult(
         length=67,
-        dest='[ecx]',  # [ebx+0x110]
+        dest=RelativeMemoryReference(base_reg=Reg.ecx),
         deleted_relocs={2, 14, 25, 37, 50},
         saved_mach=bytes.fromhex("8d 8b 10 01 00 00"),  # lea    ecx,[ebx+0x110]
-        added_relocs=set(),
-        nops=dict(),
-        pokes=dict()
     )
 
     meta = Metadata()

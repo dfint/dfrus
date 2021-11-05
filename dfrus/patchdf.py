@@ -492,11 +492,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
 @dataclass
 class GetLengthResult:
-    deleted_relocs: Set[int]
-    added_relocs: Set[int]
     dest: MemoryReference
     length: int
-    saved_mach: bytes
+    saved_mach: bytes = field(default_factory=bytes)
+    added_relocs: Set[int] = field(default_factory=set)
+    deleted_relocs: Set[int] = field(default_factory=set)
     nops: Mapping[int, int] = field(default_factory=dict)
     pokes: Mapping[int, Union[int, bytes]] = field(default_factory=dict)
 
