@@ -47,6 +47,9 @@ class Operand(ABC):
     def data_size(self, value: Optional[int]):
         self.set_data_size(value)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self})"
+
 
 @dataclass
 class ImmediateValueOperand(Operand):
@@ -148,6 +151,9 @@ class RelativeMemoryReference(MemoryReference):
 
         return result
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self})"
+
 
 @dataclass
 class AbsoluteMemoryReference(MemoryReference):
@@ -175,3 +181,6 @@ class AbsoluteMemoryReference(MemoryReference):
             result = op_sizes[data_size] + ' ' + result
 
         return result
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self})"

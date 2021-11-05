@@ -670,9 +670,9 @@ def get_length(data: bytes,
                 not_moveable_after = not_moveable_after or offset
 
                 assert line.operands is not None
-                dest = line.operands[0]
-                assert isinstance(dest, ImmediateValueOperand)
-                data_after_jump = data[dest.value:]
+                jump_destination = line.operands[0]
+                assert isinstance(jump_destination, ImmediateValueOperand)
+                data_after_jump = data[jump_destination.value:]
                 if not data_after_jump:
                     raise ValueError('Cannot jump: jump destination not included in the passed machinecode.')
 

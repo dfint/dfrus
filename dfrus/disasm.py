@@ -131,7 +131,7 @@ def create_operand2_from_modrm_or_sib(analysis_result: ModRmAnalysisResult) -> O
     elif modrm.mode == 0 and modrm.regmem == 5:
         # Direct addressing
         assert analysis_result.disp is not None
-        return RelativeMemoryReference(disp=analysis_result.disp)
+        return AbsoluteMemoryReference(analysis_result.disp)
     elif modrm.regmem != 4:
         # Without SIB-byte
         op = RelativeMemoryReference(base_reg=Reg((RegType.general, modrm.regmem, 4)))

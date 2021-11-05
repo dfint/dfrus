@@ -1,44 +1,31 @@
-import pytest
 from dataclasses import asdict
+
+import pytest
 
 from dfrus.disasm import disasm
 from dfrus.opcodes import *
-from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata
+from dfrus.operand import RelativeMemoryReference, AbsoluteMemoryReference
+from dfrus.patchdf import get_length, mach_memcpy, get_start, match_mov_reg_imm32, get_fix_for_moves, Metadata, \
+    GetLengthResult
 
-
-def convert_test_data_from_copypaste(s: str):
-    test_data = bytes()
-
-    for line in s.strip().splitlines():
-        line = line.split()
-        test_data += bytes.fromhex(line[1])
-
-    return test_data
-
-
-# 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
-# 4c1da0     mov         esi, eax
-# 4c1da2     mov         eax, [524b4ch] ; [aFainted]
-# 4c1da7     mov         [esp+20h], eax
-# 4c1dab     mov         [esp+24h], ecx
 test_data_1 = bytes.fromhex(
-    '8B 0D 50 4B 52 00 8B F0  A1 4C 4B 52 00 89 44 24 '
-    '20 89 4C 24 24'
+    '8B 0D 50 4B 52 00 '    # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
+    '8B F0 '                # 4c1da0     mov         esi, eax
+    'A1 4C 4B 52 00 '       # 4c1da2     mov         eax, [524b4ch] ; [aFainted]
+    '89 44 24 20 '          # 4c1da7     mov         [esp+20h], eax
+    '89 4C 24 24'           # 4c1dab     mov         [esp+24h], ecx
 )
 
 
 def test_get_length():
     result = get_length(test_data_1, 7)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert str(result) == str(GetLengthResult(
         deleted_relocs={2, 9},
         added_relocs=set(),
-        dest='[esp+0x20]',
+        dest=RelativeMemoryReference(base_reg=Reg.esp, disp=0x20),
         length=21,
         saved_mach=b'\x8b\xf0',  # mov esi, eax
-        nops=dict(),
-        pokes=dict(),
-    )
+    ))
 
 
 # 40253b !   mov         ecx, [strz_DOWN_PLANTS_5406cc]
@@ -62,16 +49,15 @@ test_data_push = bytes.fromhex(
 
 def test_get_length_push():
     result = get_length(test_data_push, 15)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert str(result) == str(GetLengthResult(
         deleted_relocs={2, 7, 13, 30},
         added_relocs=set(),
-        dest='[ecx]',
+        dest=RelativeMemoryReference(base_reg=Reg.ecx),
         length=40,
         saved_mach=bytes.fromhex('8D 8D 90 FB FF FF'),  # lea ecx, [ebp-470h] ; push ecx
         nops={41: 6, 47: 6},
         pokes=dict(),
-    )
+    ))
 
 
 # 414111 !   mov         edx, [strz_after_a_while_543e38]
@@ -100,16 +86,13 @@ test_data_abs_ref = bytes.fromhex(
 
 def test_get_length_abs_ref():
     result = get_length(test_data_abs_ref, 13)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert str(result) == str(GetLengthResult(
         deleted_relocs={2, 7, 13, 19, 25, 30, 36, 42, 48},
         added_relocs={2},
-        dest='[0x617990]',
+        dest=AbsoluteMemoryReference(0x617990),
         length=52,
         saved_mach=bytes.fromhex('2B 0D E0 82 D6 0A '),  # sub ecx, [0ad682e0h]
-        nops=dict(),
-        pokes=dict()
-    )
+    ))
 
 
 # 428605 !   mov         eax, [strz_nausea_5452c4]
@@ -473,16 +456,14 @@ test_data_tribesman_peasant_intersection = bytes.fromhex(
 
 def test_get_length_tribesman_peasant_intersection():
     result = get_length(test_data_tribesman_peasant_intersection, len('tribesman'), 0x54bfdc)
-    result.dest = str(result.dest)
-    assert asdict(result) == dict(
+    assert str(result) == str(GetLengthResult(
         deleted_relocs={2, 8, 14},
         added_relocs=set(),
-        dest='[ebp-0x70]',
+        dest=RelativeMemoryReference(base_reg=Reg.ebp, disp=-0x70),  # [ebp-0x70]
         length=22,
         saved_mach=bytes(),
         pokes={23: 0x0C+6},
-        nops=dict(),
-    )
+    ))
 
 
 test_data_has_arrived = bytes.fromhex(
