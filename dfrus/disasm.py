@@ -103,17 +103,6 @@ def analyse_modrm(s: bytes, i: int) -> Tuple[ModRmAnalysisResult, int]:
     return ModRmAnalysisResult(modrm, sib, disp), i
 
 
-regs = (
-    ("al", "ax", "eax"),
-    ("cl", "cx", "ecx"),
-    ("dl", "dx", "edx"),
-    ("bl", "bx", "ebx"),
-    ("ah", "sp", "esp"),
-    ("ch", "bp", "ebp"),
-    ("dh", "si", "esi"),
-    ("bh", "di", "edi"),
-)
-
 seg_prefixes = {Prefix.seg_es: Reg.es, Prefix.seg_cs: Reg.cs, Prefix.seg_ss: Reg.ss, Prefix.seg_ds: Reg.ds,
                 Prefix.seg_fs: Reg.fs, Prefix.seg_gs: Reg.gs}
 
