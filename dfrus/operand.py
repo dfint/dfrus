@@ -48,6 +48,12 @@ class Operand(ABC):
 class ImmediateValueOperand(Operand):
     value: int
 
+    def get_data_size(self) -> Optional[int]:
+        raise NotImplementedError()
+
+    def set_data_size(self, value: Optional[int]):
+        raise NotImplementedError()
+
     def __str__(self):
         if self.value >= 0:
             return asmhex(self.value)
@@ -83,13 +89,6 @@ class RegisterOperand(Operand):
 class MemoryReference(Operand, ABC):
     disp: int = 0
     seg_prefix: Optional[Reg] = None
-
-
-@dataclass
-class RelativeMemoryReference(MemoryReference):
-    base_reg: Optional[Reg] = None
-    index_reg: Optional[Reg] = None
-    scale: int = 0
     _data_size: Optional[int] = None
 
     def get_data_size(self) -> Optional[int]:
@@ -97,6 +96,13 @@ class RelativeMemoryReference(MemoryReference):
 
     def set_data_size(self, value: Optional[int]):
         self._data_size = value
+
+
+@dataclass
+class RelativeMemoryReference(MemoryReference):
+    base_reg: Optional[Reg] = None
+    index_reg: Optional[Reg] = None
+    scale: int = 0
 
     def __str__(self):
         if self.base_reg is None and self.index_reg is None:
@@ -138,14 +144,6 @@ class RelativeMemoryReference(MemoryReference):
 
 @dataclass
 class AbsoluteMemoryReference(MemoryReference):
-    _data_size: Optional[int] = None
-
-    def get_data_size(self) -> Optional[int]:
-        return self._data_size
-
-    def set_data_size(self, value: Optional[int]):
-        self._data_size = value
-
     def __int__(self):
         return self.disp
 
