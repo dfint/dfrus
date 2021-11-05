@@ -1,12 +1,12 @@
 import sys
 from ast import literal_eval
 from functools import partial
-from typing import Callable, Set, BinaryIO, Mapping, Sequence, Iterable
+from typing import Callable, Set, BinaryIO, Sequence, Iterable, Tuple, Iterator
 
 from .peclasses import PortableExecutable, RelocationTable
 
 
-def group_args(args) -> Mapping[str, Sequence[int]]:
+def group_args(args) -> Iterator[Tuple[str, Sequence[int]]]:
     operators = {'+', '-', '-*'}
     op = None
     list_start = None
@@ -26,7 +26,8 @@ def group_args(args) -> Mapping[str, Sequence[int]]:
 
             args[i] = arg
 
-    yield op, args[list_start:]
+    if op is not None:
+        yield op, args[list_start:]
 
 
 def common(file: BinaryIO, functions: Iterable[Callable[[Set[int]], Set[int]]]):
