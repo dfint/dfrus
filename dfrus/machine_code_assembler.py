@@ -1,4 +1,4 @@
-from dfrus.disasm import join_byte, Operand
+from dfrus.disasm import join_byte, Operand, RelativeMemoryReference
 from dfrus.machine_code_builder import MachineCodeBuilder
 from dfrus.opcodes import *
 
@@ -38,7 +38,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def mov_reg_reg32(self, dest: Reg, src: Reg):
         return self.byte(mov_rm_reg | 1).modrm(3, src.code, dest.code)
 
-    def modrm_sib_compiler(self, register: Reg, src: Operand):
+    def modrm_sib_compiler(self, register: Reg, src: RelativeMemoryReference):
         if src.disp == 0 and src.base_reg != Reg.ebp:
             mode = 0
         elif -0x80 <= src.disp < 0x80:

@@ -132,17 +132,24 @@ class OperandType(Enum):
     unknown = auto()
 
 
-@dataclass
 class Operand(ABC):
     @abstractmethod
     def get_type(self) -> OperandType:
         return OperandType.unknown
 
     def get_data_size(self) -> Optional[int]:
-        ...
+        raise NotImplementedError()
 
-    def set_data_size(self, value: int):
-        ...
+    def set_data_size(self, value: Optional[int]):
+        raise NotImplementedError()
+
+    @property
+    def data_size(self) -> Optional[int]:
+        return self.get_data_size()
+
+    @data_size.setter
+    def data_size(self, value: Optional[int]):
+        self.set_data_size(value)
 
 
 @dataclass
@@ -199,6 +206,12 @@ class RelativeMemoryReference(Operand):
     def get_type(self) -> OperandType:
         return OperandType.relative_memory_reference
 
+    def get_data_size(self) -> Optional[int]:
+        return self._data_size
+
+    def set_data_size(self, value: Optional[int]):
+        self._data_size = value
+
     def __str__(self):
         if self.base_reg is None and self.index_reg is None:
             result = asmhex(self.disp)
@@ -229,19 +242,41 @@ class RelativeMemoryReference(Operand):
         else:
             result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
 
-        if self.get_data_size() is not None:
-            result = op_sizes[self.get_data_size()] + ' ' + result
+        data_size = self.get_data_size()
+        if data_size is not None:
+            result = op_sizes[data_size] + ' ' + result
 
         return result
 
 
 @dataclass
 class AbsoluteMemoryReference(Operand):
-    value: int
+    disp: int
     seg_prefix: Optional[Reg] = None
+    _data_size: Optional[int] = None
 
     def get_type(self) -> OperandType:
         return OperandType.absolute_memory_reference
+
+    def get_data_size(self) -> Optional[int]:
+        return self._data_size
+
+    def set_data_size(self, value: Optional[int]):
+        self._data_size = value
+
+    def __str__(self):
+        result = asmhex(self.disp)
+
+        if self.seg_prefix is None:
+            result = "[%s]" % result
+        else:
+            result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
+
+        data_size = self.get_data_size()
+        if data_size is not None:
+            result = op_sizes[data_size] + ' ' + result
+
+        return result
 
 
 # @dataclass
@@ -647,7 +682,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             immediate = int.from_bytes(s[i:i+imm_size], byteorder='little')
             i += imm_size
             operand1 = RegisterOperand(Reg((RegType.general, Reg.eax.code, 1 << size)))
-            operand = ImmediateValueOperand(immediate)
+            operand = AbsoluteMemoryReference(immediate)
             if seg_prefix:
                 operand.seg_prefix = seg_prefix
             if dir_flag:
@@ -663,7 +698,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             analysis_result, i = analyse_modrm(s, i+1)
 
             operand1 = RegisterOperand(Reg.segment(analysis_result.modrm.reg))
-            operand2 = create_operand2_from_modrm_or_sib(analysis_result)
+            operand2: Operand = create_operand2_from_modrm_or_sib(analysis_result)
 
             if not dir_flag:
                 operand1, operand2 = operand2, operand1
