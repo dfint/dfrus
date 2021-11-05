@@ -47,9 +47,6 @@ class Operand(ABC):
     def data_size(self, value: Optional[int]):
         self.set_data_size(value)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self})"
-
 
 @dataclass
 class ImmediateValueOperand(Operand):
@@ -63,6 +60,9 @@ class ImmediateValueOperand(Operand):
             return asmhex(self.value)
         else:
             return '-' + asmhex(-self.value)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self})"
 
 
 @dataclass
@@ -91,6 +91,9 @@ class RegisterOperand(Operand):
 
     def __str__(self):
         return self.reg.name
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self})"
 
 
 @dataclass
@@ -141,9 +144,10 @@ class RelativeMemoryReference(MemoryReference):
                     result += '-' + asmhex(-self.disp)
 
         if self.seg_prefix is None:
-            result = "[%s]" % result
+            result = f"[{result}]"
         else:
-            result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
+            segment_register = seg_regs[int(self.seg_prefix)]
+            result = f"{segment_register}:[{result}]"
 
         data_size = self.get_data_size()
         if data_size is not None:
@@ -172,9 +176,10 @@ class AbsoluteMemoryReference(MemoryReference):
         result = asmhex(self.disp)
 
         if self.seg_prefix is None:
-            result = "[%s]" % result
+            result = f"[{result}]"
         else:
-            result = "%s:[%s]" % (seg_regs[int(self.seg_prefix)], result)
+            segment_register = seg_regs[int(self.seg_prefix)]
+            result = f"{segment_register}:[{result}]"
 
         data_size = self.get_data_size()
         if data_size is not None:
