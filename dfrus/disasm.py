@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Optional, Tuple, Iterator
 
 from .binio import to_signed
@@ -63,9 +63,6 @@ class ModRmAnalysisResult:
     modrm: ModRM
     sib: Optional[Sib]
     disp: Optional[int]
-
-    def as_dict(self):
-        return {key: value for key, value in asdict(self).items() if value is not None}
 
 
 def analyse_modrm(s: bytes, i: int) -> Tuple[ModRmAnalysisResult, int]:
@@ -145,40 +142,6 @@ def create_operands_from_modrm_or_sib(x: ModRmAnalysisResult, size=4) -> Tuple[O
     op1 = create_operand1_from_modrm(x, size)
     op2 = create_operand2_from_modrm_or_sib(x)
     return op1, op2
-
-
-def process_operands(x: ModRmAnalysisResult) -> Tuple[Reg, int]:
-    op = create_operand2_from_modrm_or_sib(x)
-    assert isinstance(op, RelativeMemoryReference)
-    if op.base_reg is not None:
-        base_reg = op.base_reg
-    else:
-        assert op.index_reg is not None
-        base_reg = op.index_reg
-    disp = op.disp
-    return base_reg, disp
-
-
-def analyse_mach(s):
-    i = 0
-    while True:
-        j = i
-        if s[i] == Prefix.operand_size:
-            i += 1
-        op = s[i]
-        data = s[j:i+1]
-        result = dict(data=data)
-        i += 1
-        if op & 0xfe == mov_acc_mem:
-            result.update(reg=Reg.eax, imm=int.from_bytes(s[i:i+4], byteorder='little'))
-            i += 4
-        elif op & 0xfc == mov_rm_reg or op == lea:
-            modrm, i = analyse_modrm(s, i)
-            result.update(modrm.as_dict())
-        else:
-            break
-
-        yield result, j
 
 
 op_1byte_nomask_noargs = {
