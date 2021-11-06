@@ -2,7 +2,8 @@ import bisect
 from array import array
 from ctypes import Structure, c_char, c_ushort, c_uint, sizeof, c_ubyte
 from itertools import zip_longest
-from typing import Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type, TypeVar
+from typing import (Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type, TypeVar,
+                    SupportsBytes)
 
 from .disasm import align
 
@@ -224,6 +225,7 @@ class SectionTable(Sequence[Section]):
         if offset is not None:
             file.seek(offset)
 
+        section: SupportsBytes
         for section in self._sections:
             file.write(bytes(section))
 
@@ -347,9 +349,16 @@ class PortableExecutable:
         self._section_table = None
         self._relocation_table = None
 
+    def rewrite_image_nt_headers(self):
+        offset = self.image_dos_header.e_lfanew
+        self.file.seek(offset)
+        self.image_nt_headers: SupportsBytes
+        self.file.write(bytes(self.image_nt_headers))
+
     def rewrite_data_directory(self):
         offset = self.image_dos_header.e_lfanew + sizeof(ImageNTHeaders) - sizeof(ImageDataDirectory)
         self.file.seek(offset)
+        self.image_data_directory: SupportsBytes
         self.file.write(bytes(self.image_data_directory))
 
     def reread(self):

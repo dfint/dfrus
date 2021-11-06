@@ -3,6 +3,7 @@ import sys
 import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
+from ctypes import sizeof
 from dataclasses import dataclass, fields, field
 from operator import itemgetter
 from typing import Tuple, Optional, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
@@ -1100,14 +1101,14 @@ def add_new_section(pe: PortableExecutable, new_section, new_section_offset):
     # Set the new section virtual size
     new_section.virtual_size = new_section_offset - new_section.pointer_to_raw_data
     # Write the new section info
-    fn.seek(pe.image_nt_headers.offset + pe.image_nt_headers.sizeof() + len(sections) * Section.sizeof())
+    fn.seek(pe.image_dos_header.e_lfanew + sizeof(pe.image_nt_headers) + len(sections) * sizeof(Section))
     new_section.write(fn)
     # Fix number of sections
     pe.image_file_header.number_of_sections = len(sections) + 1
     # Fix ImageSize field of the PE header
-    pe.image_optional_header.size_of_image = align(new_section.virtual_address + new_section.virtual_size, section_alignment)
-    pe.image_file_header.rewrite()
-    pe.image_optional_header.rewrite()
+    pe.image_optional_header.size_of_image = align(new_section.virtual_address + new_section.virtual_size,
+                                                   section_alignment)
+    pe.rewrite_image_nt_headers()
 
 
 def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections):
