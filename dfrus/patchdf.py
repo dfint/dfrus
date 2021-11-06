@@ -14,7 +14,9 @@ from .disasm import disasm, DisasmLine, join_byte, align
 from .extract_strings import extract_strings
 from .machine_code_assembler import asm
 from .machine_code_builder import MachineCodeBuilder
-from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
+from .machine_code_match import match_jump, match_jump_conditional_short, match_jump_conditional_near, match_call_near, \
+    match_mov_reg_imm, match_lea_reg_reg_disp, get_start
+from .machine_code_utils import mach_strlen, mach_memcpy
 from .opcodes import *
 from .operand import (ImmediateValueOperand, RegisterOperand, MemoryReference,
                       RelativeMemoryReference, AbsoluteMemoryReference)
@@ -131,18 +133,17 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
     pre = read_bytes(fn, offset - count_before, count_before)
     aft = read_bytes(fn, next_off, count_after)
-    jmp = None
+    jmp: Optional[str] = None
     old_next = next_off
-    if aft[0] in {jmp_short, jmp_near} or aft[0] & 0xf0 == jcc_short:
-        if aft[0] == jmp_short or aft[0] & 0xf0 == jcc_short:
-            displacement = to_signed(aft[1], width=8)
-            next_off += 2 + displacement
-        elif aft[0] == jmp_near:
-            displacement = from_dword(aft[1:5], signed=True)
-            next_off += 5 + displacement
-        jmp = aft[0]
+
+    match = match_jump(aft, next_off) or match_jump_conditional_short(aft, next_off)
+    if match:
+        jmp = match.mnemonic
+        operand = match.operand1
+        assert isinstance(operand, ImmediateValueOperand)
+        next_off = operand.value
         aft = read_bytes(fn, next_off, count_after)
-    elif aft[0] == call_near or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
+    elif match_jump_conditional_near(aft) or match_call_near(aft):
         aft = bytes()
 
     meta = Metadata()
@@ -253,7 +254,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     fpoke(fn, next_off + 1, new_len)
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
-                elif jmp == jmp_near:
+                elif jmp == "jmp near":
                     ret_value = Fix(
                         src_off=old_next + 1,
                         new_code=asm().push_imm8(new_len),
@@ -261,7 +262,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     )
                     ret_value.meta = meta
                     return ret_value
-                else:  # jmp == jmp_short
+                else:  # jmp == "jmp_short"
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         displacement = from_dword(aft[i + 1:i + 5], signed=True)
@@ -292,14 +293,14 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     )
                     ret_value.meta = meta
                     return ret_value
-            elif aft and match_mov_reg_imm32(aft[:5], Reg.edi, old_len):
+            elif aft and match_mov_reg_imm(aft, Reg.edi, old_len):
                 # mov edi, len ; after
                 meta.length = 'edi'
                 if not jmp:
                     fpoke4(fn, next_off + 1, new_len)
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
-                elif jmp == jmp_near:
+                elif jmp == "jmp near":
                     m = asm().mov_reg_imm(Reg.edi, new_len)  # mov edi, new_len
                     ret_value = Fix(
                         src_off=old_next + 1,
@@ -308,20 +309,21 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     )
                     ret_value.meta = meta
                     return ret_value
-                else:  # jmp == jmp_short
+                else:  # jmp == "jmp_short"
                     i = find_instruction(aft, call_near)
                     if i is not None:
                         displacement = from_dword(aft[i + 1:i + 5], signed=True)
                         ret_value = Fix(
                             src_off=next_off + i + 1,
                             new_code=mach_strlen(
-                                asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
+                                asm().mov_reg_reg_32(Reg.edi, Reg.ecx)
                             ),
                             dest_off=next_off + i + 5 + displacement,
                         )
                         ret_value.meta = meta
                         return ret_value
-            elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
+            # elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
+            elif match_lea_reg_reg_disp(pre[-4:], Reg.edi) and pre[-2] != 0:
                 # Possible to be `lea edi, [reg+N]`
                 displacement = to_signed(pre[-2], 8)
                 if displacement == old_len:
@@ -338,7 +340,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                     fpoke(fn, next_off + 3, new_len)
                     meta.fixed = 'yes'
                     return Fix(meta=meta)
-                elif jmp == jmp_near:
+                elif jmp == "jmp near":
                     # TODO: Handle this case
                     meta.fixed = 'not implemented'
                     return Fix(meta=meta)
@@ -360,13 +362,14 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
             dword_count = (old_len + 1) // 4
             new_dword_count = (new_len - r) // 4 + 1
             mod_1_ecx_0 = join_byte(1, Reg.ecx, 0)
-            if match_mov_reg_imm32(pre[-6:-1], Reg.ecx, dword_count):
+
+            if match_mov_reg_imm(pre[-6:-1], Reg.ecx, dword_count):
                 # mov ecx, dword_count
                 fpoke4(fn, offset - 5, new_dword_count)
                 meta.length = 'ecx*4'
                 meta.fixed = 'yes'
                 return Fix(meta=meta)
-            elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
+            elif match_lea_reg_reg_disp(pre[-4:-1], Reg.ecx, dword_count):
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
                 fpoke(fn, offset - 2, new_dword_count)
                 meta.length = 'ecx*4'
@@ -393,11 +396,8 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             next_off_2 = operand.value
                             aft = read_bytes(fn, offset, count_after)
 
-                            skip = None
-                            if match_mov_reg_imm32(aft[:5], Reg.ecx, dword_count):
-                                skip = 5
-                            elif aft[0] == lea and aft[1] & 0xf8 == mod_1_ecx_0 and aft[2] == dword_count:
-                                skip = 3
+                            skip = (match_mov_reg_imm(aft, Reg.ecx, dword_count)
+                                    or match_lea_reg_reg_disp(aft, Reg.ecx, dword_count))
 
                             if skip is not None:
                                 meta.length = 'ecx*4'
@@ -411,12 +411,12 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
                             meta.fixed = 'no'
                             return Fix(meta=meta)
-                        elif len(line_data) == 5 and match_mov_reg_imm32(line_data, Reg.ecx, dword_count):
+                        elif match_mov_reg_imm(line_data, Reg.ecx, dword_count):
                             fpoke4(fn, line.address + 1, new_dword_count)
                             meta.length = 'ecx*4'
                             meta.fixed = 'yes'
                             return Fix(meta=meta)
-                        elif line_data[0] == lea and line_data[1] & 0xf8 == mod_1_ecx_0 and line_data[2] == dword_count:
+                        elif match_lea_reg_reg_disp(line_data, Reg.ecx, dword_count):
                             fpoke(fn, line.address + 2, new_dword_count)
                             meta.length = 'ecx*4'
                             meta.fixed = 'yes'

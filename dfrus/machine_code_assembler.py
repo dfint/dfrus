@@ -77,6 +77,9 @@ class MachineCodeAssembler(MachineCodeBuilder):
     def call_near(self, label: str):
         return self.byte(call_near).relative_reference(label)
 
+    def mov_reg_reg_32(self, reg1: Reg, reg2: Reg):
+        return self.byte(mov_reg_rm | 1).modrm(3, reg1, reg2)
+
 
 def asm() -> MachineCodeAssembler:
     return MachineCodeAssembler()
