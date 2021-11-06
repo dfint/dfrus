@@ -162,12 +162,11 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
 
         def stop_func(disasm_line: DisasmLine):
             if disasm_line.operands:
-                operands = disasm_line.operands
-                operand1 = operands[0]
+                operand1 = disasm_line.operand1
                 if isinstance(operand1, RegisterOperand) and operand1.reg == reg:
                     return True
-                elif len(operands) > 1:
-                    operand2 = operands[1]
+                elif disasm_line.operand2:
+                    operand2 = disasm_line.operand2
                     if isinstance(operand2, RelativeMemoryReference) and operand2.base_reg == reg:
                         return True
 
@@ -228,8 +227,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                                 m.mov_reg_imm(Reg.edi, old_len)  # mov edi, old_len
                                 m.byte(jmp_near).relative_reference(name="return_addr")  # jmp near return_addr
 
-                                assert line.operands
-                                operand = line.operands[0]
+                                operand = line.operand1
                                 assert isinstance(operand, ImmediateValueOperand)
 
                                 m.set_values(func=operand.value, return_addr=line.address + 5)
@@ -390,8 +388,7 @@ def fix_len(fn, offset, old_len, new_len, string_address, original_string_addres
                             meta.fixed = 'no'
                             return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
-                            assert line.operands
-                            operand = line.operands[0]
+                            operand = line.operand1
                             assert isinstance(operand, ImmediateValueOperand)
                             next_off_2 = operand.value
                             aft = read_bytes(fn, offset, count_after)
@@ -673,9 +670,7 @@ def get_length(data: bytes,
         elif line.mnemonic.startswith('j'):
             if line.mnemonic.startswith('jmp'):
                 not_moveable_after = not_moveable_after or offset
-
-                assert line.operands is not None
-                jump_destination = line.operands[0]
+                jump_destination = line.operand1
                 assert isinstance(jump_destination, ImmediateValueOperand)
                 data_after_jump = data[jump_destination.value:]
                 if not data_after_jump:
@@ -701,25 +696,21 @@ def get_length(data: bytes,
                 reg_state[Reg.edi] = None
             elif line.mnemonic.startswith('set'):
                 # setz, setnz etc.
-                assert line.operands
-                operand = line.operands[0]
+                operand = line.operand1
                 assert isinstance(operand, RegisterOperand)
                 reg_state[operand.reg.parent] = -1
             elif line.mnemonic == 'push':
-                assert line.operands
-                operand = line.operands[0]
+                operand = line.operand1
                 if isinstance(operand, RegisterOperand) and operand.reg.type == RegType.general:
                     reg_state[operand.reg.parent] = None  # Mark the pushed register as unoccupied
                 not_moveable_after = not_moveable_after or offset
             elif line.mnemonic == 'pop':
-                assert line.operands
-                operand = line.operands[0]
+                operand = line.operand1
                 if isinstance(operand, RegisterOperand) and operand.reg.type == RegType.general:
                     reg_state[operand.reg.parent] = -1
                 not_moveable_after = not_moveable_after or offset
             elif line.mnemonic in {'add', 'sub', 'and', 'xor', 'or'}:
-                assert line.operands
-                operand = line.operands[0]
+                operand = line.operand1
                 if isinstance(operand, RegisterOperand) and operand.reg.type == RegType.general:
                     assert operand.reg is not None
                     if operand.reg == Reg.esp:

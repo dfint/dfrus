@@ -167,6 +167,16 @@ class DisasmLine:
     operands: Optional[Tuple[Operand, ...]] = None
     prefix: Optional[Prefix] = None
 
+    @property
+    def operand1(self) -> Operand:
+        assert self.operands
+        return self.operands[0]
+
+    @property
+    def operand2(self) -> Optional[Operand]:
+        if self.operands and len(self.operands) >= 2:
+            return self.operands[1]
+
     def __str__(self):
         if not self.operands:
             text = self.mnemonic

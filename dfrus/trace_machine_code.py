@@ -43,8 +43,7 @@ def trace_code(fn: BinaryIO,
             elif stop_cond(line):  # Stop when the stop_cond returns True
                 return line
             elif line.mnemonic.startswith('jmp'):
-                assert line.operands
-                operand = line.operands[0]
+                operand = line.operand1
                 assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_jmp is Trace.not_follow:
                     pass
@@ -56,8 +55,7 @@ def trace_code(fn: BinaryIO,
                     if int(operand) > line.address:
                         return trace_code(fn, int(operand), stop_cond, trace_config)
             elif line.mnemonic.startswith('j'):
-                assert line.operands
-                operand = line.operands[0]
+                operand = line.operand1
                 assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_jcc is Trace.not_follow:
                     pass
@@ -69,8 +67,7 @@ def trace_code(fn: BinaryIO,
                     if int(operand) > line.address:
                         return trace_code(fn, int(operand), stop_cond, trace_config)
             elif line.mnemonic.startswith('call'):
-                assert line.operands
-                operand = line.operands[0]
+                operand = line.operand1
                 assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_call is Trace.not_follow:
                     pass
@@ -105,8 +102,7 @@ def which_func(fn, offset, stop_cond=lambda _: False) -> FunctionInformation:
     elif str(disasm_line).startswith('rep'):
         return FunctionInformation(str(disasm_line))
     elif disasm_line.mnemonic.startswith('call'):
-        assert disasm_line.operands
-        operand = disasm_line.operands[0]
+        operand = disasm_line.operand1
         if isinstance(operand, AbsoluteMemoryReference):
             return FunctionInformation(disasm_line.mnemonic, disasm_line.address, int(operand))
         else:
