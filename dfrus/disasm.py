@@ -248,7 +248,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             if s[i] == jmp_short:
                 mnemonic = "jmp short"
             else:
-                mnemonic = f'j{Cond(s[i] & 0x0F)} short'
+                mnemonic = f'j{Cond(s[i] & 0x0F).name} short'
             line = DisasmLine(start_address + j, data=s[i:i+2], mnemonic=mnemonic,
                               operands=(ImmediateValueOperand(immediate),), prefix=rep_prefix)
             i += 2
@@ -487,7 +487,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             i += 1
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
                 condition = s[i] & 0x0F
-                mnemonic = f"set{Cond(condition)}"
+                mnemonic = f"set{Cond(condition).name}"
                 reg_op = RegisterOperand(Reg((RegType.general, s[i + 1] & 7, 1)))
                 i += 2
                 line = DisasmLine(start_address+j,
@@ -498,7 +498,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
 
             elif s[i] & 0xF0 == x0f_jcc_near:
                 condition = s[i] & 0x0F
-                mnemonic = f"j{Cond(condition)} near"
+                mnemonic = f"j{Cond(condition).name} near"
                 i += 1
                 immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 i += 4
@@ -572,7 +572,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
 
             elif s[i] & 0xF0 == x0f_cmov:
                 condition = s[i] & 0x0F
-                mnemonic = f'cmov{Cond(condition)}'
+                mnemonic = f'cmov{Cond(condition).name}'
                 size = 4 >> size_prefix
                 analysis_result, i = analyse_modrm(s, i + 1)
                 operand1 = create_operand1_from_modrm(analysis_result, size)
