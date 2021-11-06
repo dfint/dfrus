@@ -1208,7 +1208,7 @@ def find_earliest_midrefs(offset, xref_table, length):
         if offset + k in xref_table:
             for j, ref in enumerate(references):
                 mid_refs = xref_table[offset + k]
-                for mid_ref in reversed(sorted(mid_refs)):
+                for mid_ref in sorted(mid_refs, reverse=True):
                     if mid_ref < ref and ref - mid_ref < 70:  # Empirically picked number
                         references[j] = mid_ref
                         break
