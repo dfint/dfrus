@@ -1,6 +1,5 @@
 import io
 import sys
-import textwrap
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
 from ctypes import sizeof
@@ -21,6 +20,7 @@ from .operand import (ImmediateValueOperand, RegisterOperand, MemoryReference,
                       RelativeMemoryReference, AbsoluteMemoryReference)
 from .patch_charmap import patch_unicode_table, get_encoder
 from .peclasses import Section, RelocationTable, PortableExecutable
+from .pretty_printing import myrepr, format_hex_list
 from .search_charmap import search_charmap
 from .trace_machine_code import which_func, FunctionInformation
 
@@ -870,13 +870,13 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     if relocs_to_add or relocs_to_remove:
         if relocs_to_remove - relocatable_items:
             warn("Trying to remove some relocations which weren't in the original list: " +
-                 int_list_to_hex_str(item + image_base for item in (relocs_to_remove - relocatable_items)))
+                 format_hex_list(item + image_base for item in (relocs_to_remove - relocatable_items)))
 
         if debug:
             print("\nRemoved relocations:")
-            print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_remove), 80)))
+            print(format_hex_list(relocs_to_remove, wrap_at=80))
             print("\nAdded relocations:")
-            print("[%s]" % '\n'.join(textwrap.wrap(int_list_to_hex_str(relocs_to_add), 80)))
+            print(format_hex_list(relocs_to_add, wrap_at=80))
 
         relocatable_items -= relocs_to_remove
         relocatable_items |= relocs_to_add
@@ -1196,10 +1196,6 @@ def extract_function_information(image_base: int,
     return functions
 
 
-def int_list_to_hex_str(s):
-    return ', '.join(hex(x) for x in sorted(s))
-
-
 def find_earliest_midrefs(offset, xref_table, length):
     increment = 4
     k = increment
@@ -1218,11 +1214,3 @@ def find_earliest_midrefs(offset, xref_table, length):
 
         k += increment
     return references
-
-
-def myrepr(s):
-    text = repr(s)
-    if sys.stdout:
-        b = text.encode(sys.stdout.encoding, 'backslashreplace')
-        text = b.decode(sys.stdout.encoding, 'strict')
-    return text
