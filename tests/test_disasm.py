@@ -25,6 +25,22 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib, ModRmAnalysisResult
     ('6689460c', 'mov [esi+0xC], ax'),
     ('83f90a', 'cmp ecx, 0xA'),
 
+    ('C2 08 00', 'retn 8'),
+    ('74 0E', 'je short 0x10'),
+    ('FF 44 BC 10', 'inc dword [esp+4*edi+0x10]'),
+    ('FE 44 BC 10', 'inc byte [esp+4*edi+0x10]'),
+    ('8C 54 BC 10', 'mov [esp+4*edi+0x10], ss'),
+    ('8E 54 BC 10', 'mov ss, [esp+4*edi+0x10]'),
+    ('8F 44 BC 10', 'pop dword [esp+4*edi+0x10]'),
+    ('66 8F 44 BC 10', 'pop word [esp+4*edi+0x10]'),
+    ('05 FF FF 00 00', 'add eax, 0xFFFF'),
+    ('D1 44 BC 10', 'rol dword [esp+4*edi+0x10], 1'),
+    ('C1 44 BC 10 08', 'rol dword [esp+4*edi+0x10], 8'),
+    ('D3 44 BC 10', 'rol dword [esp+4*edi+0x10], cl'),
+    ('F7 5C BC 10', 'neg dword [esp+4*edi+0x10]'),
+    ('F7 44 BC 10 FF 00 00 00', 'test dword [esp+4*edi+0x10], 0xFF'),
+    ('0F 84 FA FF 00 00', 'je near 0x10000'),
+
     # MMX/SSE
     ('0f10 05 2cddeb00', 'movups xmm0, [0xEBDD2C]'),
     ('0f11 02', 'movups [edx], xmm0'),

@@ -248,7 +248,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             if s[i] == jmp_short:
                 mnemonic = "jmp short"
             else:
-                mnemonic = 'j%s short' % Cond(s[i] & 0x0F).name
+                mnemonic = f'j{Cond(s[i] & 0x0F)} short'
             line = DisasmLine(start_address + j, data=s[i:i+2], mnemonic=mnemonic,
                               operands=(ImmediateValueOperand(immediate),), prefix=rep_prefix)
             i += 2
@@ -487,7 +487,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             i += 1
             if s[i] & 0xF0 == x0f_setcc and s[i+1] & 0xC0 == 0xC0:
                 condition = s[i] & 0x0F
-                mnemonic = "set%s" % Cond(condition).name
+                mnemonic = f"set{Cond(condition)}"
                 reg_op = RegisterOperand(Reg((RegType.general, s[i + 1] & 7, 1)))
                 i += 2
                 line = DisasmLine(start_address+j,
@@ -498,7 +498,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
 
             elif s[i] & 0xF0 == x0f_jcc_near:
                 condition = s[i] & 0x0F
-                mnemonic = "j%s near" % Cond(condition).name
+                mnemonic = f"j{Cond(condition)} near"
                 i += 1
                 immediate = start_address+i+4+int.from_bytes(s[i:i+4], byteorder='little', signed=True)
                 i += 4
@@ -572,7 +572,7 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
 
             elif s[i] & 0xF0 == x0f_cmov:
                 condition = s[i] & 0x0F
-                mnemonic = 'cmov' + Cond(condition).name
+                mnemonic = f'cmov{Cond(condition)}'
                 size = 4 >> size_prefix
                 analysis_result, i = analyse_modrm(s, i + 1)
                 operand1 = create_operand1_from_modrm(analysis_result, size)
@@ -601,12 +601,12 @@ def _main(argv):
             mach = fn.read(0x500)
             prev_addr = None
             prev_size = None
-            print('Entry point: 0x%x\n' % (image_base+entry_point))
+            print(f'Entry point: 0x{image_base + entry_point:x}\n')
             for disasm_line in disasm(mach, image_base+entry_point):
                 assert(prev_addr is None or disasm_line.address-prev_addr == prev_size)
                 prev_addr = disasm_line.address
                 prev_size = len(disasm_line.data)
-                print("%08x\t%s" % (disasm_line.address, disasm_line))
+                print(f"{disasm_line.address:08x}\t{disasm_line}")
                 if disasm_line.mnemonic == 'db':
                     break
 

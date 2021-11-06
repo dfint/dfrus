@@ -22,6 +22,9 @@ class Cond(IntEnum):
     ge = nl
     nle = g
 
+    def __str__(self):
+        return self.name
+
 
 class RegType(Enum):
     general = auto()
