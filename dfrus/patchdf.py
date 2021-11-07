@@ -14,7 +14,8 @@ from .disasm import disasm, DisasmLine, join_byte, align
 from .extract_strings import extract_strings
 from .machine_code_assembler import asm
 from .machine_code_builder import MachineCodeBuilder
-from .machine_code_utils import mach_strlen, match_mov_reg_imm32, get_start, mach_memcpy
+from .machine_code_match import match_mov_reg_imm32, get_start
+from .machine_code_utils import mach_strlen, mach_memcpy
 from .opcodes import *
 from .operand import (ImmediateValueOperand, RegisterOperand, MemoryReference,
                       RelativeMemoryReference, AbsoluteMemoryReference)
