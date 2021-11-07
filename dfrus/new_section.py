@@ -5,15 +5,13 @@ from .disasm import align
 from .peclasses import PortableExecutable, Section
 
 
-def create_section_blueprint(last_section, pe):
+def create_section_blueprint(section_name, virtual_address, physical_address):
     return Section.new(
-        name=b'.new',
-        vstart=align(last_section.virtual_address + last_section.virtual_size,
-                     pe.image_optional_header.section_alignment),
-        vsize=0,  # for now
-        pstart=align(last_section.pointer_to_raw_data +
-                     last_section.size_of_raw_data, pe.image_optional_header.file_alignment),
-        psize=0xFFFFFFFF,  # for now
+        name=section_name,
+        virtual_address=virtual_address,
+        virtual_size=0,  # for now
+        pointer_to_raw_data=physical_address,
+        size_of_raw_data=0xFFFFFFFF,  # for now
         flags=Section.IMAGE_SCN_CNT_INITIALIZED_DATA | Section.IMAGE_SCN_MEM_READ | Section.IMAGE_SCN_MEM_EXECUTE
     )
 

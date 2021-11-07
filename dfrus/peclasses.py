@@ -142,14 +142,18 @@ class Section(AnnotatedStructure):
     characteristics: c_uint
 
     @staticmethod
-    def new(name: bytes, flags: int, pstart: int, psize: int, vstart: int, vsize: int):
+    def new(name: bytes, flags: int,
+            pointer_to_raw_data: int,
+            size_of_raw_data: int,
+            virtual_address: int,
+            virtual_size: int):
         self = Section()
         self.name = type(self.name)(name)
         self.characteristics = flags
-        self.pointer_to_raw_data = pstart
-        self.size_of_raw_data = psize
-        self.virtual_address = vstart
-        self.virtual_size = vsize
+        self.pointer_to_raw_data = pointer_to_raw_data
+        self.size_of_raw_data = size_of_raw_data
+        self.virtual_address = virtual_address
+        self.virtual_size = virtual_size
         return self
 
     def offset_to_rva(self, offset):

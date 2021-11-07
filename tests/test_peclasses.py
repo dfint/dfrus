@@ -17,11 +17,46 @@ def test_sizes():
 @pytest.fixture
 def section_table():
     return SectionTable([
-        Section.new(b'.text', flags=0x60000020, pstart=0x400, psize=0xAA9800, vstart=0x1000, vsize=0xAA977F),
-        Section.new(b'.rdata', flags=0x40000040, pstart=0xAA9C00, psize=0x12CA00, vstart=0xAAB000, vsize=0x12C802),
-        Section.new(b'.data', flags=0xC0000040, pstart=0xBD6600, psize=0x9A00, vstart=0xBD8000, vsize=0xDFC4A4),
-        Section.new(b'.rsrc', flags=0x40000040, pstart=0xBE0000, psize=0x1800, vstart=0x19D5000, vsize=0x1630),
-        Section.new(b'.reloc', flags=0x42000040, pstart=0xBE1800, psize=0xBA200, vstart=0x19D7000, vsize=0xBA138)
+        Section.new(
+            b'.text',
+            flags=0x60000020,
+            pointer_to_raw_data=0x400,
+            size_of_raw_data=0xAA9800,
+            virtual_address=0x1000,
+            virtual_size=0xAA977F
+        ),
+        Section.new(
+            b'.rdata',
+            flags=0x40000040,
+            pointer_to_raw_data=0xAA9C00,
+            size_of_raw_data=0x12CA00,
+            virtual_address=0xAAB000,
+            virtual_size=0x12C802
+        ),
+        Section.new(
+            b'.data',
+            flags=0xC0000040,
+            pointer_to_raw_data=0xBD6600,
+            size_of_raw_data=0x9A00,
+            virtual_address=0xBD8000,
+            virtual_size=0xDFC4A4
+        ),
+        Section.new(
+            b'.rsrc',
+            flags=0x40000040,
+            pointer_to_raw_data=0xBE0000,
+            size_of_raw_data=0x1800,
+            virtual_address=0x19D5000,
+            virtual_size=0x1630
+        ),
+        Section.new(
+            b'.reloc',
+            flags=0x42000040,
+            pointer_to_raw_data=0xBE1800,
+            size_of_raw_data=0xBA200,
+            virtual_address=0x19D7000,
+            virtual_size=0xBA138
+        )
     ])
 
 

@@ -8,6 +8,7 @@ from warnings import warn
 from .analyze_and_provide_fix import Metadata, Fix, analyze_reference_code
 from .binio import fpoke4, fpoke, to_dword
 from .cross_references import get_cross_references
+from .disasm import align
 from .extract_strings import extract_strings
 from .machine_code_assembler import asm
 from .machine_code_utils import mach_strlen
@@ -47,7 +48,13 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
         return
 
     # New section prototype
-    new_section = create_section_blueprint(last_section, pe)
+    new_section = create_section_blueprint(
+        b'.new',
+        align(last_section.virtual_address + last_section.virtual_size,
+              pe.image_optional_header.section_alignment),
+        align(last_section.pointer_to_raw_data + last_section.size_of_raw_data,
+              pe.image_optional_header.file_alignment),
+    )
 
     new_section_offset = new_section.pointer_to_raw_data
 
