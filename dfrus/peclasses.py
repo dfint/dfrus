@@ -1,31 +1,12 @@
 import bisect
 from array import array
-from ctypes import Structure, c_char, c_ushort, c_uint, sizeof, c_ubyte
+from ctypes import c_char, c_ushort, c_uint, sizeof, c_ubyte
 from itertools import zip_longest
 from typing import (Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type, TypeVar,
                     SupportsBytes)
 
+from .ctypes_annotated_structure import AnnotatedStructure
 from .disasm import align
-
-
-class CTypesField:
-    def __init__(self, c_type):
-        self.c_type = c_type
-
-    def __set_name__(self, owner, name):
-        self.public_name = name
-        self.private_name = '_' + name
-        # if not hasattr(owner, "_fields_"):
-        #     setattr(owner, "_fields_", [])
-        owner._fields_.append((self.private_name, self.c_type))
-
-    def __get__(self, obj, objtype=None):
-        value = getattr(obj, self.private_name)
-        return value
-
-    def __set__(self, obj, value):
-        setattr(obj, self.private_name, value)
-
 
 TStructure = TypeVar("TStructure")
 
@@ -39,109 +20,106 @@ def read_structure(cls: Type[TStructure], file: BinaryIO, offset=None) -> TStruc
     return new_obj
 
 
-class ImageDosHeader(Structure):
-    _fields_ = []
-    e_magic: bytes = CTypesField(c_char * 2)
-    e_cblp = CTypesField(c_ushort)
-    e_cp = CTypesField(c_ushort)
-    e_crlc = CTypesField(c_ushort)
-    e_cparhdr = CTypesField(c_ushort)
-    e_minalloc = CTypesField(c_ushort)
-    e_maxalloc = CTypesField(c_ushort)
-    e_ss = CTypesField(c_ushort)
-    e_sp = CTypesField(c_ushort)
-    e_csum = CTypesField(c_ushort)
-    e_ip = CTypesField(c_ushort)
-    e_cs = CTypesField(c_ushort)
-    e_lfarlc = CTypesField(c_ushort)
-    e_ovno = CTypesField(c_ushort)
-    e_res = CTypesField(c_ushort * 4)
-    e_oemid = CTypesField(c_ushort)
-    e_oeminfo = CTypesField(c_ushort)
-    e_res2 = CTypesField(c_ushort * 10)
-    e_lfanew = CTypesField(c_uint)
+class ImageDosHeader(AnnotatedStructure):
+    e_magic: c_char * 2
+    e_cblp: c_ushort
+    e_cp: c_ushort
+    e_crlc: c_ushort
+    e_cparhdr: c_ushort
+    e_minalloc: c_ushort
+    e_maxalloc: c_ushort
+    e_ss: c_ushort
+    e_sp: c_ushort
+    e_csum: c_ushort
+    e_ip: c_ushort
+    e_cs: c_ushort
+    e_lfarlc: c_ushort
+    e_ovno: c_ushort
+    e_res: c_ushort * 4
+    e_oemid: c_ushort
+    e_oeminfo: c_ushort
+    e_res2: c_ushort * 10
+    e_lfanew: c_uint
 
 
-class ImageFileHeader(Structure):
-    _fields_ = []
-    machine = CTypesField(c_ushort)
-    number_of_sections = CTypesField(c_ushort)
-    timedate_stamp = CTypesField(c_uint)
-    pointer_to_symbol_table = CTypesField(c_uint)
-    number_of_symbols = CTypesField(c_uint)
-    size_of_optional_header = CTypesField(c_ushort)
-    characteristics = CTypesField(c_ushort)
+print(sizeof(ImageDosHeader))
 
 
-class DataDirectory(Structure):
-    _fields_ = []
-    virtual_address = CTypesField(c_uint)
-    size = CTypesField(c_uint)
+class ImageFileHeader(AnnotatedStructure):
+    machine: c_ushort
+    number_of_sections: c_ushort
+    timedate_stamp: c_uint
+    pointer_to_symbol_table: c_uint
+    number_of_symbols: c_uint
+    size_of_optional_header: c_ushort
+    characteristics: c_ushort
 
 
-class ImageDataDirectory(Structure):
-    _fields_ = []
-    export = CTypesField(DataDirectory)
-    import_directory = CTypesField(DataDirectory)
-    resource = CTypesField(DataDirectory)
-    exception = CTypesField(DataDirectory)
-    security = CTypesField(DataDirectory)
-    basereloc = CTypesField(DataDirectory)
-    debug = CTypesField(DataDirectory)
-    copyright = CTypesField(DataDirectory)
-    globalptr = CTypesField(DataDirectory)
-    tls = CTypesField(DataDirectory)
-    load_config = CTypesField(DataDirectory)
-    bound_import = CTypesField(DataDirectory)
-    iat = CTypesField(DataDirectory)
-    delay_import = CTypesField(DataDirectory)
-    com_descriptor = CTypesField(DataDirectory)
-    reserved = CTypesField(DataDirectory)
+class DataDirectory(AnnotatedStructure):
+    virtual_address: c_uint
+    size: c_uint
 
 
-class ImageOptionalHeader(Structure):
-    _fields_ = []
-    magic = CTypesField(c_ushort)
-    major_linker_version = CTypesField(c_ubyte)
-    minor_linker_version = CTypesField(c_ubyte)
-    size_of_code = CTypesField(c_uint)
-    size_of_initialized_data = CTypesField(c_uint)
-    size_of_uninitialized_data = CTypesField(c_uint)
-    address_of_entry_point = CTypesField(c_uint)
-    base_of_code = CTypesField(c_uint)
-    base_of_data = CTypesField(c_uint)
-    image_base = CTypesField(c_uint)
-    section_alignment = CTypesField(c_uint)
-    file_alignment = CTypesField(c_uint)
-    major_operating_system_version = CTypesField(c_ushort)
-    minor_operating_system_version = CTypesField(c_ushort)
-    major_image_version = CTypesField(c_ushort)
-    minor_image_version = CTypesField(c_ushort)
-    major_subsystem_version = CTypesField(c_ushort)
-    minor_subsystem_version = CTypesField(c_ushort)
-    win32_version_value = CTypesField(c_uint)
-    size_of_image = CTypesField(c_uint)
-    size_of_headers = CTypesField(c_uint)
-    check_sum = CTypesField(c_uint)
-    subsystem = CTypesField(c_ushort)
-    dll_characteristics = CTypesField(c_ushort)
-    size_of_stack_reserve = CTypesField(c_uint)
-    size_of_stack_commit = CTypesField(c_uint)
-    size_of_heap_reserve = CTypesField(c_uint)
-    size_of_heap_commit = CTypesField(c_uint)
-    loader_flags = CTypesField(c_uint)
-    number_of_rva_and_sizes = CTypesField(c_uint)
-    image_data_directory: ImageDataDirectory = CTypesField(ImageDataDirectory)
+class ImageDataDirectory(AnnotatedStructure):
+    export: DataDirectory
+    import_directory: DataDirectory
+    resource: DataDirectory
+    exception: DataDirectory
+    security: DataDirectory
+    basereloc: DataDirectory
+    debug: DataDirectory
+    copyright: DataDirectory
+    globalptr: DataDirectory
+    tls: DataDirectory
+    load_config: DataDirectory
+    bound_import: DataDirectory
+    iat: DataDirectory
+    delay_import: DataDirectory
+    com_descriptor: DataDirectory
+    reserved: DataDirectory
 
 
-class ImageNTHeaders(Structure):
-    _fields_ = []
-    signature: bytes = CTypesField(c_char * 4)
-    image_file_header: ImageFileHeader = CTypesField(ImageFileHeader)
-    image_optional_header: ImageOptionalHeader = CTypesField(ImageOptionalHeader)
+class ImageOptionalHeader(AnnotatedStructure):
+    magic: c_ushort
+    major_linker_version: c_ubyte
+    minor_linker_version: c_ubyte
+    size_of_code: c_uint
+    size_of_initialized_data: c_uint
+    size_of_uninitialized_data: c_uint
+    address_of_entry_point: c_uint
+    base_of_code: c_uint
+    base_of_data: c_uint
+    image_base: c_uint
+    section_alignment: c_uint
+    file_alignment: c_uint
+    major_operating_system_version: c_ushort
+    minor_operating_system_version: c_ushort
+    major_image_version: c_ushort
+    minor_image_version: c_ushort
+    major_subsystem_version: c_ushort
+    minor_subsystem_version: c_ushort
+    win32_version_value: c_uint
+    size_of_image: c_uint
+    size_of_headers: c_uint
+    check_sum: c_uint
+    subsystem: c_ushort
+    dll_characteristics: c_ushort
+    size_of_stack_reserve: c_uint
+    size_of_stack_commit: c_uint
+    size_of_heap_reserve: c_uint
+    size_of_heap_commit: c_uint
+    loader_flags: c_uint
+    number_of_rva_and_sizes: c_uint
+    image_data_directory: ImageDataDirectory
 
 
-class Section(Structure):
+class ImageNTHeaders(AnnotatedStructure):
+    signature: c_char * 4
+    image_file_header: ImageFileHeader
+    image_optional_header: ImageOptionalHeader
+
+
+class Section(AnnotatedStructure):
     # ImageSectionHeader
     IMAGE_SCN_CNT_CODE = 0x00000020
     IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
@@ -152,22 +130,21 @@ class Section(Structure):
     IMAGE_SCN_MEM_READ = 0x40000000
     IMAGE_SCN_MEM_WRITE = 0x80000000
 
-    _fields_ = []
-    name: bytes = CTypesField(c_char * 8)
-    virtual_size = CTypesField(c_uint)
-    virtual_address = CTypesField(c_uint)
-    size_of_raw_data = CTypesField(c_uint)
-    pointer_to_raw_data = CTypesField(c_uint)
-    pointer_to_relocations = CTypesField(c_uint)
-    pointer_to_linenumbers = CTypesField(c_uint)
-    number_of_relocations = CTypesField(c_ushort)
-    number_of_linenumbers = CTypesField(c_ushort)
-    characteristics = CTypesField(c_uint)
+    name: c_char * 8
+    virtual_size: c_uint
+    virtual_address: c_uint
+    size_of_raw_data: c_uint
+    pointer_to_raw_data: c_uint
+    pointer_to_relocations: c_uint
+    pointer_to_linenumbers: c_uint
+    number_of_relocations: c_ushort
+    number_of_linenumbers: c_ushort
+    characteristics: c_uint
 
     @staticmethod
     def new(name: bytes, flags: int, pstart: int, psize: int, vstart: int, vsize: int):
         self = Section()
-        self.name = name
+        self.name = type(self.name)(name)
         self.characteristics = flags
         self.pointer_to_raw_data = pstart
         self.size_of_raw_data = psize
