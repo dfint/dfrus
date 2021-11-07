@@ -2,7 +2,6 @@ import io
 import sys
 from binascii import hexlify
 from collections import defaultdict, OrderedDict
-from ctypes import sizeof
 from dataclasses import dataclass, fields, field
 from operator import itemgetter
 from typing import Tuple, Optional, Union, Set, Iterable, Mapping, MutableMapping, List, Dict, BinaryIO
@@ -10,12 +9,13 @@ from warnings import warn
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
 from .cross_references import get_cross_references
-from .disasm import disasm, DisasmLine, join_byte, align
+from .disasm import disasm, DisasmLine, join_byte
 from .extract_strings import extract_strings
 from .machine_code_assembler import asm
 from .machine_code_builder import MachineCodeBuilder
 from .machine_code_match import match_mov_reg_imm32, get_start
 from .machine_code_utils import mach_strlen, mach_memcpy
+from .new_section import add_new_section, add_to_new_section, create_section_blueprint
 from .opcodes import *
 from .operand import (ImmediateValueOperand, RegisterOperand, MemoryReference,
                       RelativeMemoryReference, AbsoluteMemoryReference)
@@ -776,13 +776,6 @@ def get_length(data: bytes,
     return result
 
 
-def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_byte=b'\0'):
-    aligned = align(len(s), alignment)
-    s = s.ljust(aligned, padding_byte)
-    fpoke(fn, new_section_offset, s)
-    return new_section_offset + aligned
-
-
 def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str], debug=False):
     print("Finding cross-references...")
 
@@ -808,16 +801,7 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
         return
 
     # New section prototype
-    new_section = Section.new(
-        name=b'.new',
-        vstart=align(last_section.virtual_address + last_section.virtual_size,
-                     pe.image_optional_header.section_alignment),
-        vsize=0,  # for now
-        pstart=align(last_section.pointer_to_raw_data +
-                     last_section.size_of_raw_data, pe.image_optional_header.file_alignment),
-        psize=0xFFFFFFFF,  # for now
-        flags=Section.IMAGE_SCN_CNT_INITIALIZED_DATA | Section.IMAGE_SCN_MEM_READ | Section.IMAGE_SCN_MEM_EXECUTE
-    )
+    new_section = create_section_blueprint(last_section, pe)
 
     new_section_offset = new_section.pointer_to_raw_data
 
@@ -1084,31 +1068,6 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
             pe.rewrite_data_directory()
             new_section_offset = add_to_new_section(file, new_section_offset, buffer.getvalue())
     return new_section_offset, relocation_table
-
-
-def add_new_section(pe: PortableExecutable, new_section, new_section_offset):
-    fn = pe.file
-    sections = pe.section_table
-    section_alignment = pe.image_optional_header.section_alignment
-    file_alignment = pe.image_optional_header.file_alignment
-    file_size = align(new_section_offset, file_alignment)
-    new_section.size_of_raw_data = file_size - new_section.pointer_to_raw_data
-    print("Adding new data section...")
-    # Align file size
-    if file_size > new_section_offset:
-        fn.seek(file_size - 1)
-        fn.write(b'\0')
-    # Set the new section virtual size
-    new_section.virtual_size = new_section_offset - new_section.pointer_to_raw_data
-    # Write the new section info
-    fn.seek(pe.image_dos_header.e_lfanew + sizeof(pe.image_nt_headers) + len(sections) * sizeof(Section))
-    new_section.write(fn)
-    # Fix number of sections
-    pe.image_file_header.number_of_sections = len(sections) + 1
-    # Fix ImageSize field of the PE header
-    pe.image_optional_header.size_of_image = align(new_section.virtual_address + new_section.virtual_size,
-                                                   section_alignment)
-    pe.rewrite_image_nt_headers()
 
 
 def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections):

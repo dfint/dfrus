@@ -1,0 +1,50 @@
+from ctypes import sizeof
+
+from .binio import fpoke
+from .disasm import align
+from .peclasses import PortableExecutable, Section
+
+
+def create_section_blueprint(last_section, pe):
+    return Section.new(
+        name=b'.new',
+        vstart=align(last_section.virtual_address + last_section.virtual_size,
+                     pe.image_optional_header.section_alignment),
+        vsize=0,  # for now
+        pstart=align(last_section.pointer_to_raw_data +
+                     last_section.size_of_raw_data, pe.image_optional_header.file_alignment),
+        psize=0xFFFFFFFF,  # for now
+        flags=Section.IMAGE_SCN_CNT_INITIALIZED_DATA | Section.IMAGE_SCN_MEM_READ | Section.IMAGE_SCN_MEM_EXECUTE
+    )
+
+
+def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_byte=b'\0'):
+    aligned = align(len(s), alignment)
+    s = s.ljust(aligned, padding_byte)
+    fpoke(fn, new_section_offset, s)
+    return new_section_offset + aligned
+
+
+def add_new_section(pe: PortableExecutable, new_section, new_section_offset):
+    fn = pe.file
+    sections = pe.section_table
+    section_alignment = pe.image_optional_header.section_alignment
+    file_alignment = pe.image_optional_header.file_alignment
+    file_size = align(new_section_offset, file_alignment)
+    new_section.size_of_raw_data = file_size - new_section.pointer_to_raw_data
+    print("Adding new data section...")
+    # Align file size
+    if file_size > new_section_offset:
+        fn.seek(file_size - 1)
+        fn.write(b'\0')
+    # Set the new section virtual size
+    new_section.virtual_size = new_section_offset - new_section.pointer_to_raw_data
+    # Write the new section info
+    fn.seek(pe.image_dos_header.e_lfanew + sizeof(pe.image_nt_headers) + len(sections) * sizeof(Section))
+    new_section.write(fn)
+    # Fix number of sections
+    pe.image_file_header.number_of_sections = len(sections) + 1
+    # Fix ImageSize field of the PE header
+    pe.image_optional_header.size_of_image = align(new_section.virtual_address + new_section.virtual_size,
+                                                   section_alignment)
+    pe.rewrite_image_nt_headers()
