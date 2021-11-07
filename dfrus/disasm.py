@@ -16,12 +16,9 @@ def split_byte(x):
     return x >> 6, x >> 3 & 7, x & 7
 
 
-def join_byte(*parts):
-    s = 0
-    for x in parts:
-        s <<= 3
-        s |= int(x)
-    return s
+def join_byte(x, y, z):
+    """Join parts of a byte: 2 bits x + 3 bits y + 3 bits z"""
+    return (int(x) << 3 | int(y)) << 3 | int(z)
 
 
 @dataclass(frozen=True)
