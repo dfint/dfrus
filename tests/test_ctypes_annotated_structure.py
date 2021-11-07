@@ -11,8 +11,12 @@ def test_annotated_structure():
     assert sizeof(Test) == 8
 
     test = Test()
-    test.field = 10
-    test.bytes_field = type(test.bytes_field)(*b'1234')
-    assert test.field == 10
-    assert bytes(test.bytes_field) == b'1234'
-    assert bytes(test) == test.field.to_bytes(4, 'little') + bytes(test.bytes_field)
+
+    integer_value = 10
+    bytes_value = b'1234'
+
+    test.field = integer_value
+    test.bytes_field = type(test.bytes_field)(*bytes_value)
+    assert test.field == integer_value
+    assert bytes(test.bytes_field) == bytes_value
+    assert bytes(test) == integer_value.to_bytes(4, 'little') + bytes_value
