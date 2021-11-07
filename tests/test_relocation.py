@@ -21,3 +21,11 @@ def test_relocation():
     table = RelocationTable.from_file(file, len(file.getbuffer()))
     
     assert list(table) == relocs
+
+
+def test_relocation_to_file():
+    relocs = [0x123, 0x456, 0x567]
+    table = RelocationTable.build(relocs)
+    file = io.BytesIO()
+    table.to_file(file)
+    assert len(file.getvalue()) == 4*2 + 2*len(relocs) + 2  # 2 dwords + N words + 1 padding word
