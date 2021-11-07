@@ -1,6 +1,7 @@
-from dfrus.analyze_and_provide_fix import Metadata, get_fix_for_moves, get_length, GetLengthResult
 from dfrus.disasm import disasm
 from dfrus.machine_code_utils import mach_memcpy
+from dfrus.metadata_objects import Metadata
+from dfrus.moves_series import get_fix_for_moves, MovesSeriesAnalysisResult, analyze_moves_series
 from dfrus.opcodes import *
 from dfrus.operand import RelativeMemoryReference, AbsoluteMemoryReference
 
@@ -14,8 +15,8 @@ test_data_1 = bytes.fromhex(
 
 
 def test_get_length():
-    result = get_length(test_data_1, 7)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_1, 7)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 9},
         dest=RelativeMemoryReference(base_reg=Reg.esp, disp=0x20),
         length=21,
@@ -50,8 +51,8 @@ test_data_push = bytes.fromhex(
 
 
 def test_get_length_push():
-    result = get_length(test_data_push, 15)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_push, 15)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 7, 13, 30},
         dest=RelativeMemoryReference(base_reg=Reg.ecx),
         length=40,
@@ -84,9 +85,9 @@ test_data_abs_ref = bytes.fromhex(
 )
 
 
-def test_get_length_abs_ref():
-    result = get_length(test_data_abs_ref, 13)
-    assert result == GetLengthResult(
+def test_analyze_moves_series_abs_ref():
+    result = analyze_moves_series(test_data_abs_ref, 13)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 7, 13, 19, 25, 30, 36, 42, 48},
         added_relocs={2},
         dest=AbsoluteMemoryReference(0x617990),
@@ -110,9 +111,9 @@ test_data_abs_ref_simple = bytes.fromhex(
 )
 
 
-def test_get_length_abs_ref_simple():
-    result = get_length(test_data_abs_ref_simple, 6)
-    assert result == GetLengthResult(
+def test_analyze_moves_series_abs_ref_simple():
+    result = analyze_moves_series(test_data_abs_ref_simple, 6)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={1, 8, 14, 19, 26, 32},
         dest=AbsoluteMemoryReference(0xAE19178),
         length=36,
@@ -142,12 +143,12 @@ test_data_nausea = bytes.fromhex(
 )
 
 
-def test_get_length_nausea():
+def test_analyze_moves_series_nausea():
     saved = bytes.fromhex(
         'B9 0A 00 00 00 '  # mov ecx, 0Ah
     )
-    result = get_length(test_data_nausea, len('nausea'))
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_nausea, len('nausea'))
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={3, 45, 52, 59, 65, 72},
         dest=AbsoluteMemoryReference(0x62BC5C),
         length=12,
@@ -170,13 +171,13 @@ test_data_whimper_gnaw_intersection = bytes.fromhex(
 )
 
 
-def test_get_length_whimper_gnaw_intersection():
+def test_analyze_moves_series_whimper_gnaw_intersection():
     saved = bytes.fromhex(
         '85 C0 '  # test eax, eax
         '0F 95 C2 '  # setnz dl
     )
-    result = get_length(test_data_whimper_gnaw_intersection, len('whimper'), 0x541F00)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_whimper_gnaw_intersection, len('whimper'), 0x541F00)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 9, 17, 35},
         dest=AbsoluteMemoryReference(0x68FF258),
         length=21,
@@ -206,9 +207,9 @@ test_data_tanning_tan_intersection = bytes.fromhex(
 )
 
 
-def test_get_length_tanning_tan_intersection():
-    result = get_length(test_data_tanning_tan_intersection, len('Tanning'), 0x55ABB8)
-    assert result == GetLengthResult(
+def test_analyze_moves_series_tanning_tan_intersection():
+    result = analyze_moves_series(test_data_tanning_tan_intersection, len('Tanning'), 0x55ABB8)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 13},
         dest=RelativeMemoryReference(base_reg=Reg.esp, disp=+0xD40),
         length=6,
@@ -231,10 +232,10 @@ test_data_stimulant = bytes.fromhex(
 )
 
 
-def test_get_length_stimulant():
+def test_analyze_moves_series_stimulant():
     saved = bytes.fromhex('B9 0A 00 00 00')  # mov ecx, 0Ah
-    result = get_length(test_data_stimulant, len('stimulant'), 0x54645c)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_stimulant, len('stimulant'), 0x54645c)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 25, 31, 38, 44, 51},
         dest=AbsoluteMemoryReference(0x62C927),
         length=11,
@@ -244,7 +245,7 @@ def test_get_length_stimulant():
 
 
 def test_mach_memcpy_stimulant():
-    result = get_length(test_data_stimulant, len('stimulant'), 0x54645c)
+    result = analyze_moves_series(test_data_stimulant, len('stimulant'), 0x54645c)
     dest = result.dest
     string_addr = 0x123456
     newlen = len('стимулятор')
@@ -276,9 +277,9 @@ test_data_linen_apron = bytes.fromhex(
 )
 
 
-def test_get_length_linen_apron():
-    result = get_length(test_data_linen_apron, len('Linen apron'), 0x550b18)
-    assert result == GetLengthResult(
+def test_analyze_moves_series_linen_apron():
+    result = analyze_moves_series(test_data_linen_apron, len('Linen apron'), 0x550b18)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 8, 13, 19, 25, 47},
         dest=AbsoluteMemoryReference(0x6702DC9),
         length=29,
@@ -304,9 +305,9 @@ test_data_smoked = bytes.fromhex(
 )
 
 
-def test_get_length_smoked():
-    result = get_length(test_data_smoked, len('smoked %s'), 0x545B60)
-    assert result == GetLengthResult(
+def test_analyze_moves_series_smoked():
+    result = analyze_moves_series(test_data_smoked, len('smoked %s'), 0x545B60)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 7, 14, 60, 65, 72},
         dest=AbsoluteMemoryReference(0x189A325),
         length=18,
@@ -361,9 +362,9 @@ test_data_mild_low_pressure = bytes.fromhex(
 )
 
 
-def test_get_length_mild_low_pressure():
-    result = get_length(test_data_mild_low_pressure, len('mild low pressure'), 0x57AC80)
-    assert result == GetLengthResult(
+def test_analyze_moves_series_mild_low_pressure():
+    result = analyze_moves_series(test_data_mild_low_pressure, len('mild low pressure'), 0x57AC80)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 8, 14, 33, 39, 58, 64, 83, 90, 288},
         dest=AbsoluteMemoryReference(0xAE1AABE),
         length=18,
@@ -395,8 +396,8 @@ def test_get_length_tribesman():
         '8b 0c 8d c0 ee d0 0a'      # mov         ecx, [ecx*4+0ad0eec0]
         '2b 0d e0 82 d6 0a'         # sub         ecx, [0ad682e0]
     )
-    result = get_length(test_data_tribesman, len('for some time'), 0x543d74)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_tribesman, len('for some time'), 0x543d74)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 7, 17, 23, 31, 40},
         added_relocs={6, 12},
         dest=RelativeMemoryReference(base_reg=Reg.esi),
@@ -422,8 +423,8 @@ test_data_tribesman_peasant_intersection = bytes.fromhex(
 
 
 def test_get_length_tribesman_peasant_intersection():
-    result = get_length(test_data_tribesman_peasant_intersection, len('tribesman'), 0x54bfdc)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_tribesman_peasant_intersection, len('tribesman'), 0x54bfdc)
+    assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 8, 14},
         dest=RelativeMemoryReference(base_reg=Reg.ebp, disp=-0x70),  # [ebp-0x70]
         length=22,
@@ -447,8 +448,8 @@ test_data_has_arrived = bytes.fromhex(
 
 
 def test_get_length_has_arrived():
-    result = get_length(test_data_has_arrived, len(' has arrived.'), 0x00F12F00)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_has_arrived, len(' has arrived.'), 0x00F12F00)
+    assert result == MovesSeriesAnalysisResult(
         length=5,
         dest=RelativeMemoryReference(base_reg=Reg.ecx),
         nops={12: 2, 14: 5, 19: 3, 22: 5, 27: 3, 30: 6, 36: 4},
@@ -463,8 +464,8 @@ test_data_select_item = bytes.fromhex(
 
 
 def test_get_length_select_item():
-    result = get_length(test_data_select_item, len('  Select Item: '), 0x00EAF944)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_select_item, len('  Select Item: '), 0x00EAF944)
+    assert result == MovesSeriesAnalysisResult(
         length=len(test_data_select_item),
         deleted_relocs={3},
         dest=RelativeMemoryReference(base_reg=Reg.ebx, disp=0x52C),
@@ -486,8 +487,8 @@ test_data_dnwwap = bytes.fromhex(
 
 
 def test_dnwwap():
-    result = get_length(test_data_dnwwap, len('Design New World with Advanced Parameters'), 0x0EBDD44)
-    assert result == GetLengthResult(
+    result = analyze_moves_series(test_data_dnwwap, len('Design New World with Advanced Parameters'), 0x0EBDD44)
+    assert result == MovesSeriesAnalysisResult(
         length=len(test_data_dnwwap),
         dest=RelativeMemoryReference(base_reg=Reg.edx),
         deleted_relocs={3, 21, 33, 44},
@@ -517,10 +518,10 @@ test_data_create_new_world = bytes.fromhex(
 
 def test_create_new_world():
     original_string_address = 0xf2a8b8
-    result = get_length(test_data_create_new_world, len("Create New World!"), original_string_address)
+    result = analyze_moves_series(test_data_create_new_world, len("Create New World!"), original_string_address)
     new_len = len("Создать новый мир!")
 
-    assert result == GetLengthResult(
+    assert result == MovesSeriesAnalysisResult(
         length=67,
         dest=RelativeMemoryReference(base_reg=Reg.ecx),
         deleted_relocs={2, 14, 25, 37, 50},

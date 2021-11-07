@@ -5,13 +5,14 @@ from operator import itemgetter
 from typing import Tuple, Set, Mapping, MutableMapping, List
 from warnings import warn
 
-from .analyze_and_provide_fix import Metadata, Fix, analyze_reference_code
+from .analyze_and_provide_fix import analyze_reference_code
 from .binio import fpoke4, fpoke, to_dword
 from .cross_references import get_cross_references
 from .disasm import align
 from .extract_strings import extract_strings
 from .machine_code_assembler import asm
 from .machine_code_utils import mach_strlen
+from .metadata_objects import Metadata, Fix
 from .new_section import add_new_section, add_to_new_section, create_section_blueprint
 from .opcodes import *
 from .patch_charmap import patch_unicode_table, get_encoder
