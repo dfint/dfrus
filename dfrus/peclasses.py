@@ -144,7 +144,7 @@ class Section(AnnotatedStructure):
     @staticmethod
     def new(name: bytes, flags: int, pstart: int, psize: int, vstart: int, vsize: int):
         self = Section()
-        self.name = name
+        self.name = type(self.name)(name)
         self.characteristics = flags
         self.pointer_to_raw_data = pstart
         self.size_of_raw_data = psize
