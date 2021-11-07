@@ -5,7 +5,7 @@ from collections import defaultdict, OrderedDict
 from ctypes import sizeof
 from dataclasses import dataclass, fields, field
 from operator import itemgetter
-from typing import Tuple, Optional, Union, Set, Iterable, Mapping, MutableMapping, List, Dict
+from typing import Tuple, Optional, Union, Set, Iterable, Mapping, MutableMapping, List, Dict, BinaryIO
 from warnings import warn
 
 from .binio import read_bytes, fpoke4, fpoke, from_dword, to_dword, to_signed
@@ -127,7 +127,15 @@ count_after = 0x100
 count_after_for_get_length = 0x2000
 
 
-def fix_len(fn, offset, old_len, new_len, string_address, original_string_address) -> Fix:
+def analyze_reference_code(fn: BinaryIO,
+                           offset: int,
+                           old_len: int,
+                           new_len: int,
+                           string_address: int,
+                           original_string_address: int) -> Fix:
+    """
+    Analyze a machine code around a reference to a string and provide a fix for the code if needed
+    """
     next_off = offset + 4
 
     pre = read_bytes(fn, offset - count_before, count_before)
@@ -956,9 +964,9 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                 ref_rva = sections.offset_to_rva(ref)
                 if 0 <= (ref - sections[code_section].pointer_to_raw_data) < sections[code_section].size_of_raw_data:
                     try:
-                        fix = fix_len(fn, offset=ref, old_len=len(string), new_len=len(translation),
-                                      string_address=string_address,
-                                      original_string_address=original_string_address)
+                        fix = analyze_reference_code(fn, offset=ref, old_len=len(string), new_len=len(translation),
+                                                     string_address=string_address,
+                                                     original_string_address=original_string_address)
                     except Exception:
                         print('Catched %s exception on string %r at reference 0x%x' %
                               (sys.exc_info()[0], string, ref_rva + image_base))
