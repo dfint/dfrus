@@ -17,6 +17,10 @@ class Command(Generic[X, Y]):
         return self.function(input_object)
 
 
+class NoSuitableCommandException(Exception):
+    ...
+
+
 class Executor(ABC, Generic[X, Y]):
     def __init__(self):
         self._commands: List[Command[X, Y]] = []
@@ -29,7 +33,7 @@ class Executor(ABC, Generic[X, Y]):
             if command.is_applicable(input_object):
                 return command.apply(input_object)
 
-        raise ValueError(f"No suitable command for object {input_object!r}")
+        raise NoSuitableCommandException(f"No suitable command for object {input_object!r}")
 
     def command(self, predicate: Callable[[X], bool]):
         def decorator(function: Callable[[X], Y]):

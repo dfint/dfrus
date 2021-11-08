@@ -1,6 +1,8 @@
-from dataclasses import dataclass
 from typing import Optional, Tuple, Iterator
 
+from dataclasses import dataclass
+
+from .abstract_executor import Executor
 from .binio import to_signed
 from .opcodes import *
 from .operand import (Operand, ImmediateValueOperand, RegisterOperand, RelativeMemoryReference,
@@ -592,6 +594,40 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
             line = BytesLine(start_address+j, data=s[j:i])
 
         yield line
+
+
+@dataclass
+class DisassemblerCommandContext:
+    code: bytes
+    address: int
+    size_prefix: bool = False
+    seg_prefix: Optional[Prefix] = None
+    rep_prefix: Optional[Prefix] = None
+
+
+class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
+    def disassemble(self, data: bytes, start_address: int = 0) -> Iterator[DisasmLine]:
+        i = 0
+        while True:
+            size_prefix = False
+            seg_prefix = None
+            rep_prefix = None
+            if data[i] in seg_prefixes:
+                seg_prefix = seg_prefixes[Prefix(data[i])]
+                i += 1
+
+            if data[i] == Prefix.operand_size:
+                size_prefix = True
+                i += 1
+
+            if data[i] in {Prefix.rep.value, Prefix.repne.value, Prefix.lock.value}:
+                rep_prefix = Prefix(data[i])
+                i += 1
+
+            context = DisassemblerCommandContext(data[i:], start_address + i, size_prefix, seg_prefix, rep_prefix)
+            result = self.execute(context)
+            yield result
+            i += len(result.data)
 
 
 def _main(argv):
