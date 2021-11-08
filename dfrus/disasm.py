@@ -601,10 +601,21 @@ class DisassemblerCommandContext:
     rep_prefix: Optional[Prefix] = None
 
 
-class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
+@dataclass
+class DisasmCommandResult:
+    size: int
+    mnemonic: str
+    operands: Optional[Tuple[Operand, ...]] = None
+
+
+class IllegalCode(Exception):
+    pass
+
+
+class Disassembler(Executor[DisassemblerCommandContext, DisasmCommandResult]):
     def __init__(self):
         super().__init__()
-        self._default_command: Optional[Callable[[DisassemblerCommandContext], DisasmLine]] = None
+        self._default_command: Optional[Callable[[DisassemblerCommandContext], DisasmCommandResult]] = None
 
     def disassemble(self, data: bytes, start_address: int = 0) -> Iterator[DisasmLine]:
         data = memoryview(data)
@@ -630,14 +641,20 @@ class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
                                                  size_prefix, seg_prefix, rep_prefix)
             try:
                 result = self.execute(context)
-            except NoSuitableCommandException:
+            except (NoSuitableCommandException, IllegalCode):
                 if self._default_command:
                     result = self._default_command(context)
                 else:
                     raise
 
-            yield result
-            i += len(result.data)
+            yield DisasmLine(
+                prefix=rep_prefix,
+                address=start_address+prefix_start,
+                data=bytes(data[prefix_start:i+result.size]),
+                mnemonic=result.mnemonic,
+                operands=result.operands
+            )
+            i += result.size
 
     def default(self, function: Callable[[DisassemblerCommandContext], DisasmLine]):
         self._default_command = function
@@ -649,7 +666,11 @@ disassembler = Disassembler()
 
 @disassembler.default
 def bytes_line(context: DisassemblerCommandContext):
-    return BytesLine(context.address, data=bytes(context.prefix_bytes) + bytes(context.data[:1]))
+    return DisasmCommandResult(
+        size=len(context.prefix_bytes) + 1,
+        mnemonic="db",
+        operands=tuple(map(ImmediateValueOperand, bytes(context.prefix_bytes) + bytes(context.data[:1])))
+    )
 
 
 op_1byte_nomask_noargs = {
@@ -665,16 +686,12 @@ op_1byte_nomask_noargs = {
 def one_byte_no_operands(context: DisassemblerCommandContext):
     mnemonic = op_1byte_nomask_noargs[context.data[0]]
     if context.prefix_bytes:  # Are there any prefixes?
-        if context.size_prefix and mnemonic == 'movsd':
+        if context.size_prefix and context.data[0] == movsd:
             mnemonic = 'movsw'
-        elif context.rep_prefix is None:
-            return BytesLine(context.address, data=context.data[:1])
+        elif context.rep_prefix is None:  # Prefixes other then rep* are not allowed
+            raise IllegalCode
 
-    return DisasmLine(context.address,
-                      data=bytes(context.prefix_bytes) + bytes(context.data[:1]),
-                      mnemonic=mnemonic,
-                      prefix=context.rep_prefix,
-                      operands=None)
+    return DisasmCommandResult(size=1, mnemonic=mnemonic)
 
 
 def _main(argv):

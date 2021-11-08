@@ -4,6 +4,8 @@ from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib, ModRmAnalysisResult,
 
 
 @pytest.mark.parametrize('hex_data,disasm_str', [
+    ('90', 'nop'),
+
     ('B0 01', 'mov al, 1'),
     ('66 B8 01', 'mov ax, 1'),
     ('B8 01', 'mov eax, 1'),
@@ -60,6 +62,8 @@ def test_disasm(hex_data, disasm_str):
 
 
 @pytest.mark.parametrize('hex_data,disasm_str', [
+    ('90', 'nop'),
+
     ('B0 01', 'mov al, 1'),
     ('66 B8 01', 'mov ax, 1'),
     ('B8 01', 'mov eax, 1'),
@@ -108,7 +112,7 @@ def test_disasm(hex_data, disasm_str):
     ('f30f7e 05 f017ec00', 'movq xmm0, qword [0xEC17F0]'),
     ('660fd6 05 f017ec00', 'movq qword [0xEC17F0], xmm0'),
 ])
-def test_disasm(hex_data, disasm_str):
+def test_disassembler(hex_data, disasm_str):
     test_data = bytes.fromhex(hex_data)
     d = next(disassembler.disassemble(test_data))
     assert str(d) == disasm_str
