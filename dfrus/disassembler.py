@@ -118,7 +118,7 @@ class OneByteNoOperands(Command[DisassemblerCommandContext, DisasmCommandResult]
 @disassembler.command(lambda context: context.data[0] == ret_near_n)
 def command_ret_near_n(context: DisassemblerCommandContext) -> DisasmCommandResult:
     if context.prefix_bytes:
-        raise IllegalCode
+        raise IllegalCode  # FIXME: skip prefixes instead of abortion
 
     immediate = int.from_bytes(bytes(context.data[1:3]), byteorder='little')
     return DisasmCommandResult(size=3, mnemonic='retn', operands=(ImmediateValueOperand(immediate),))
@@ -127,7 +127,7 @@ def command_ret_near_n(context: DisassemblerCommandContext) -> DisasmCommandResu
 @disassembler.command(lambda context: context.data[0] in (call_near, jmp_near))
 def command_call_jmp_near(context: DisassemblerCommandContext) -> DisasmCommandResult:
     if context.prefix_bytes:
-        raise IllegalCode
+        raise IllegalCode  # FIXME: skip prefixes instead of abortion
 
     mnemonic = op_nomask[context.data[0]]
     size = 5
