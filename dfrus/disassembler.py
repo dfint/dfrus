@@ -2,7 +2,7 @@ from typing import Union, Optional, Tuple, Callable, Iterator
 
 from dataclasses import dataclass
 
-from .abstract_executor import Executor, NoSuitableCommandException
+from .abstract_executor import Executor, NoSuitableCommandException, Command
 from .disasm import DisasmLine, seg_prefixes
 from .opcodes import *
 from .operand import Operand, ImmediateValueOperand
@@ -90,22 +90,25 @@ def bytes_line(context: DisassemblerCommandContext):
     )
 
 
-op_1byte_nomask_noargs = {
-    nop: "nop", ret_near: "retn",
-    pushfd: "pushfd", pushad: "pushad",
-    popfd: "popfd", popad: "popad",
-    leave: "leave", int3: "int3",
-    cdq: "cdq", movsb: "movsb", movsd: "movsd",
-}
+@disassembler.command
+class OneByteNoOperands(Command[DisassemblerCommandContext, DisasmCommandResult]):
+    opcode_to_mnemonic = {
+        nop: "nop", ret_near: "retn",
+        pushfd: "pushfd", pushad: "pushad",
+        popfd: "popfd", popad: "popad",
+        leave: "leave", int3: "int3",
+        cdq: "cdq", movsb: "movsb", movsd: "movsd",
+    }
 
+    def is_applicable(self, context: DisassemblerCommandContext) -> bool:
+        return context.data[0] in OneByteNoOperands.opcode_to_mnemonic
 
-@disassembler.command(lambda context: context.data[0] in op_1byte_nomask_noargs)
-def one_byte_no_operands(context: DisassemblerCommandContext):
-    mnemonic = op_1byte_nomask_noargs[context.data[0]]
-    if context.prefix_bytes:  # Are there any prefixes?
-        if context.size_prefix and context.data[0] == movsd:
-            mnemonic = 'movsw'
-        elif context.rep_prefix is None:  # Prefixes other then rep* are not allowed
-            raise IllegalCode
+    def apply(self, context: DisassemblerCommandContext) -> DisasmCommandResult:
+        mnemonic = OneByteNoOperands.opcode_to_mnemonic[context.data[0]]
+        if context.prefix_bytes:  # Are there any prefixes?
+            if context.size_prefix and context.data[0] == movsd:
+                mnemonic = 'movsw'
+            elif context.rep_prefix is None:  # Prefixes other then rep* are not allowed
+                raise IllegalCode
 
-    return DisasmCommandResult(size=1, mnemonic=mnemonic)
+        return DisasmCommandResult(size=1, mnemonic=mnemonic)

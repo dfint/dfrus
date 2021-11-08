@@ -1,11 +1,21 @@
-from abc import ABC
-from typing import TypeVar, List, Generic, Callable
+from abc import ABC, abstractmethod
+from typing import TypeVar, List, Generic, Callable, Union, Type
 
 X = TypeVar("X")
 Y = TypeVar("Y")
 
 
-class Command(Generic[X, Y]):
+class Command(ABC, Generic[X, Y]):
+    @abstractmethod
+    def is_applicable(self, input_object: X) -> bool:
+        ...
+
+    @abstractmethod
+    def apply(self, input_object: X) -> Y:
+        ...
+
+
+class CommandWrapper(Command, Generic[X, Y]):
     def __init__(self, predicate: Callable[[X], bool], function: Callable[[X], Y]):
         self.predicate = predicate
         self.function = function
@@ -35,8 +45,12 @@ class Executor(ABC, Generic[X, Y]):
 
         raise NoSuitableCommandException(f"No suitable command for object {input_object!r}")
 
-    def command(self, predicate: Callable[[X], bool]):
-        def decorator(function: Callable[[X], Y]):
-            self.add_command(Command(predicate, function))
-            return function
-        return decorator
+    def command(self, arg: Union[Type[Command], Callable[[X], bool]]):
+        if isinstance(arg, type(Command)):
+            self.add_command(arg())
+            return arg
+        else:
+            def decorator(function: Callable[[X], Y]):
+                self.add_command(CommandWrapper(arg, function))
+                return function
+            return decorator
