@@ -1,8 +1,8 @@
-from typing import Optional, Tuple, Iterator, Callable
+from typing import Optional, Tuple, Iterator, Callable, Union
 
 from dataclasses import dataclass
 
-from .abstract_executor import Executor, Command, NoSuitableCommandException
+from .abstract_executor import Executor, NoSuitableCommandException
 from .binio import to_signed
 from .opcodes import *
 from .operand import (Operand, ImmediateValueOperand, RegisterOperand, RelativeMemoryReference,
@@ -143,11 +143,6 @@ def create_operands_from_modrm_or_sib(x: ModRmAnalysisResult, size=4) -> Tuple[O
     return op1, op2
 
 
-op_1byte_nomask_noargs = {
-    nop: "nop", ret_near: "retn", pushfd: "pushfd", pushad: "pushad", popfd: "popfd",
-    popad: "popad", leave: "leave", int3: "int3",
-    cdq: "cdq", movsb: "movsb", movsd: "movsd",
-}
 op_nomask = {call_near: "call near", jmp_near: "jmp near", jmp_short: "jmp short"}
 op_FE_width_REG_RM = {test_rm_reg: "test", xchg_rm_reg: "xchg"}
 op_FC_dir_width_REG_RM = {mov_rm_reg: "mov", add_rm_reg: "add", sub_rm_reg: "sub", or_rm_reg: "or", and_rm_reg: "and",
@@ -598,7 +593,8 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
 
 @dataclass
 class DisassemblerCommandContext:
-    code: bytes
+    prefix_bytes: Union[bytes, memoryview]
+    data: Union[bytes, memoryview]
     address: int
     size_prefix: bool = False
     seg_prefix: Optional[Prefix] = None
@@ -611,8 +607,10 @@ class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
         self._default_command: Optional[Callable[[DisassemblerCommandContext], DisasmLine]] = None
 
     def disassemble(self, data: bytes, start_address: int = 0) -> Iterator[DisasmLine]:
+        data = memoryview(data)
         i = 0
         while True:
+            prefix_start = i
             size_prefix = False
             seg_prefix = None
             rep_prefix = None
@@ -628,7 +626,8 @@ class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
                 rep_prefix = Prefix(data[i])
                 i += 1
 
-            context = DisassemblerCommandContext(data[i:], start_address + i, size_prefix, seg_prefix, rep_prefix)
+            context = DisassemblerCommandContext(data[prefix_start:i], data[i:], start_address + i,
+                                                 size_prefix, seg_prefix, rep_prefix)
             try:
                 result = self.execute(context)
             except NoSuitableCommandException:
@@ -640,11 +639,42 @@ class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
             yield result
             i += len(result.data)
 
-    def default(self, predicate: Callable[[DisassemblerCommandContext], bool]):
-        def decorator(function: Callable[[DisassemblerCommandContext], DisasmLine]):
-            self.add_command(Command(predicate, function))
-            return function
-        return decorator
+    def default(self, function: Callable[[DisassemblerCommandContext], DisasmLine]):
+        self._default_command = function
+        return function
+
+
+disassembler = Disassembler()
+
+
+@disassembler.default
+def bytes_line(context: DisassemblerCommandContext):
+    return BytesLine(context.address, data=bytes(context.prefix_bytes) + bytes(context.data[:1]))
+
+
+op_1byte_nomask_noargs = {
+    nop: "nop", ret_near: "retn",
+    pushfd: "pushfd", pushad: "pushad",
+    popfd: "popfd", popad: "popad",
+    leave: "leave", int3: "int3",
+    cdq: "cdq", movsb: "movsb", movsd: "movsd",
+}
+
+
+@disassembler.command(lambda context: context.data[0] in op_1byte_nomask_noargs)
+def one_byte_no_operands(context: DisassemblerCommandContext):
+    mnemonic = op_1byte_nomask_noargs[context.data[0]]
+    if context.prefix_bytes:  # Are there any prefixes?
+        if context.size_prefix and mnemonic == 'movsd':
+            mnemonic = 'movsw'
+        elif context.rep_prefix is None:
+            return BytesLine(context.address, data=context.data[:1])
+
+    return DisasmLine(context.address,
+                      data=bytes(context.prefix_bytes) + bytes(context.data[:1]),
+                      mnemonic=mnemonic,
+                      prefix=context.rep_prefix,
+                      operands=None)
 
 
 def _main(argv):
