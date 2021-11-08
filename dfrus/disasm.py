@@ -1,8 +1,8 @@
-from typing import Optional, Tuple, Iterator
+from typing import Optional, Tuple, Iterator, Callable
 
 from dataclasses import dataclass
 
-from .abstract_executor import Executor
+from .abstract_executor import Executor, Command, NoSuitableCommandException
 from .binio import to_signed
 from .opcodes import *
 from .operand import (Operand, ImmediateValueOperand, RegisterOperand, RelativeMemoryReference,
@@ -606,6 +606,10 @@ class DisassemblerCommandContext:
 
 
 class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
+    def __init__(self):
+        super().__init__()
+        self._default_command: Optional[Callable[[DisassemblerCommandContext], DisasmLine]] = None
+
     def disassemble(self, data: bytes, start_address: int = 0) -> Iterator[DisasmLine]:
         i = 0
         while True:
@@ -625,9 +629,22 @@ class Disassembler(Executor[DisassemblerCommandContext, DisasmLine]):
                 i += 1
 
             context = DisassemblerCommandContext(data[i:], start_address + i, size_prefix, seg_prefix, rep_prefix)
-            result = self.execute(context)
+            try:
+                result = self.execute(context)
+            except NoSuitableCommandException:
+                if self._default_command:
+                    result = self._default_command(context)
+                else:
+                    raise
+
             yield result
             i += len(result.data)
+
+    def default(self, predicate: Callable[[DisassemblerCommandContext], bool]):
+        def decorator(function: Callable[[DisassemblerCommandContext], DisasmLine]):
+            self.add_command(Command(predicate, function))
+            return function
+        return decorator
 
 
 def _main(argv):
