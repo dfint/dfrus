@@ -3,7 +3,8 @@ from typing import Union, Optional, Tuple, Callable, Iterator
 from dataclasses import dataclass
 
 from .abstract_executor import Executor, NoSuitableCommandException, Command
-from .disasm import DisasmLine, seg_prefixes
+from .binio import from_dword
+from .disasm import DisasmLine, seg_prefixes, op_nomask
 from .opcodes import *
 from .operand import Operand, ImmediateValueOperand
 
@@ -121,3 +122,14 @@ def command_ret_near_n(context: DisassemblerCommandContext) -> DisasmCommandResu
 
     immediate = int.from_bytes(bytes(context.data[1:3]), byteorder='little')
     return DisasmCommandResult(size=3, mnemonic='retn', operands=(ImmediateValueOperand(immediate),))
+
+
+@disassembler.command(lambda context: context.data[0] in (call_near, jmp_near))
+def command_call_jmp_near(context: DisassemblerCommandContext) -> DisasmCommandResult:
+    if context.prefix_bytes:
+        raise IllegalCode
+
+    mnemonic = op_nomask[context.data[0]]
+    size = 5
+    immediate = context.address + size + from_dword(context.data[1:5], signed=True)
+    return DisasmCommandResult(size, mnemonic, operands=(ImmediateValueOperand(immediate),))

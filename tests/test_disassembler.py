@@ -5,6 +5,7 @@ from dfrus.disassembler import disassembler
 
 @pytest.mark.parametrize('hex_data,disasm_str', [
     ('90', 'nop'),
+    ('E9 FA FF 00 00', 'jmp near 0xFFFF'),
 
     ('B0 01', 'mov al, 1'),
     ('66 B8 01', 'mov ax, 1'),
