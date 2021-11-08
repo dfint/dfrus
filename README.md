@@ -4,4 +4,4 @@
 [![codecov](https://codecov.io/gh/dfint/dfrus/branch/develop/graph/badge.svg?token=PKw7KdAswK)](https://codecov.io/gh/dfint/dfrus)
 ![Warning: Legacy!](https://img.shields.io/badge/Warning-Legacy!-red)
 
-Patcher for text in the executable of the Dwarf Fortress game
+A patcher for a text hard-coded into an executable of the Dwarf Fortress game
