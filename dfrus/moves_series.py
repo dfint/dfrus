@@ -1,7 +1,8 @@
-from _warnings import warn
 from binascii import hexlify
-from dataclasses import dataclass, field
 from typing import Set, Mapping, Union, Optional, Dict
+from warnings import warn
+
+from dataclasses import dataclass, field
 
 from .binio import to_dword, from_dword
 from .disasm import disasm
