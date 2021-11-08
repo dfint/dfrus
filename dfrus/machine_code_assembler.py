@@ -1,7 +1,7 @@
-from dfrus.disasm import join_byte
-from dfrus.machine_code_builder import MachineCodeBuilder
-from dfrus.opcodes import *
-from dfrus.operand import Operand, RelativeMemoryReference
+from .disasm import join_byte
+from .machine_code_builder import MachineCodeBuilder
+from .opcodes import *
+from .operand import Operand, RelativeMemoryReference
 
 
 class MachineCodeAssembler(MachineCodeBuilder):
