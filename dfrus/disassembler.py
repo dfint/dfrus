@@ -112,3 +112,12 @@ class OneByteNoOperands(Command[DisassemblerCommandContext, DisasmCommandResult]
                 raise IllegalCode
 
         return DisasmCommandResult(size=1, mnemonic=mnemonic)
+
+
+@disassembler.command(lambda context: context.data[0] == ret_near_n)
+def command_ret_near_n(context: DisassemblerCommandContext) -> DisasmCommandResult:
+    if context.prefix_bytes:
+        raise IllegalCode
+
+    immediate = int.from_bytes(bytes(context.data[1:3]), byteorder='little')
+    return DisasmCommandResult(size=3, mnemonic='retn', operands=(ImmediateValueOperand(immediate),))
