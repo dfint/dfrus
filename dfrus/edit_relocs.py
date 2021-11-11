@@ -1,36 +1,27 @@
-import sys
 from ast import literal_eval
 from functools import partial
-from typing import Callable, Set, BinaryIO, Sequence, Iterable, Tuple, Iterator
+from typing import Callable, Set, BinaryIO, Sequence, List
+
+import click
 
 from .peclasses import PortableExecutable, RelocationTable
 
 
-def group_args(args) -> Iterator[Tuple[str, Sequence[int]]]:
-    operators = {'+', '-', '-*'}
-    op = None
-    list_start = None
-    for i, item in enumerate(args):
-        if op is None or item in operators:
-            if list_start is not None:
-                yield op, args[list_start:i]
-            op = item
-            list_start = i + 1
-        else:
-            try:
-                arg = literal_eval(item)
-                assert isinstance(arg, int)
-            except (ValueError, AssertionError):
-                print(f'{item!r} is not an integer number')
-                raise
-
-            args[i] = arg
-
-    if op is not None:
-        yield op, args[list_start:]
+def int_literal_converter(value: str) -> int:
+    try:
+        arg = literal_eval(value)
+        assert isinstance(arg, int)
+        return arg
+    except (ValueError, AssertionError):
+        print(f'{value!r} is not an integer number')
+        raise
 
 
-def common(file: BinaryIO, functions: Iterable[Callable[[Set[int]], Set[int]]]):
+def list_int_literal_converter(values: List[str]) -> List[int]:
+    return list(map(int_literal_converter, values))
+
+
+def common(file: BinaryIO, function: Callable[[Set[int]], Set[int]]):
     pe = PortableExecutable(file)
     data_directory = pe.image_data_directory
     sections = pe.section_table
@@ -38,8 +29,7 @@ def common(file: BinaryIO, functions: Iterable[Callable[[Set[int]], Set[int]]]):
     reloc_off = sections.rva_to_offset(reloc_rva)
     relocs = set(pe.relocation_table)
 
-    for function in functions:
-        relocs = function(relocs)
+    relocs = function(relocs)
 
     new_relocation_table = RelocationTable.build(relocs)
     new_size = new_relocation_table.size
@@ -73,10 +63,10 @@ def remove_items(items: Sequence[int], relocs: Set[int]) -> Set[int]:
 
 def remove_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
     if len(items) < 2:
-        print('"-*" operation needs 2 arguments. Operation skipped.')
+        print('Range remove operation needs 2 arguments. Operation skipped.')
         return relocs
     elif len(items) > 2:
-        print('"-*" operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}.'.format(
+        print('Range remove operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}.'.format(
             *items[:2]))
     lower_bound, upper_bound = items[:2]
     relocs_in_range = list(filter(lambda x: lower_bound <= x <= upper_bound, relocs))
@@ -89,33 +79,26 @@ def remove_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
         return set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
 
 
-def _main():
-    cmd = sys.argv
+@click.command()
+@click.argument("file", type=click.File(mode='rb+'))
+@click.argument("command", type=click.Choice(["add", "remove", "remove_range"]))
+@click.argument("items", nargs=-1, type=str, required=True,
+                callback=lambda _, __, values: list_int_literal_converter(values))
+def _main(
+        file: BinaryIO,
+        command: str,
+        items: List[int]
+):
+    function = None
+    if command == "add":
+        function = partial(add_items, items)
+    elif command == "remove":
+        function = partial(remove_items, items)
+    elif command == "remove_range":
+        function = partial(remove_range, items)
 
-    # cmd.extend(["d:\Games\df_40_13_win_s\Dwarf Fortress 1.exe", "-*", "0x3fdaa0", "0x3fdb1f"])
-    # print(cmd)
-
-    if len(cmd) < 3:
-        print('Usage:')
-        print('python file.exe + 0x123 0x345 0x567 # add relocations')
-        print('python file.exe - 0x123 0x345 0x567 # remove specific relocations')
-        print('python file.exe -* 0x123 0x567 # remove relocations from the range')
-    else:
-        args = list(group_args(cmd[2:]))
-
-        functions = []
-        for op, items in args:
-            if op == '+':
-                functions.append(partial(add_items, items))
-            elif op == '-':
-                functions.append(partial(remove_items, items))
-            elif op == '-*':
-                functions.append(partial(remove_range, items))
-            else:
-                print('Wrong operation: "%s". Skipped.' % cmd[2])
-
-        with open(cmd[1], 'r+b') as fn:
-            common(fn, functions)
+    if function:
+        common(file, function)
 
 
 if __name__ == '__main__':
