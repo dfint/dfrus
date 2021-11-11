@@ -29,5 +29,11 @@ def test_remove_items():
     assert remove_items((3, 4, 5), {1, 2, 3}) == {1, 2}
 
 
-def test_remove_range():
-    assert remove_range((3, 4), {1, 2, 3, 4, 5, 6}) == {1, 2, 5, 6}
+@pytest.mark.parametrize("items, relocs, expected", [
+    ((3, 4), {1, 2, 3, 4, 5, 6}, {1, 2, 5, 6}),
+    ((3,), {1, 2, 3, 4, 5, 6}, {1, 2, 3, 4, 5, 6}),
+    ((3, 4, 5), {1, 2, 3, 4, 5, 6}, {1, 2, 5, 6}),
+    ((3, 4), {1, 2, 5, 6}, {1, 2, 5, 6}),
+])
+def test_remove_range(items, relocs, expected):
+    assert remove_range(items, relocs) == expected
