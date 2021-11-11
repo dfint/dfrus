@@ -52,13 +52,11 @@ def common(file: BinaryIO, function: Callable[[Set[int]], Set[int]]):
 
 
 def add_items(items: Sequence[int], relocs: Set[int]) -> Set[int]:
-    relocs.update(items)
-    return relocs
+    return relocs | set(items)
 
 
 def remove_items(items: Sequence[int], relocs: Set[int]) -> Set[int]:
-    relocs.difference(items)
-    return relocs
+    return relocs - set(items)
 
 
 def remove_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
