@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus.edit_relocs import int_literal_converter, list_int_literal_converter
+from dfrus.edit_relocs import int_literal_converter, list_int_literal_converter, add_items, remove_items, remove_range
 
 
 @pytest.mark.parametrize("values, expected_result", [
@@ -19,3 +19,15 @@ def test_list_int_literal_converter(values, expected_result):
 def test_int_literal_converter_raises_error(value):
     with pytest.raises(Exception):
         int_literal_converter(value)
+
+
+def test_add_items():
+    assert add_items((3, 4, 5), {1, 2, 3}) == {1, 2, 3, 4, 5}
+
+
+def test_remove_items():
+    assert remove_items((3, 4, 5), {1, 2, 3}) == {1, 2}
+
+
+def test_remove_range():
+    assert remove_range((3, 4), {1, 2, 3, 4, 5, 6}) == {1, 2, 5, 6}
