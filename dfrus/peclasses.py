@@ -42,9 +42,6 @@ class ImageDosHeader(AnnotatedStructure):
     e_lfanew: c_uint
 
 
-print(sizeof(ImageDosHeader))
-
-
 class ImageFileHeader(AnnotatedStructure):
     machine: c_ushort
     number_of_sections: c_ushort
