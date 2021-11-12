@@ -88,7 +88,7 @@ def find_next_string_xref(s_xrefs, i, obj_off):
     return s_xrefs[i]
 
 
-def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
+def extract_strings(fn, xrefs, block_size=4096, encoding='cp437', arrays=False):
     prev_string = None
     current_string = None
     s_xrefs = sorted(xrefs)
@@ -97,7 +97,7 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
             continue  # it's not the beginning of the string
 
         fn.seek(obj_off)
-        buf = fn.read(blocksize)
+        buf = fn.read(block_size)
 
         s_len, letters = check_string(buf, encoding)
 
