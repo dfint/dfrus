@@ -75,14 +75,6 @@ def check_string_array(buf, offset, encoding='cp437'):
             yield offset + start, buf[start:end], len(buf) - start - 1
 
 
-def count_zeros(buf):
-    for i, item in enumerate(buf):
-        if item:
-            return i
-
-    return len(buf)
-
-
 def find_next_string_xref(s_xrefs, i, obj_off):
     i += 1
     if i >= len(s_xrefs):
