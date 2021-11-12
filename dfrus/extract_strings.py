@@ -1,4 +1,3 @@
-import sys
 from collections import Counter
 from typing import Tuple
 
@@ -7,6 +6,7 @@ import click
 from .cross_references import get_cross_references
 from .disasm import align
 from .peclasses import PortableExecutable
+from .pretty_printing import myrepr
 
 forbidden = set(b'$^')
 
@@ -132,14 +132,6 @@ def extract_strings(fn, xrefs, blocksize=4096, encoding='cp437', arrays=False):
                         yield current_string
 
             prev_string = current_string
-
-
-def myrepr(s):
-    text = repr(s)
-    if sys.stdout:
-        b = text.encode(sys.stdout.encoding, 'backslashreplace')
-        text = b.decode(sys.stdout.encoding, 'strict')
-    return text
 
 
 @click.command()
