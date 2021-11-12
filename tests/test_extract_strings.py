@@ -4,6 +4,7 @@ from dfrus.extract_strings import check_string_array, check_string
 
 
 @pytest.mark.parametrize('test_data,encoding,expected', [
+    (b'', 'cp437', (0, 0)),
     (b'12345\0', 'cp437', (5, 0)),
     (b'12345\xFF\0', 'utf-8', (0, 0)),
     (b'1a345a\xFF\0', 'utf-8', (0, 2)),
