@@ -59,7 +59,7 @@ def generate_charmap_table_patch(enc1: str, enc2: str) -> Mapping[int, int]:
 
 
 @functools.lru_cache(maxsize=None)
-def get_codepages() -> Mapping[str, Mapping[int, Union[int, Iterable[int]]]]:
+def get_supported_codepages() -> Mapping[str, Mapping[int, Union[int, Iterable[int]]]]:
     codepages: Dict[str, Mapping[int, Union[int, Iterable[int]]]] = dict()
 
     for i in range(700, 1253):
@@ -74,7 +74,7 @@ def get_codepages() -> Mapping[str, Mapping[int, Union[int, Iterable[int]]]]:
 
 
 def patch_unicode_table(file: BinaryIO, offset: Offset, codepage: str) -> None:
-    cp = get_codepages()[codepage]
+    cp = get_supported_codepages()[codepage]
     for item in cp:
         fpoke4(file, offset + item * 4, cp[item])
 
@@ -110,7 +110,7 @@ def get_encoder(encoding: str) -> Callable[[str], Tuple[bytes, int]]:
     try:
         return codecs.getencoder(encoding)
     except LookupError as ex:
-        if encoding in get_codepages():
+        if encoding in get_supported_codepages():
             return _encoders[encoding].encode
         else:
             raise ex

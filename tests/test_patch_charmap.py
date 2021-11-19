@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus.patch_charmap import Encoder, ord_utf16, get_encoder, get_codepages
+from dfrus.patch_charmap import Encoder, ord_utf16, get_encoder, get_supported_codepages
 
 
 @pytest.mark.parametrize('codepage_data,input_string,expected', [
@@ -17,5 +17,5 @@ def test_combining_grave_accent():
 
 
 def test_get_codepages():
-    for codepage in get_codepages():
+    for codepage in get_supported_codepages():
         assert codepage in {'cp437', 'viscii'} or int(codepage[2:]) in range(700, 1253)
