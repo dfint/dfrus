@@ -18,7 +18,9 @@ def test_combining_grave_accent():
 
 def test_get_codepages():
     for codepage in get_supported_codepages():
-        assert codepage in {'cp437', 'viscii'} or int(codepage[2:]) in range(700, 1253)
+        assert (codepage in {'cp437', 'viscii'}
+                or "_" in codepage and int(codepage.partition("_")[2]) in range(1, 17)  # iso codepages
+                or int(codepage[2:]) in range(700, 1253))  # cp codepages
 
 
 def can_be_encoded(text: str, encoding):
