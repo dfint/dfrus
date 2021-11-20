@@ -19,3 +19,17 @@ def test_combining_grave_accent():
 def test_get_codepages():
     for codepage in get_supported_codepages():
         assert codepage in {'cp437', 'viscii'} or int(codepage[2:]) in range(700, 1253)
+
+
+def can_be_encoded(text: str, encoding):
+    try:
+        text.encode(encoding)
+    except UnicodeEncodeError:
+        return False
+    else:
+        return True
+
+
+def test_esperanto():
+    text = " ĉirkaŭprenas "
+    assert any(can_be_encoded(text, encoding) for encoding in get_supported_codepages())
