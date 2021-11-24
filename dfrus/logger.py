@@ -10,8 +10,8 @@ def logger() -> logging.Logger:
 
     file_handler = RotatingFileHandler("dfrus.log", maxBytes=1024**2, backupCount=1, encoding="utf-8")
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s "
-                                  "(%(filename)s).%(funcName)s(%(lineno)d): %(message)s")
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] (%(filename)s).%(funcName)s(%(lineno)d): "
+                                  "%(message)s")
 
     file_handler.setFormatter(formatter)
     log.addHandler(file_handler)
