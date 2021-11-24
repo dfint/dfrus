@@ -6,7 +6,8 @@ from logging.handlers import RotatingFileHandler
 
 @lru_cache()
 def logger() -> logging.Logger:
-    log = logging.Logger(name="dfrus")
+    log = logging.getLogger(name="dfrus")
+    log.setLevel(logging.INFO)
 
     file_handler = RotatingFileHandler("dfrus.log", maxBytes=1024**2, backupCount=1, encoding="utf-8")
 

@@ -1,3 +1,4 @@
+import logging
 import os.path
 import sys
 from contextlib import contextmanager
@@ -69,6 +70,8 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
         dict_slice=None, debug=False, stdout=None, stderr=None):
 
     log = logger()
+    if debug:
+        log.setLevel(logging.DEBUG)
 
     if stdout is not None:
         sys.stdout = stdout
