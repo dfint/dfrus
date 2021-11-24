@@ -1,11 +1,12 @@
 import logging
-from logging.handlers import RotatingFileHandler
+import sys
 from functools import lru_cache
+from logging.handlers import RotatingFileHandler
 
 
 @lru_cache()
-def get_logger() -> logging.Logger:
-    logger = logging.Logger(name="dfrus")
+def logger() -> logging.Logger:
+    log = logging.Logger(name="dfrus")
 
     file_handler = RotatingFileHandler("dfrus.log", maxBytes=1024**2, backupCount=1, encoding="utf-8")
 
@@ -13,10 +14,13 @@ def get_logger() -> logging.Logger:
                                   "(%(filename)s).%(funcName)s(%(lineno)d): %(message)s")
 
     file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    log.addHandler(file_handler)
 
-    return logger
+    return log
 
 
-def get_stream_handler(stream) -> logging.StreamHandler:
-    return logging.StreamHandler(stream)
+def create_stream_handler(stream) -> logging.StreamHandler:
+    if stream:
+        return logging.StreamHandler(stream)
+    else:
+        return logging.StreamHandler(sys.stdout)
