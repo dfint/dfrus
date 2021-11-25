@@ -20,5 +20,5 @@ Includes:
 - Custom parser of the Portable Executable format (see `peclasses.py` module). I tried to migrate to the [pefile](https://github.com/erocarrera/pefile) module, but it turned out that our implementation is faster and easier to use (e.g., IDE shows field names of PE Structures as you type code)
 - Command-line relocation table editor (see `edit_relocs.py`)
 - Custom disassembler engine (see `disasm.py` module). It is planned to replace it with some fully functional engine (e.g., [zydis-py](https://github.com/zyantific/zydis-py)), because it needs too much effort to develop.
-- Machine code builder class and some simple assembly DSL implementation (see `machine_code_builder.py`, `machine_code_assembler.py`, and `machine_code_utils.py` as a demonstration)
+- Machine code builder class and some simple assembly DSL implementation (only a few assembly commands are implemented yet). See `machine_code_builder.py`, `machine_code_assembler.py`, and `machine_code_utils.py` as a demonstration.
 
