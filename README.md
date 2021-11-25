@@ -21,4 +21,4 @@ Includes:
 - Command-line relocation table editor (see `edit_relocs.py`)
 - Custom disassembler engine (see `disasm.py` module). It is planned to replace it with some fully functional engine (e.g., [zydis-py](https://github.com/zyantific/zydis-py)), because it needs too much effort to develop.
 - Machine code builder class and some simple assembly DSL implementation (only a few assembly commands are implemented yet). See `machine_code_builder.py`, `machine_code_assembler.py`, and `machine_code_utils.py` as a demonstration.
-
+- A metaclass that makes possible to create ctypes structures in a dataclass style. See implementation in `ctypes_annotated_structure.py` module and usage examples in `peclasses.py`.
