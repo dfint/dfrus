@@ -9,7 +9,7 @@ from .binio import fpoke4, fpoke, to_dword
 from .cross_references import get_cross_references
 from .disasm import align
 from .extract_strings import extract_strings
-from .logger import logger
+from .logger import get_logger
 from .machine_code_assembler import asm
 from .machine_code_utils import mach_strlen
 from .metadata_objects import Metadata, Fix
@@ -27,7 +27,7 @@ code_section, rdata_section, data_section = range(3)
 
 
 def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str], debug=False):
-    log = logger()
+    log = get_logger()
 
     print("Finding cross-references...")
 

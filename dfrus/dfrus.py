@@ -8,13 +8,13 @@ from typing import Sequence, Tuple, Union, Dict, Iterable
 import click
 
 from .dictionary_loaders import load_trans_file
-from .logger import logger, create_stream_handler
+from .logger import get_logger, init_logger
 from .patchdf import fix_df_exe
 from .peclasses import PortableExecutable
 
 
 def slice_translation(trans_table: Union[Dict[str, str], Iterable[Tuple[str, str]]], bounds) -> Dict[str, str]:
-    log = logger()
+    log = get_logger()
     if isinstance(trans_table, dict):
         trans_table = list(trans_table.items())
     else:
@@ -69,19 +69,16 @@ def destination_file_context(src, dest):
 def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, original_codepage="cp437",
         dict_slice=None, debug=False, stdout=None, stderr=None):
 
-    log = logger()
+    log = init_logger("dfrus.log", stdout, stderr)
+
     if debug:
         log.setLevel(logging.DEBUG)
 
     if stdout is not None:
         sys.stdout = stdout
 
-    create_stream_handler(stdout)
-
     if stderr is not None:
         sys.stderr = stderr
-
-    # TODO: add a separate handler for the logger for ERROR and CRITICAL levels (to show such entries in red in GUI)
 
     if not path or not os.path.exists(path):
         df1 = "Dwarf Fortress.exe"
