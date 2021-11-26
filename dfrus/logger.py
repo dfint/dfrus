@@ -9,6 +9,8 @@ from logging.handlers import RotatingFileHandler
 def get_logger() -> logging.Logger:
     log = logging.getLogger(name="dfrus")
     log.setLevel(logging.INFO)
+    log.addHandler(logging.StreamHandler(sys.stdout))
+    log.addHandler(create_rotating_file_handler("dfrus.log"))
     return log
 
 
@@ -22,18 +24,11 @@ def create_rotating_file_handler(filename) -> RotatingFileHandler:
     return file_handler
 
 
-def create_stdout_stream_handler(stream) -> logging.StreamHandler:
-    if stream:
-        return logging.StreamHandler(stream)
-    else:
-        return logging.StreamHandler(sys.stdout)
-
-
 def create_separate_stream_handlers(stdout, stderr) -> Iterable[logging.StreamHandler]:
     """
     Create two separate logging handlers, one for errors (level ERROR or CRITICAL), one for all other levels
     """
-    stdout_stream = create_stdout_stream_handler(stdout)
+    stdout_stream = logging.StreamHandler(stdout)
     stdout_stream.addFilter(lambda record: record.level < logging.ERROR)
     stderr_stream = logging.StreamHandler(stderr)
     stderr_stream.setLevel(logging.ERROR)
@@ -41,16 +36,15 @@ def create_separate_stream_handlers(stdout, stderr) -> Iterable[logging.StreamHa
 
 
 def create_stream_handlers(stdout, stderr) -> Iterable[logging.StreamHandler]:
-    if stderr is None:
-        return [create_stdout_stream_handler(stdout)]
+    if not stderr:
+        if stdout:
+            return [logging.StreamHandler(stdout)]
     else:
         return create_separate_stream_handlers(stdout, stderr)
 
 
-def init_logger(log_file_name, stdout, stderr) -> logging.Logger:
+def init_logger(stdout, stderr) -> logging.Logger:
     log = get_logger()
-
-    log.addHandler(create_rotating_file_handler(log_file_name))
 
     for handler in create_stream_handlers(stdout, stderr):
         log.addHandler(handler)

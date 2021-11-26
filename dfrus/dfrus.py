@@ -49,36 +49,29 @@ def slice_translation(trans_table: Union[Dict[str, str], Iterable[Tuple[str, str
 
 @contextmanager
 def destination_file_context(src, dest):
-    print("Copying '{}'\nTo '{}'...".format(src, dest))
+    log = get_logger()
+    log.info("Copying '{}'\nTo '{}'...".format(src, dest))
     try:
         copy(src, dest)
     except IOError as ex:
-        print(f"Failed: {ex}")
+        log.error(f"Failed: {ex}")
         sys.exit()
     else:
-        print("Success.")
+        log.info("Success.")
     
     try:
         yield dest
     except Exception as ex:
-        # print("Removing '{}'".format(dest))
-        # os.remove(dest)
         raise ex
 
 
 def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, original_codepage="cp437",
         dict_slice=None, debug=False, stdout=None, stderr=None):
 
-    log = init_logger("dfrus.log", stdout, stderr)
+    log = init_logger(stdout, stderr)
 
     if debug:
         log.setLevel(logging.DEBUG)
-
-    if stdout is not None:
-        sys.stdout = stdout
-
-    if stderr is not None:
-        sys.stderr = stderr
 
     if not path or not os.path.exists(path):
         df1 = "Dwarf Fortress.exe"
@@ -146,7 +139,7 @@ SLICE_PARAM = SliceParam()
 def _main(path, dest, dictionary, debug, codepage, original_codepage, dict_slice):
     """A patcher for the hardcoded strings of the Dwarf Fortress"""
 
-    print("Loading translation file...")
+    get_logger().info("Loading translation file...")
 
     with open(dictionary, encoding="utf-8") as trans:
         trans_table = list(load_trans_file(trans))
