@@ -129,10 +129,10 @@ def analyze_reference_code(fn: BinaryIO,
                                     # mov dword [esi+14h], oldlen
                                     m.byte(mov_rm_imm | 1).modrm(1, 0, Reg.esi).byte(0x14).dword(old_len)
 
-                                m.byte(call_near).relative_reference(name="func")  # call near func
+                                m.byte(call_near).relative_reference(name="func", size=4)  # call near func
                                 # Restore original edi value for the case if it is used further in the code:
                                 m.mov_reg_imm(Reg.edi, old_len)  # mov edi, old_len
-                                m.byte(jmp_near).relative_reference(name="return_addr")  # jmp near return_addr
+                                m.byte(jmp_near).relative_reference(name="return_addr", size=4)  # jmp near return_addr
 
                                 operand = line.operand1
                                 assert isinstance(operand, ImmediateValueOperand)

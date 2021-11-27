@@ -353,7 +353,7 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
                 mach.set_values(dest=dest_rva)
             else:
                 # Add jump from the hook
-                mach.byte(jmp_near).relative_reference(dest_rva)
+                mach.byte(jmp_near).relative_reference(dest_rva, size=4)
 
         assert mach is not None
         # Write the hook to the new section
