@@ -34,7 +34,10 @@ class Fix:
         new_code = fix.new_code
         assert new_code is not None
         old_code = self.new_code
-        assert old_code is not None and new_code is not None
-        if new_code.build() not in old_code.build():  # FIXME: probably this check needs to be optimized
+        assert new_code is not None
+        if old_code is None:
+            fix.new_code = new_code
+            self.update(fix)
+        elif new_code.build() not in old_code.build():  # FIXME: probably this check needs to be optimized
             fix.new_code = new_code + old_code
             self.update(fix)
