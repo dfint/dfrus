@@ -37,12 +37,11 @@ def trace_code(fn: BinaryIO,
     s = read_bytes(fn, offset, count_after)
     with suppress(IndexError):
         for line in disasm(s, offset):
-            # print('%-8x\t%-16s\t%s' % (line.address, ' '.join('%02x' % x for x in line.data), line))
-            if line.mnemonic == 'db':
+            if line.mnemonic == "db":
                 return None
             elif stop_cond(line):  # Stop when the stop_cond returns True
                 return line
-            elif line.mnemonic.startswith('jmp'):
+            elif line.mnemonic.startswith("jmp"):
                 operand = line.operand1
                 assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_jmp is Trace.not_follow:
@@ -54,7 +53,7 @@ def trace_code(fn: BinaryIO,
                 elif trace_config.trace_jmp is Trace.forward_only:
                     if int(operand) > line.address:
                         return trace_code(fn, int(operand), stop_cond, trace_config)
-            elif line.mnemonic.startswith('j'):
+            elif line.mnemonic.startswith("j"):
                 operand = line.operand1
                 assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_jcc is Trace.not_follow:
@@ -66,21 +65,21 @@ def trace_code(fn: BinaryIO,
                 elif trace_config.trace_jcc is Trace.forward_only:
                     if int(operand) > line.address:
                         return trace_code(fn, int(operand), stop_cond, trace_config)
-            elif line.mnemonic.startswith('call'):
+            elif line.mnemonic.startswith("call"):
                 operand = line.operand1
                 assert isinstance(operand, AbsoluteMemoryReference)
                 if trace_config.trace_call is Trace.not_follow:
                     pass
                 elif trace_config.trace_call is Trace.follow:
                     returned = trace_code(fn, int(operand), stop_cond, trace_config)
-                    if returned is None or not returned.mnemonic.startswith('ret'):
+                    if returned is None or not returned.mnemonic.startswith("ret"):
                         return returned
                 elif trace_config.trace_call is Trace.stop:
                     return line
                 elif trace_config.trace_call is Trace.forward_only:
                     if int(operand) > line.address:
                         return trace_code(fn, int(operand), stop_cond, trace_config)
-            elif line.mnemonic.startswith('ret'):
+            elif line.mnemonic.startswith("ret"):
                 return line
 
     return None
@@ -95,17 +94,17 @@ class FunctionInformation:
 
 def which_func(fn, offset, stop_cond=lambda _: False) -> FunctionInformation:
     disasm_line = trace_code(fn, offset, stop_cond=lambda current_line:
-                             str(current_line).startswith('rep') or stop_cond(current_line))
+                             str(current_line).startswith("rep") or stop_cond(current_line))
 
     if disasm_line is None:
-        return FunctionInformation('not reached')
-    elif str(disasm_line).startswith('rep'):
+        return FunctionInformation("not reached")
+    elif str(disasm_line).startswith("rep"):
         return FunctionInformation(str(disasm_line))
-    elif disasm_line.mnemonic.startswith('call'):
+    elif disasm_line.mnemonic.startswith("call"):
         operand = disasm_line.operand1
         if isinstance(operand, AbsoluteMemoryReference):
             return FunctionInformation(disasm_line.mnemonic, disasm_line.address, int(operand))
         else:
-            return FunctionInformation(disasm_line.mnemonic + ' indirect', disasm_line.address, str(operand))
+            return FunctionInformation(disasm_line.mnemonic + " indirect", disasm_line.address, str(operand))
     else:
-        return FunctionInformation('not reached')
+        return FunctionInformation("not reached")

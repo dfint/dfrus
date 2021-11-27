@@ -1,8 +1,7 @@
 from binascii import hexlify
+from dataclasses import dataclass, field
 from typing import Set, Mapping, Union, Optional, Dict
 from warnings import warn
-
-from dataclasses import dataclass, field
 
 from .binio import to_dword, from_dword
 from .disasm import disasm
@@ -43,8 +42,8 @@ def get_fix_for_moves(get_length_info: MovesSeriesAnalysisResult, newlen, string
         mach = asm().call_near("call_address")
         if len(mach) > get_length_info.length:
             # Too tight here, even for a procedure call
-            meta.fixed = 'no'
-            meta.cause = 'to tight to call'
+            meta.fixed = "no"
+            meta.cause = "to tight to call"
             return Fix(meta=meta)
 
     mach.duplicate_byte(nop, get_length_info.length - len(mach))
@@ -71,7 +70,7 @@ def get_fix_for_moves(get_length_info: MovesSeriesAnalysisResult, newlen, string
             pokes=pokes,
         )
 
-    meta.fixed = 'yes'
+    meta.fixed = "yes"
     fix.meta = meta
     return fix
 
@@ -123,11 +122,11 @@ def analyze_moves_series(data: bytes,
             length = offset
             break
 
-        if line.mnemonic == 'db':
-            raise ValueError('Unknown instruction encountered: '
+        if line.mnemonic == "db":
+            raise ValueError("Unknown instruction encountered: "
                              + hexlify(data[line.address:line.address + 8]).decode())
 
-        if line.mnemonic.startswith('mov') and not line.mnemonic.startswith('movs'):
+        if line.mnemonic.startswith("mov") and not line.mnemonic.startswith("movs"):
             assert line.operands is not None
             left_operand, right_operand = line.operands
             if isinstance(left_operand, RegisterOperand):
@@ -136,8 +135,8 @@ def analyze_moves_series(data: bytes,
                 if (not is_empty(reg_state, left_operand.reg)
                         and isinstance(right_operand, RelativeMemoryReference)
                         and left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
-                    warn(f'{left_operand} register is already marked as occupied. '
-                         f'String address: 0x{original_string_address:x}', stacklevel=2)
+                    warn(f"{left_operand} register is already marked as occupied. "
+                         f"String address: 0x{original_string_address:x}", stacklevel=2)
 
                 if isinstance(right_operand, AbsoluteMemoryReference):
                     # mov reg, [mem]
@@ -177,7 +176,7 @@ def analyze_moves_series(data: bytes,
                                     and left_operand.index_reg is not None)
 
                         if reg_state[right_operand.reg.parent] == 0:
-                            raise ValueError('Copying of a string to several different locations not supported.')
+                            raise ValueError("Copying of a string to several different locations not supported.")
 
                         if dest is None:
                             dest = left_operand
@@ -226,9 +225,9 @@ def analyze_moves_series(data: bytes,
                     saved_mach += line.data
             else:
                 # Segment register etc.
-                raise ValueError('Unallowed left operand type: %s, type is %r, instruction is `%s`' %
-                                 (left_operand, type(left_operand), str(line)))
-        elif line.mnemonic == 'lea':
+                raise ValueError("Unallowed left operand type: {}, type is {!r}, instruction is `{}`"
+                                 .format(left_operand, type(left_operand), str(line)))
+        elif line.mnemonic == "lea":
             assert line.operands is not None
             left_operand, right_operand = line.operands
 
@@ -242,19 +241,19 @@ def analyze_moves_series(data: bytes,
                 dest = RelativeMemoryReference(base_reg=left_operand.reg, disp=0)
 
             saved_mach += line.data
-        elif line.mnemonic.startswith('j'):
-            if line.mnemonic.startswith('jmp'):
+        elif line.mnemonic.startswith("j"):
+            if line.mnemonic.startswith("jmp"):
                 not_moveable_after = not_moveable_after or offset
                 jump_destination = line.operand1
                 assert isinstance(jump_destination, ImmediateValueOperand)
                 data_after_jump = data[jump_destination.value:]
                 if not data_after_jump:
-                    raise ValueError('Cannot jump: jump destination not included in the passed machinecode.')
+                    raise ValueError("Cannot jump: jump destination not included in the passed machinecode.")
 
                 result = analyze_moves_series(data_after_jump, oldlen - copied_len - 1,
                                               original_string_address, reg_state, dest)
                 dest = result.dest
-                if 'short' in line.mnemonic:
+                if "short" in line.mnemonic:
                     disp = line.data[1] + result.length
                     pokes = {offset + 1: disp}
                 else:
@@ -262,38 +261,38 @@ def analyze_moves_series(data: bytes,
                     pokes = {offset + 1: to_dword(disp)}
                 break
             else:
-                raise ValueError('Conditional jump encountered at offset 0x%02x' % line.address)
+                raise ValueError("Conditional jump encountered at offset 0x{:02x}".format(line.address))
         else:
-            if line.prefix and line.prefix.name.startswith('rep'):
+            if line.prefix and line.prefix.name.startswith("rep"):
                 reg_state[Reg.ecx] = None  # Mark ecx as unoccupied
-            if line.mnemonic.startswith('movs'):
+            if line.mnemonic.startswith("movs"):
                 reg_state[Reg.esi] = None
                 reg_state[Reg.edi] = None
-            elif line.mnemonic.startswith('set'):
+            elif line.mnemonic.startswith("set"):
                 # setz, setnz etc.
                 operand = line.operand1
                 assert isinstance(operand, RegisterOperand)
                 reg_state[operand.reg.parent] = -1
-            elif line.mnemonic == 'push':
+            elif line.mnemonic == "push":
                 operand = line.operand1
                 if isinstance(operand, RegisterOperand) and operand.reg.type == RegType.general:
                     reg_state[operand.reg.parent] = None  # Mark the pushed register as unoccupied
                 not_moveable_after = not_moveable_after or offset
-            elif line.mnemonic == 'pop':
+            elif line.mnemonic == "pop":
                 operand = line.operand1
                 if isinstance(operand, RegisterOperand) and operand.reg.type == RegType.general:
                     reg_state[operand.reg.parent] = -1
                 not_moveable_after = not_moveable_after or offset
-            elif line.mnemonic in {'add', 'sub', 'and', 'xor', 'or'}:
+            elif line.mnemonic in {"add", "sub", "and", "xor", "or"}:
                 operand = line.operand1
                 if isinstance(operand, RegisterOperand) and operand.reg.type == RegType.general:
                     assert operand.reg is not None
                     if operand.reg == Reg.esp:
                         not_moveable_after = not_moveable_after or offset
                     reg_state[operand.reg.parent] = -1
-            elif line.mnemonic.startswith('call'):
+            elif line.mnemonic.startswith("call"):
                 not_moveable_after = not_moveable_after or offset
-            elif line.mnemonic.startswith('ret'):
+            elif line.mnemonic.startswith("ret"):
                 break
 
             if is_moveable():
@@ -321,9 +320,9 @@ def analyze_moves_series(data: bytes,
     if not is_moveable():
         length = not_moveable_after  # return length of code which can be moved harmlessly
     if length is None:
-        raise ValueError('Length of the copying code not recognized.')
+        raise ValueError("Length of the copying code not recognized.")
     if dest is None:
-        raise ValueError('Destination not recognized.')
+        raise ValueError("Destination not recognized.")
 
     result = MovesSeriesAnalysisResult(
         length=length,

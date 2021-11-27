@@ -49,7 +49,7 @@ class Reg(Enum):
         self.size = reg_data.size
 
         if reg_data.type == RegType.general:
-            assert reg_data.size <= 4, 'Fix me!'
+            assert reg_data.size <= 4, "Fix me!"
             if reg_data.size == 4:  # TODO: fix this when 64-bit general purpose registers will be added
                 self.parent = self
             elif reg_data.size == 2:

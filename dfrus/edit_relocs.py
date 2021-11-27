@@ -13,7 +13,7 @@ def int_literal_converter(value: str) -> int:
         assert isinstance(arg, int)
         return arg
     except (ValueError, AssertionError):
-        print(f'{value!r} is not an integer number')
+        print(f"{value!r} is not an integer number")
         raise
 
 
@@ -61,24 +61,23 @@ def remove_items(items: Sequence[int], relocs: Set[int]) -> Set[int]:
 
 def remove_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
     if len(items) < 2:
-        print('Range remove operation needs 2 arguments. Operation skipped.')
+        print("Range remove operation needs 2 arguments. Operation skipped.")
         return relocs
     elif len(items) > 2:
-        print('Range remove operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}.'.format(
-            *items[:2]))
+        print("Range remove operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}."
+              .format(*items[:2]))
     lower_bound, upper_bound = items[:2]
     relocs_in_range = list(filter(lambda x: lower_bound <= x <= upper_bound, relocs))
     if not relocs_in_range:
         print("No relocations in range.")
         return relocs
     else:
-        print("These relocations will be removed: %s" % ', '
-              .join(hex(x) for x in sorted(relocs_in_range)))
+        print("These relocations will be removed:", ", ".join(hex(x) for x in sorted(relocs_in_range)))
         return set(filter(lambda x: not (lower_bound <= x <= upper_bound), relocs))
 
 
 @click.command()
-@click.argument("file", type=click.File(mode='rb+'))
+@click.argument("file", type=click.File(mode="rb+"))
 @click.argument("command", type=click.Choice(["add", "remove", "remove_range"]))
 @click.argument("items", nargs=-1, type=str, required=True,
                 callback=lambda _, __, values: list_int_literal_converter(values))
@@ -99,5 +98,5 @@ def _main(
         common(file, function)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     _main()
