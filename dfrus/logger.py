@@ -29,7 +29,11 @@ def create_separate_stream_handlers(stdout, stderr) -> Iterable[logging.StreamHa
     Create two separate logging handlers, one for errors (level ERROR or CRITICAL), one for all other levels
     """
     stdout_stream = logging.StreamHandler(stdout)
-    stdout_stream.addFilter(lambda record: record.level < logging.ERROR)
+
+    def no_error(record: logging.LogRecord):
+        return record.levelno < logging.ERROR
+
+    stdout_stream.addFilter(no_error)
     stderr_stream = logging.StreamHandler(stderr)
     stderr_stream.setLevel(logging.ERROR)
     return [stdout_stream, stderr_stream]
