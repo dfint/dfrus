@@ -4,9 +4,9 @@ Machine code builder. A replacement for the legacy MachineCode class. Base class
 # Concept:
 m = MachineCodeBuilder()
 m.byte(mov_rm_imm | 1).byte(join_byte(1, 0, Reg.esi)).byte(0x14).dword(0xf)  # mov dword [esi+14h], 0fh
-m.byte(call_near).relative_reference(name='func', size=4)  # call near func
+m.byte(call_near).relative_reference(name="func", size=4)  # call near func
 m.byte(mov_reg_imm | 8 | Reg.edi.code).dword(0xf)  # mov edi, 0fh
-m.byte(jmp_near).relative_reference(name='return_address', size=4)  # jmp near return_addr
+m.byte(jmp_near).relative_reference(name="return_address", size=4)  # jmp near return_addr
 
 m.origin_address = 0x123456
 m.values(func=0x756733, return_address=0x475675)
@@ -48,7 +48,7 @@ class Reference(MachineCodeItem):
 
 
 class MachineCodeBuilder:
-    def __init__(self, origin_address=0, byteorder='little'):
+    def __init__(self, origin_address=0, byteorder="little"):
         self.origin_address = origin_address
         self.byteorder = byteorder
         self._raw_list: List[MachineCodeItem] = list()

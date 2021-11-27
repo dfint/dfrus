@@ -8,13 +8,13 @@ from .disasm import align
 from .peclasses import PortableExecutable
 from .pretty_printing import myrepr
 
-forbidden = set(b'$^')
+forbidden = set(b"$^")
 
-allowed = set(b'\r\t')
+allowed = set(b"\r\t")
 
 
 def is_allowed(x):
-    return x in allowed or (ord(' ') <= x and x not in forbidden)
+    return x in allowed or (ord(" ") <= x and x not in forbidden)
 
 
 def possible_to_decode(c, encoding):
@@ -49,7 +49,7 @@ def check_string(buf: bytes, encoding: str) -> Tuple[int, int]:
     return string_length, number_of_letters
 
 
-def check_string_array(buf, offset, encoding='cp437'):
+def check_string_array(buf, offset, encoding="cp437"):
     start = None
     end = None
     for i, c in enumerate(buf):
@@ -88,7 +88,7 @@ def find_next_string_xref(s_xrefs, i, obj_off):
     return s_xrefs[i]
 
 
-def extract_strings(fn, xrefs, block_size=4096, encoding='cp437', arrays=False):
+def extract_strings(fn, xrefs, block_size=4096, encoding="cp437", arrays=False):
     prev_string = None
     current_string = None
     s_xrefs = sorted(xrefs)
@@ -127,10 +127,10 @@ def extract_strings(fn, xrefs, block_size=4096, encoding='cp437', arrays=False):
 
 
 @click.command()
-@click.option('--ascii', 'ascii_only', is_flag=True, default=False, help="Extract only ascii based strings")
-@click.argument('executable', type=click.File("rb"))
-@click.argument('output_file', type=click.Path(exists=False))
-@click.argument('encoding', default="cp437")
+@click.option("--ascii", "ascii_only", is_flag=True, default=False, help="Extract only ascii based strings")
+@click.argument("executable", type=click.File("rb"))
+@click.argument("output_file", type=click.Path(exists=False))
+@click.argument("encoding", default="cp437")
 def _main(ascii_only, executable, output_file, encoding):
     """
     Extract strings embedded into a portable executable file (exe)
@@ -144,7 +144,7 @@ def _main(ascii_only, executable, output_file, encoding):
 
     strings = list(extract_strings(executable, xrefs, encoding=encoding, arrays=True))
     count = Counter(x[1] for x in strings)
-    with open(output_file, 'wt', encoding=encoding, errors='strict') as dump:
+    with open(output_file, "wt", encoding=encoding, errors="strict") as dump:
         for offset, s, cap_len in strings:
             if count[s] >= 1:
                 if ascii_only and any(ord(c) >= 0x80 for c in s):
@@ -152,8 +152,8 @@ def _main(ascii_only, executable, output_file, encoding):
                     continue
 
                 assert cap_len >= len(s)
-                s = s.replace('\r', '\\r')
-                s = s.replace('\t', '\\t')
+                s = s.replace("\r", "\\r")
+                s = s.replace("\t", "\\t")
                 print(hex(offset), myrepr(s), cap_len, xrefs[offset])
                 print(s, file=dump)
                 count[s] = 0

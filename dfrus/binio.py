@@ -4,7 +4,7 @@ from .type_aliases import Offset
 
 
 def write_dword(file_object: BinaryIO, val: int) -> None:
-    file_object.write(val.to_bytes(4, byteorder='little'))
+    file_object.write(val.to_bytes(4, byteorder="little"))
 
 
 def read_bytes(file_object: BinaryIO, offset: Offset, count: int = 1) -> bytes:
@@ -34,7 +34,7 @@ def write_string(file_object: BinaryIO,
     else:
         bs = string.encode(encoding)
 
-    file_object.write(bs.ljust(new_len, b'\0'))
+    file_object.write(bs.ljust(new_len, b"\0"))
 
 
 def fpoke4(file_object: BinaryIO,
@@ -81,10 +81,10 @@ def to_unsigned(x: int, width: int) -> int:
     return x
 
 
-def from_dword(b: bytes, signed=False, byteorder='little') -> int:
+def from_dword(b: bytes, signed=False, byteorder="little") -> int:
     assert len(b) == 4
     return int.from_bytes(b, byteorder=byteorder, signed=signed)
 
 
-def to_dword(x: int, signed=False, byteorder='little') -> bytes:
+def to_dword(x: int, signed=False, byteorder="little") -> bytes:
     return x.to_bytes(length=4, byteorder=byteorder, signed=signed)

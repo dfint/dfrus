@@ -18,7 +18,7 @@ def test_sizes():
 def section_table():
     return SectionTable([
         Section.new(
-            b'.text',
+            b".text",
             flags=0x60000020,
             pointer_to_raw_data=0x400,
             size_of_raw_data=0xAA9800,
@@ -26,7 +26,7 @@ def section_table():
             virtual_size=0xAA977F
         ),
         Section.new(
-            b'.rdata',
+            b".rdata",
             flags=0x40000040,
             pointer_to_raw_data=0xAA9C00,
             size_of_raw_data=0x12CA00,
@@ -34,7 +34,7 @@ def section_table():
             virtual_size=0x12C802
         ),
         Section.new(
-            b'.data',
+            b".data",
             flags=0xC0000040,
             pointer_to_raw_data=0xBD6600,
             size_of_raw_data=0x9A00,
@@ -42,7 +42,7 @@ def section_table():
             virtual_size=0xDFC4A4
         ),
         Section.new(
-            b'.rsrc',
+            b".rsrc",
             flags=0x40000040,
             pointer_to_raw_data=0xBE0000,
             size_of_raw_data=0x1800,
@@ -50,7 +50,7 @@ def section_table():
             virtual_size=0x1630
         ),
         Section.new(
-            b'.reloc',
+            b".reloc",
             flags=0x42000040,
             pointer_to_raw_data=0xBE1800,
             size_of_raw_data=0xBA200,

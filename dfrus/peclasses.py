@@ -229,10 +229,10 @@ class SectionTable(Sequence[Section]):
                 yield left, right
 
     def __repr__(self):
-        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(repr(x) for x in self._sections)
+        return "SectionTable([\n\t{}\n])".format(",\n\t".join(repr(x) for x in self._sections))
 
     def __str__(self):
-        return 'SectionTable([\n\t%s\n])' % ',\n\t'.join(str(x) for x in self._sections)
+        return "SectionTable([\n\t{}\n])".format(",\n\t".join(str(x) for x in self._sections))
 
     def __getitem__(self, item):
         return self._sections[item]
@@ -273,11 +273,11 @@ class RelocationTable:
     def iter_read(file: BinaryIO, reloc_size: int) -> Iterable[Tuple[int, List[int]]]:
         cur_off = 0
         while cur_off < reloc_size:
-            cur_page = int.from_bytes(file.read(4), 'little')
-            block_size = int.from_bytes(file.read(4), 'little')
+            cur_page = int.from_bytes(file.read(4), "little")
+            block_size = int.from_bytes(file.read(4), "little")
             assert (block_size > 8), block_size
             assert ((block_size - 8) % 2 == 0)
-            relocs = array('H')
+            relocs = array("H")
             relocs.fromfile(file, (block_size - 8) // 2)
             yield cur_page, [x for x in relocs if x >> 12 == RelocationTable.IMAGE_REL_BASED_HIGHLOW]
             cur_off += block_size
@@ -300,8 +300,8 @@ class RelocationTable:
             if len(records) % 2 == 1:
                 records.append(RelocationTable.IMAGE_REL_BASED_ABSOLUTE << 12 | 0)
             block_size = 8 + 2 * len(records)  # 2 dwords + N words
-            array('I', [page, block_size]).tofile(file)
-            array('H', records).tofile(file)
+            array("I", [page, block_size]).tofile(file)
+            array("H", records).tofile(file)
 
 
 class PortableExecutable:
@@ -366,19 +366,19 @@ class PortableExecutable:
     def info(self):
         entry_point = self.image_optional_header.address_of_entry_point + self.image_optional_header.image_base
         return (
-            f'DOS signature: {self.image_dos_header.e_magic!r}\n'
-            f'e_lfanew: 0x{self.image_dos_header.e_lfanew:x}\n'
-            f'PE signature: {self.image_nt_headers.signature!r}\n'
-            f'Entry point address: 0x{entry_point}\n'
-            f'{self.image_file_header}\n'
-            f'{self.image_optional_header}\n'
-            f'{self.image_data_directory}\n'
-            f'{self.section_table}\n'
+            f"DOS signature: {self.image_dos_header.e_magic!r}\n"
+            f"e_lfanew: 0x{self.image_dos_header.e_lfanew:x}\n"
+            f"PE signature: {self.image_nt_headers.signature!r}\n"
+            f"Entry point address: 0x{entry_point}\n"
+            f"{self.image_file_header}\n"
+            f"{self.image_optional_header}\n"
+            f"{self.image_data_directory}\n"
+            f"{self.section_table}\n"
         )
 
 
 def main():
-    with open("/home/insolor/Projects/Dwarf Fortress/df/df_42_06_win_s/Dwarf Fortress.exe", 'rb') as file:
+    with open("/home/insolor/Projects/Dwarf Fortress/df/df_42_06_win_s/Dwarf Fortress.exe", "rb") as file:
         pe = PortableExecutable(file)
         print(pe.info())
 

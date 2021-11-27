@@ -8,7 +8,7 @@ from .trace_machine_code import FunctionInformation
 @dataclass
 class Metadata:
     fixed: Optional[str] = None  #: Was the string length value fixed?
-    cause: Optional[str] = None  #: A cause of failure (if fixed == 'no')
+    cause: Optional[str] = None  #: A cause of failure (if fixed == "no")
     length: Optional[str] = None  #: A way of string length specification (a register, push, etc.)
     string: Set[str] = field(default_factory=set)  #: A way of string value passing (a register, push, etc.)
     func: Optional[FunctionInformation] = None  #: A function to which the string is passed

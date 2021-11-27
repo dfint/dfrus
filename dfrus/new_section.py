@@ -16,7 +16,7 @@ def create_section_blueprint(section_name, virtual_address, physical_address):
     )
 
 
-def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_byte=b'\0'):
+def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_byte=b"\0"):
     aligned = align(len(s), alignment)
     s = s.ljust(aligned, padding_byte)
     fpoke(fn, new_section_offset, s)
@@ -30,11 +30,12 @@ def add_new_section(pe: PortableExecutable, new_section, new_section_offset):
     file_alignment = pe.image_optional_header.file_alignment
     file_size = align(new_section_offset, file_alignment)
     new_section.size_of_raw_data = file_size - new_section.pointer_to_raw_data
-    print("Adding new data section...")
+
     # Align file size
     if file_size > new_section_offset:
         fn.seek(file_size - 1)
-        fn.write(b'\0')
+        fn.write(b"\0")
+
     # Set the new section virtual size
     new_section.virtual_size = new_section_offset - new_section.pointer_to_raw_data
     # Write the new section info

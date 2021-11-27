@@ -32,7 +32,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
         if is_absolute_reference:
             self.absolute_reference(value=immediate, size=register.size)
         else:
-            self.add_bytes(immediate.to_bytes(register.size, byteorder='little'))
+            self.add_bytes(immediate.to_bytes(register.size, byteorder="little"))
 
         return self
 
