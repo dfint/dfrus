@@ -11,7 +11,7 @@ def asmhex(n):
     if n < 0xA:
         return str(n)
     else:
-        return '0x{:X}'.format(n)
+        return "0x{:X}".format(n)
 
 
 seg_regs = ("es", "cs", "ss", "ds", "fs", "gs")
@@ -58,7 +58,7 @@ class ImmediateValueOperand(Operand):
         if self.value >= 0:
             return asmhex(self.value)
         else:
-            return '-' + asmhex(-self.value)
+            return "-" + asmhex(-self.value)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self})"
@@ -75,7 +75,7 @@ class RegisterOperand(Operand):
         assert new_size is None or 1 <= new_size
 
         if self.reg is not None:
-            assert self.reg.type == RegType.general, 'Do not change non-general register size explicitly'
+            assert self.reg.type == RegType.general, "Do not change non-general register size explicitly"
             self.reg = Reg((RegType.general, self.reg.code, new_size))
 
     def __str__(self):
@@ -125,9 +125,9 @@ class RelativeMemoryReference(MemoryReference):
                     if not result:
                         result += asmhex(self.disp)
                     else:
-                        result += '+' + asmhex(self.disp)
+                        result += "+" + asmhex(self.disp)
                 else:
-                    result += '-' + asmhex(-self.disp)
+                    result += "-" + asmhex(-self.disp)
 
         if self.seg_prefix is None:
             result = f"[{result}]"
@@ -137,7 +137,7 @@ class RelativeMemoryReference(MemoryReference):
 
         data_size = self.get_data_size()
         if data_size is not None:
-            result = op_sizes[data_size] + ' ' + result
+            result = op_sizes[data_size] + " " + result
 
         return result
 
@@ -158,7 +158,7 @@ class AbsoluteMemoryReference(MemoryReference):
 
         data_size = self.get_data_size()
         if data_size is not None:
-            result = op_sizes[data_size] + ' ' + result
+            result = op_sizes[data_size] + " " + result
 
         return result
 

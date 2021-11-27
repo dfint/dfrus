@@ -48,13 +48,13 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
 
     last_section = sections[-1]
 
-    if last_section.name == b'.new':
+    if last_section.name == b".new":
         log.error("There is '.new' section in the file already.")
         return
 
     # New section prototype
     new_section = create_section_blueprint(
-        b'.new',
+        b".new",
         align(last_section.virtual_address + last_section.virtual_size,
               pe.image_optional_header.section_alignment),
         align(last_section.pointer_to_raw_data + last_section.size_of_raw_data,
@@ -75,11 +75,11 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
         strings = [x for x in strings if x[1] in trans_table]
         log.info("{} strings remaining.".format(len(strings)))
         if 0 < len(strings) <= 16:
-            log.info('All remaining strings:')
+            log.info("All remaining strings:")
             for offset, string, *_ in strings:
                 log.info("0x{:x} : {!r}".format(offset, string))
 
-    encoding = codepage if codepage else 'cp437'
+    encoding = codepage if codepage else "cp437"
 
     encoder_function = get_encoder(encoding)
 
@@ -91,17 +91,17 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     functions = extract_function_information(image_base, metadata, sections)
 
     if debug:
-        log.debug('\nGuessed function parameters:')
+        log.debug("\nGuessed function parameters:")
         for address, meta in sorted(functions.items(), key=itemgetter(0)):
-            log.debug('sub_{:x}: {!r}'.format(sections[code_section].offset_to_rva(address) + image_base, meta))
+            log.debug("sub_{:x}: {!r}".format(sections[code_section].offset_to_rva(address) + image_base, meta))
 
     not_fixed, status_unknown = add_strlens(fixes, functions, metadata)
     if debug:
         for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
-            log.debug('Length not fixed: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
+            log.debug("Length not fixed: %s (reference from 0x%x)" % (myrepr(string), ref), meta)
 
         for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
-            log.debug('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
+            log.debug("Status unknown: %s (reference from 0x%x)" % (myrepr(string), ref), meta)
 
     new_section_offset = apply_delayed_fixes(fixes, file, new_section, new_section_offset, relocs_to_add, sections)
 
@@ -127,6 +127,7 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
 
     # Add new section to the executable
     if new_section_offset > new_section.pointer_to_raw_data:
+        log.info("Adding new data section...")
         add_new_section(pe, new_section, new_section_offset)
 
     # Check if the patched file is not broken
@@ -134,7 +135,7 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     pe.reread()
     assert set(pe.relocation_table) == relocatable_items, "Error: relocation table is broken"
 
-    log.info('Done.')
+    log.info("Done.")
 
 
 def fix_unicode_table(codepage, fn, sections, xref_table):
@@ -184,16 +185,16 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
             original_string_address = sections.offset_to_rva(off) + image_base
 
             try:
-                encoded_translation = encoder_function(translation)[0] + b'\0'
+                encoded_translation = encoder_function(translation)[0] + b"\0"
             except UnicodeEncodeError:
-                encoded_translation = encoder_function(translation, errors='replace')[0] + b'\0'
+                encoded_translation = encoder_function(translation, errors="replace")[0] + b"\0"
                 log.warning("Warning: some of characters in a translation strings can't be represented in {}, "
                             "they will be replaced with ? marks.".format(encoding))
                 log.warning("{!r}: {!r}".format(string, encoded_translation))
 
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
-                fpoke(fn, off, encoded_translation.ljust(cap_len, b'\0'))
+                fpoke(fn, off, encoded_translation.ljust(cap_len, b"\0"))
                 string_address = original_string_address
             else:
                 # Add the translation to the separate section
@@ -214,11 +215,11 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                                       .format(sys.exc_info()[0], string, ref_rva + image_base))
                         raise
                 else:
-                    fix = Fix(meta=Metadata(fixed='not needed'))
+                    fix = Fix(meta=Metadata(fixed="not needed"))
 
                 meta = fix.meta
                 assert meta is not None
-                if 'cmp reg' in meta.string:
+                if "cmp reg" in meta.string:
                     # This is probably a bound of an array, not a string reference
                     continue
                 elif fix.new_code:
@@ -257,20 +258,20 @@ def add_strlens(fixes, functions, metadata):
 
     for string, fix in metadata.items():
         meta: Metadata = fix.meta
-        if (meta.fixed is None or meta.fixed == 'no') and fix.new_code is None:
+        if (meta.fixed is None or meta.fixed == "no") and fix.new_code is None:
             assert meta.func is not None
             func: FunctionInformation = meta.func
-            if func is not None and func.info == 'call near':
+            if func is not None and func.info == "call near":
                 if functions[func.address].length is not None:
                     src_off = func.address
                     dest_off = func.operand
                     assert src_off is not None
                     src_off += 1
                     code_chunk = None
-                    if functions[dest_off].length == 'push':
+                    if functions[dest_off].length == "push":
                         # mov [esp+8], ecx
                         code_chunk = asm().byte(mov_rm_reg | 1).modrm(1, Reg.ecx, 4).sib(0, 4, Reg.esp).byte(8)
-                    elif functions[dest_off].length == 'edi':
+                    elif functions[dest_off].length == "edi":
                         # mov edi, ecx
                         code_chunk = asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)
 
@@ -279,15 +280,15 @@ def add_strlens(fixes, functions, metadata):
                         assert isinstance(dest_off, int)
                         fix = Fix(src_off=src_off, new_code=new_code, dest_off=dest_off)
                         fixes[src_off].add_fix(fix)
-                        meta.fixed = 'yes'
+                        meta.fixed = "yes"
                     else:
-                        meta.fixed = 'no'
+                        meta.fixed = "no"
                 else:
-                    meta.fixed = 'not needed'
+                    meta.fixed = "not needed"
 
             if meta.fixed is None:
                 status_unknown[string[1]] = (string[0], meta)
-            elif meta.fixed == 'no':
+            elif meta.fixed == "no":
                 not_fixed[string[1]] = (string[0], meta)
 
     return not_fixed, status_unknown
@@ -337,7 +338,7 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
 
         hook_rva = new_section.offset_to_rva(new_section_offset)
 
-        dest_off = dict(mach.get_values()).get('dest', None) or fix.dest_off
+        dest_off = dict(mach.get_values()).get("dest", None) or fix.dest_off
 
         for field_name, value in mach.get_values():
             if value is not None:
@@ -348,7 +349,7 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
         if dest_off is not None:
             dest_rva = sections[code_section].offset_to_rva(dest_off)
             mach.origin_address = hook_rva
-            if 'dest' in mach.get_values():
+            if "dest" in mach.get_values():
                 mach.set_values(dest=dest_rva)
             else:
                 # Add jump from the hook
@@ -389,7 +390,7 @@ def extract_function_information(image_base: int,
     for fix in metadata.values():
         meta = fix.meta
         assert meta is not None
-        if meta.func and meta.func.info == 'call near':
+        if meta.func and meta.func.info == "call near":
             offset = meta.func.address
             assert offset is not None
             address = sections[code_section].offset_to_rva(offset) + image_base

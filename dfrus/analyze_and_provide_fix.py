@@ -14,7 +14,7 @@ from .trace_machine_code import FunctionInformation, which_func
 
 def find_instruction(s, instruction):
     for line in disasm(s):
-        assert (line.mnemonic != 'db')
+        assert (line.mnemonic != "db")
         if line.data[0] == instruction:
             return line.address
     return None
@@ -55,12 +55,12 @@ def analyze_reference_code(fn: BinaryIO,
     meta = Metadata()
     if pre[-1] == push_imm32:
         # push offset str
-        meta.string.add('push')
+        meta.string.add("push")
 
         if pre[-3] == push_imm8 and pre[-2] == old_len:
             fpoke(fn, offset - 2, new_len)
-            meta.length = 'push before'
-            meta.fixed = 'yes'
+            meta.length = "push before"
+            meta.fixed = "yes"
 
         meta.func = which_func(fn, old_next)
     elif pre[-1] & 0xF8 == (mov_reg_imm | 8):
@@ -85,12 +85,12 @@ def analyze_reference_code(fn: BinaryIO,
 
         if reg == Reg.eax.code:
             # mov eax, offset str
-            meta.string.add('eax')
+            meta.string.add("eax")
             if from_dword(pre[-5:-1]) == old_len:
                 fpoke4(fn, offset - 5, new_len)
-                meta.fixed = 'yes'
+                meta.fixed = "yes"
                 if pre[-6] == mov_reg_imm | 8 | Reg.edi.code:
-                    meta.length = 'edi'
+                    meta.length = "edi"
                     # mov edi, len before
                     if (old_len == 15 or old_len == 16) and aft and not jmp:
                         # Trying to fix the case when the edi value is used as a stl-string cap size
@@ -106,10 +106,10 @@ def analyze_reference_code(fn: BinaryIO,
                         mov_esp_edi = False
 
                         for line in disasm(aft, next_off):
-                            assert (line.mnemonic != 'db')
+                            assert (line.mnemonic != "db")
                             str_line = str(line)
-                            if str_line.startswith('mov [esp') and str_line.endswith('], edi'):
-                                # Check if the value of edi is used in 'mov [esp+N], edi'
+                            if str_line.startswith("mov [esp") and str_line.endswith("], edi"):
+                                # Check if the value of edi is used in "mov [esp+N], edi"
                                 mov_esp_edi = True
                             elif line.data[0] == call_near:
                                 # jmp near m1 ; replace call of sub_40f650 with jmp
@@ -129,7 +129,7 @@ def analyze_reference_code(fn: BinaryIO,
                                     # mov dword [esi+14h], oldlen
                                     m.byte(mov_rm_imm | 1).modrm(1, 0, Reg.esi).byte(0x14).dword(old_len)
 
-                                m.byte(call_near).relative_reference(name='func')  # call near func
+                                m.byte(call_near).relative_reference(name="func")  # call near func
                                 # Restore original edi value for the case if it is used further in the code:
                                 m.mov_reg_imm(Reg.edi, old_len)  # mov edi, old_len
                                 m.byte(jmp_near).relative_reference(name="return_addr")  # jmp near return_addr
@@ -150,15 +150,15 @@ def analyze_reference_code(fn: BinaryIO,
             elif pre[-3] == push_imm8 and pre[-2] == old_len:
                 # push len ; before
                 fpoke(fn, offset - 2, new_len)
-                meta.length = 'push'
-                meta.fixed = 'yes'
+                meta.length = "push"
+                meta.fixed = "yes"
                 return Fix(meta=meta)
             elif aft and aft[0] == push_imm8 and aft[1] == old_len:
                 # push len ; after
-                meta.length = 'push'
+                meta.length = "push"
                 if not jmp:
                     fpoke(fn, next_off + 1, new_len)
-                    meta.fixed = 'yes'
+                    meta.fixed = "yes"
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
                     ret_value = Fix(
@@ -184,8 +184,8 @@ def analyze_reference_code(fn: BinaryIO,
                         return ret_value
             elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
-                meta.length = 'edi'
-                # There's no code in DF that passes this condition. Left just in case.
+                meta.length = "edi"
+                # There"s no code in DF that passes this condition. Left just in case.
                 # TODO: Drop it
                 i = find_instruction(aft, call_near)
                 if i is not None:
@@ -201,10 +201,10 @@ def analyze_reference_code(fn: BinaryIO,
                     return ret_value
             elif aft and match_mov_reg_imm32(aft[:5], Reg.edi, old_len):
                 # mov edi, len ; after
-                meta.length = 'edi'
+                meta.length = "edi"
                 if not jmp:
                     fpoke4(fn, next_off + 1, new_len)
-                    meta.fixed = 'yes'
+                    meta.fixed = "yes"
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
                     m = asm().mov_reg_imm(Reg.edi, new_len)  # mov edi, new_len
@@ -233,26 +233,26 @@ def analyze_reference_code(fn: BinaryIO,
                 displacement = to_signed(pre[-2], 8)
                 if displacement == old_len:
                     # lea edi, [reg+old_len]
-                    meta.length = 'edi'
+                    meta.length = "edi"
                     fpoke(fn, offset - 2, new_len)
-                    meta.fixed = 'yes'
+                    meta.fixed = "yes"
                     return Fix(meta=meta)
             elif (aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
                   aft[2] == push_imm8 and aft[3] == old_len):
                 # mov ecx, reg; push imm8
-                meta.length = 'push'
+                meta.length = "push"
                 if not jmp:
                     fpoke(fn, next_off + 3, new_len)
-                    meta.fixed = 'yes'
+                    meta.fixed = "yes"
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
                     # TODO: Handle this case
-                    meta.fixed = 'not implemented'
+                    meta.fixed = "not implemented"
                     return Fix(meta=meta)
                 else:
-                    meta.fixed = 'no'
+                    meta.fixed = "no"
                     return Fix(meta=meta)
-        elif reg == Reg.esi.code and isinstance(func, tuple) and func[0].startswith('rep'):
+        elif reg == Reg.esi.code and isinstance(func, tuple) and func[0].startswith("rep"):
             # Sample code:
             # ; old_len = 22
             # ; r = (old_len+1) % 4 = 3 (3 bytes moved with 1 movsw and 1 movsb)
@@ -262,7 +262,7 @@ def analyze_reference_code(fn: BinaryIO,
             # repz movsd
             # movsw
             # movsb
-            meta.string.add('esi')
+            meta.string.add("esi")
             r = (old_len + 1) % 4
             dword_count = (old_len + 1) // 4
             new_dword_count = (new_len - r) // 4 + 1
@@ -270,29 +270,29 @@ def analyze_reference_code(fn: BinaryIO,
             if match_mov_reg_imm32(pre[-6:-1], Reg.ecx, dword_count):
                 # mov ecx, dword_count
                 fpoke4(fn, offset - 5, new_dword_count)
-                meta.length = 'ecx*4'
-                meta.fixed = 'yes'
+                meta.length = "ecx*4"
+                meta.fixed = "yes"
                 return Fix(meta=meta)
             elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
                 fpoke(fn, offset - 2, new_dword_count)
-                meta.length = 'ecx*4'
-                meta.fixed = 'yes'
+                meta.length = "ecx*4"
+                meta.fixed = "yes"
                 return Fix(meta=meta)
             elif new_len > old_len:
                 # ecx modification code was not found. TODO: handle this case properly.
                 if jmp:
-                    meta.fixed = 'no'
+                    meta.fixed = "no"
                     return Fix(meta=meta)
                 elif aft:
                     for line in disasm(aft, start_address=next_off):
-                        if line.mnemonic != 'db':
+                        if line.mnemonic != "db":
                             break
                         offset = line.address
                         line_data = line.data
                         if line_data[0] == Prefix.rep:
-                            meta.length = 'ecx*4'
-                            meta.fixed = 'no'
+                            meta.length = "ecx*4"
+                            meta.fixed = "no"
                             return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
                             operand = line.operand1
@@ -307,7 +307,7 @@ def analyze_reference_code(fn: BinaryIO,
                                 skip = 3
 
                             if skip is not None:
-                                meta.length = 'ecx*4'
+                                meta.length = "ecx*4"
                                 ret_value = Fix(
                                     src_off=line.address + 1,
                                     new_code=asm().mov_reg_imm(Reg.ecx, dword_count),
@@ -316,35 +316,35 @@ def analyze_reference_code(fn: BinaryIO,
                                 ret_value.meta = meta
                                 return ret_value
 
-                            meta.fixed = 'no'
+                            meta.fixed = "no"
                             return Fix(meta=meta)
                         elif len(line_data) == 5 and match_mov_reg_imm32(line_data, Reg.ecx, dword_count):
                             fpoke4(fn, line.address + 1, new_dword_count)
-                            meta.length = 'ecx*4'
-                            meta.fixed = 'yes'
+                            meta.length = "ecx*4"
+                            meta.fixed = "yes"
                             return Fix(meta=meta)
                         elif line_data[0] == lea and line_data[1] & 0xf8 == mod_1_ecx_0 and line_data[2] == dword_count:
                             fpoke(fn, line.address + 2, new_dword_count)
-                            meta.length = 'ecx*4'
-                            meta.fixed = 'yes'
+                            meta.length = "ecx*4"
+                            meta.fixed = "yes"
                             return Fix(meta=meta)
                     return Fix(meta=meta)
         else:
-            meta.string.add(['eax', 'ecx', 'edx', 'ebx', 'esp', 'ebp', 'esi', 'edi'][reg])
+            meta.string.add(["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"][reg])
         return Fix(meta=meta)
     elif (pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and
                                             pre[-1] & 0xC7 == join_byte(0, 0, 5)) or  # mov
           pre[-3] == 0x0F and pre[-2] in {x0f_movups, x0f_movaps} and
           pre[-1] & 0xC7 == join_byte(0, 0, 5)):  # movups or movaps
         # mov eax, [addr] or mov reg, [addr]
-        meta.string.add('mov')
+        meta.string.add("mov")
 
         next_off = offset - get_start(pre)
         aft = read_bytes(fn, next_off, count_after_for_get_length)
         try:
             get_length_info = analyze_moves_series(aft, old_len, original_string_address)
         except (ValueError, IndexError) as err:
-            meta.fixed = 'no'
+            meta.fixed = "no"
             meta.cause = repr(err)
             return Fix(meta=meta)
 
@@ -353,12 +353,12 @@ def analyze_reference_code(fn: BinaryIO,
                 fpoke(fn, next_off + off, b)
 
         if new_len <= old_len and not get_length_info.pokes:
-            meta.fixed = 'not needed'
+            meta.fixed = "not needed"
             return Fix(meta=meta)
         else:
             fix = get_fix_for_moves(get_length_info, new_len, string_address, meta)
 
-            if meta.fixed == 'yes':
+            if meta.fixed == "yes":
                 # Make deleted relocs offsets relative to the given offset
                 fix.deleted_relocs = [next_off + ref - offset for ref in fix.deleted_relocs]
 
@@ -374,22 +374,22 @@ def analyze_reference_code(fn: BinaryIO,
             return fix
     elif pre[-2] == mov_reg_rm and pre[-1] & 0xC0 == 0x80:
         # mov reg8, string[reg]
-        meta.func = FunctionInformation('strcpy')
-        meta.string.add('mov byte')
-        meta.fixed = 'not needed'
+        meta.func = FunctionInformation("strcpy")
+        meta.string.add("mov byte")
+        meta.fixed = "not needed"
         return Fix(meta=meta)  # No need fixing
     elif pre[-1] == add_acc_imm | 1:
         # add reg, offset string
-        meta.func = FunctionInformation('array')
-        meta.string.add('add offset')
-        meta.fixed = 'not needed'
+        meta.func = FunctionInformation("array")
+        meta.string.add("add offset")
+        meta.fixed = "not needed"
         return Fix(meta=meta)
     elif pre[-2] == op_rm_imm | 1 and pre[-1] & 0xF8 == 0xF8:
         # cmp reg, offset string
-        meta.string.add('cmp reg')
+        meta.string.add("cmp reg")
     elif pre[-4] == mov_rm_imm | 1 and pre[-3] == join_byte(1, 0, 4) and pre[-2] == join_byte(0, 4, Reg.esp):
         # mov [esp+N], offset string
-        meta.string.add('mov var')
-        meta.fixed = 'not needed'
-    meta.prev_bytes = ' '.join('%02X' % x for x in pre[-4:])
+        meta.string.add("mov var")
+        meta.fixed = "not needed"
+    meta.prev_bytes = " ".join("%02X" % x for x in pre[-4:])
     return Fix(meta=meta)

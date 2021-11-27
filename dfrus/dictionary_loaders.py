@@ -3,9 +3,9 @@ import csv
 
 def load_trans_file(fn):
     def unescape(x):
-        return x.replace('\\r', '\r').replace('\\t', '\t')
+        return x.replace("\\r", "\r").replace("\\t", "\t")
 
-    dialect = 'unix'
+    dialect = "unix"
 
     fn.seek(0)
     reader = csv.reader(fn, dialect)
