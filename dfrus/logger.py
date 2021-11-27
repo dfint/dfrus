@@ -1,8 +1,8 @@
 import logging
 import sys
-from collections import Iterable
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
+from typing import Iterable
 
 
 @lru_cache()
@@ -41,6 +41,8 @@ def create_stream_handlers(stdout, stderr) -> Iterable[logging.StreamHandler]:
             return [logging.StreamHandler(stdout)]
     else:
         return create_separate_stream_handlers(stdout, stderr)
+
+    return []
 
 
 def init_logger(stdout, stderr) -> logging.Logger:

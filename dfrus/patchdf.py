@@ -29,7 +29,7 @@ code_section, rdata_section, data_section = range(3)
 def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str], debug=False):
     log = get_logger()
 
-    print("Finding cross-references...")
+    log.info("Finding cross-references...")
 
     image_base = pe.image_optional_header.image_base
     sections = pe.section_table
@@ -44,12 +44,12 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
         fix_unicode_table(codepage, file, sections, xref_table)
 
     if debug:
-        print("Preparing additional data section...")
+        log.info("Preparing additional data section...")
 
     last_section = sections[-1]
 
     if last_section.name == b'.new':
-        print("There is '.new' section in the file already.")
+        log.error("There is '.new' section in the file already.")
         return
 
     # New section prototype
@@ -64,20 +64,20 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     new_section_offset = new_section.pointer_to_raw_data
 
     # --------------------------------------------------------
-    print("Translating...")
+    log.info("Translating...")
 
     strings = list(extract_strings(file, xref_table, encoding=original_codepage, arrays=True))
 
     if debug:
-        print("%d strings extracted." % len(strings))
+        log.info("{} strings extracted.".format(len(strings)))
 
-        print("Leaving only strings, which have translations.")
+        log.info("Leaving only strings, which have translations.")
         strings = [x for x in strings if x[1] in trans_table]
-        print("%d strings remaining." % len(strings))
+        log.info("{} strings remaining.".format(len(strings)))
         if 0 < len(strings) <= 16:
-            print('All remaining strings:')
+            log.info('All remaining strings:')
             for offset, string, *_ in strings:
-                print("0x{:x} : {!r}".format(offset, string))
+                log.info("0x{:x} : {!r}".format(offset, string))
 
     encoding = codepage if codepage else 'cp437'
 
@@ -91,20 +91,17 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     functions = extract_function_information(image_base, metadata, sections)
 
     if debug:
-        print('\nGuessed function parameters:')
+        log.debug('\nGuessed function parameters:')
         for address, meta in sorted(functions.items(), key=itemgetter(0)):
-            print('sub_%x: %r' % (sections[code_section].offset_to_rva(address) + image_base, meta))
-        print()
+            log.debug('sub_{:x}: {!r}'.format(sections[code_section].offset_to_rva(address) + image_base, meta))
 
     not_fixed, status_unknown = add_strlens(fixes, functions, metadata)
     if debug:
         for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
-            print('Length not fixed: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
-
-        print()
+            log.debug('Length not fixed: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
 
         for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
-            print('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
+            log.debug('Status unknown: %s (reference from 0x%x)' % (myrepr(string), ref), meta)
 
     new_section_offset = apply_delayed_fixes(fixes, file, new_section, new_section_offset, relocs_to_add, sections)
 
@@ -115,10 +112,10 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
                         format_hex_list(item + image_base for item in (relocs_to_remove - relocatable_items)))
 
         if debug:
-            print("\nRemoved relocations:")
-            print(format_hex_list(relocs_to_remove, wrap_at=80))
-            print("\nAdded relocations:")
-            print(format_hex_list(relocs_to_add, wrap_at=80))
+            log.debug("\nRemoved relocations:")
+            log.debug(format_hex_list(relocs_to_remove, wrap_at=80))
+            log.debug("\nAdded relocations:")
+            log.debug(format_hex_list(relocs_to_add, wrap_at=80))
 
         relocatable_items -= relocs_to_remove
         relocatable_items |= relocs_to_add
@@ -133,34 +130,37 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
         add_new_section(pe, new_section, new_section_offset)
 
     # Check if the patched file is not broken
-    print("Final check...")
+    log.info("Final check...")
     pe.reread()
     assert set(pe.relocation_table) == relocatable_items, "Error: relocation table is broken"
 
-    print('Done.')
+    log.info('Done.')
 
 
 def fix_unicode_table(codepage, fn, sections, xref_table):
-    print("Searching for charmap table...")
+    log = get_logger()
+    log.info("Searching for charmap table...")
     needle = search_charmap(fn, sections, xref_table)
     if needle is None:
-        print("Warning: charmap table not found. Skipping.")
+        log.warning("Warning: charmap table not found. Skipping.")
     else:
-        print("Charmap table found at offset 0x%X" % needle)
+        log.info("Charmap table found at offset 0x%X" % needle)
 
         try:
-            print("Patching charmap table to %s..." % codepage)
+            log.info("Patching charmap table to %s..." % codepage)
             patch_unicode_table(fn, needle, codepage)
         except KeyError:
-            print("Warning: codepage %s not implemented. Skipping." % codepage)
+            log.warning("Warning: codepage %s not implemented. Skipping." % codepage)
         else:
-            print("Done.")
+            log.info("Done.")
 
 
 def process_strings(encoder_function, encoding, fn, image_base, new_section, new_section_offset, sections,
                     strings, trans_table, xref_table) -> \
         Tuple[MutableMapping[int, Fix], MutableMapping[Tuple[str, int], Fix], int, Set[int], Set[int]]:
     # return fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove
+
+    log = get_logger()
 
     relocs_to_add: Set[int] = set()
     relocs_to_remove: Set[int] = set()
@@ -187,9 +187,9 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                 encoded_translation = encoder_function(translation)[0] + b'\0'
             except UnicodeEncodeError:
                 encoded_translation = encoder_function(translation, errors='replace')[0] + b'\0'
-                print("Warning: some of characters in a translation strings can't be represented in {}, "
-                      "they will be replaced with ? marks.".format(encoding))
-                print("{!r}: {!r}".format(string, encoded_translation))
+                log.warning("Warning: some of characters in a translation strings can't be represented in {}, "
+                            "they will be replaced with ? marks.".format(encoding))
+                log.warning("{!r}: {!r}".format(string, encoded_translation))
 
             if not is_long or off not in xref_table:
                 # Overwrite the string with the translation in-place
@@ -210,8 +210,8 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                                                      string_address=string_address,
                                                      original_string_address=original_string_address)
                     except Exception:
-                        print('Catched %s exception on string %r at reference 0x%x' %
-                              (sys.exc_info()[0], string, ref_rva + image_base))
+                        log.exception("Catched {} exception on string {!r} at reference 0x{:x}"
+                                      .format(sys.exc_info()[0], string, ref_rva + image_base))
                         raise
                 else:
                     fix = Fix(meta=Metadata(fixed='not needed'))
@@ -242,7 +242,6 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                 metadata[(string, ref_rva + image_base)] = fix
 
     for offset, b in delayed_pokes.items():
-        # print(hex(offset), b)
         fpoke(fn, offset, b)
 
     return fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove
@@ -384,6 +383,7 @@ def extract_function_information(image_base: int,
     """
     Extract information of functions parameters
     """
+    log = get_logger()
 
     functions: MutableMapping[int, Metadata] = defaultdict(Metadata)
     for fix in metadata.values():
@@ -398,8 +398,10 @@ def extract_function_information(image_base: int,
                 if not functions[offset].string:
                     functions[offset].string.update(str_param)
                 elif str_param not in functions[offset].string:
-                    print('Warning: possible function parameter recognition collision for sub_%x: %r not in %r' %
-                          (address, str_param, functions[offset].string))
+                    log.warning(
+                        "Warning: possible function parameter recognition collision for sub_{:x}: {!r} not in {!r}"
+                        .format(address, str_param, functions[offset].string)
+                    )
                     functions[offset].string.update(str_param)
 
             if meta.length is not None:
@@ -407,8 +409,8 @@ def extract_function_information(image_base: int,
                 if functions[offset].length is None:
                     functions[offset].length = len_param
                 elif functions[offset].length != len_param:
-                    raise ValueError('Function parameter recognition collision for sub_%x: %r != %r' %
-                                     (address, functions[offset].length, len_param))
+                    raise ValueError("Function parameter recognition collision for sub_{:x}: {!r} != {!r}"
+                                     .format(address, functions[offset].length, len_param))
 
     return functions
 

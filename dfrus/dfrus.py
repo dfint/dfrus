@@ -50,7 +50,7 @@ def slice_translation(trans_table: Union[Dict[str, str], Iterable[Tuple[str, str
 @contextmanager
 def destination_file_context(src, dest):
     log = get_logger()
-    log.info("Copying '{}'\nTo '{}'...".format(src, dest))
+    log.info("Copying '{}' To '{}'...".format(src, dest))
     try:
         copy(src, dest)
     except IOError as ex:
