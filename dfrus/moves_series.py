@@ -225,8 +225,8 @@ def analyze_moves_series(data: bytes,
                     saved_mach += line.data
             else:
                 # Segment register etc.
-                raise ValueError("Unallowed left operand type: %s, type is %r, instruction is `%s`" %
-                                 (left_operand, type(left_operand), str(line)))
+                raise ValueError("Unallowed left operand type: {}, type is {!r}, instruction is `{}`"
+                                 .format(left_operand, type(left_operand), str(line)))
         elif line.mnemonic == "lea":
             assert line.operands is not None
             left_operand, right_operand = line.operands

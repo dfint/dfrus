@@ -98,10 +98,10 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     not_fixed, status_unknown = add_strlens(fixes, functions, metadata)
     if debug:
         for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
-            log.debug("Length not fixed: %s (reference from 0x%x)" % (myrepr(string), ref), meta)
+            log.debug("Length not fixed: {} (reference from 0x{:x})".format(myrepr(string), ref), meta)
 
         for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
-            log.debug("Status unknown: %s (reference from 0x%x)" % (myrepr(string), ref), meta)
+            log.debug("Status unknown: {} (reference from 0x{:x})".format(myrepr(string), ref), meta)
 
     new_section_offset = apply_delayed_fixes(fixes, file, new_section, new_section_offset, relocs_to_add, sections)
 
@@ -145,13 +145,13 @@ def fix_unicode_table(codepage, fn, sections, xref_table):
     if needle is None:
         log.warning("Warning: charmap table not found. Skipping.")
     else:
-        log.info("Charmap table found at offset 0x%X" % needle)
+        log.info("Charmap table found at offset 0x{:X}".format(needle))
 
         try:
-            log.info("Patching charmap table to %s..." % codepage)
+            log.info("Patching charmap table to {}...".format(codepage))
             patch_unicode_table(fn, needle, codepage)
         except KeyError:
-            log.warning("Warning: codepage %s not implemented. Skipping." % codepage)
+            log.warning("Warning: codepage {} not implemented. Skipping.".format(codepage))
         else:
             log.info("Done.")
 

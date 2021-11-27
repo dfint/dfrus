@@ -391,5 +391,5 @@ def analyze_reference_code(fn: BinaryIO,
         # mov [esp+N], offset string
         meta.string.add("mov var")
         meta.fixed = "not needed"
-    meta.prev_bytes = " ".join("%02X" % x for x in pre[-4:])
+    meta.prev_bytes = " ".join("{:02X}".format(x) for x in pre[-4:])
     return Fix(meta=meta)

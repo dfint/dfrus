@@ -253,10 +253,10 @@ def test_mach_memcpy_stimulant():
     mach = mach_memcpy(string_addr, dest, newlen + 1)
     assert [str(line) for line in disasm(mach.build())] == [
         "pushad",
-        "mov edi, 0x%X" % dest.disp,
-        "mov esi, 0x%X" % string_addr,
+        "mov edi, 0x{:X}".format(dest.disp),
+        "mov esi, 0x{:X}".format(string_addr),
         "xor ecx, ecx",
-        "mov cl, %d" % ((count+3)//4),
+        "mov cl, {:d}".format((count + 3) // 4),
         "rep movsd",
         "popad",
     ]

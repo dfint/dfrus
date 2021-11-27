@@ -116,7 +116,7 @@ class RelativeMemoryReference(MemoryReference):
 
             if self.index_reg is not None:
                 if self.scale:
-                    result += "%d*" % (1 << self.scale)
+                    result += "{:d}*".format(1 << self.scale)
 
                 result += self.index_reg.name
 
