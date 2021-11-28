@@ -5,6 +5,7 @@ from itertools import zip_longest
 from typing import (Iterable, MutableMapping, List, Mapping, BinaryIO, Tuple, Sequence, Optional, Type, TypeVar,
                     SupportsBytes)
 
+from dfrus.type_aliases import Rva
 from .ctypes_annotated_structure import AnnotatedStructure
 from .disasm import align
 
@@ -153,7 +154,7 @@ class Section(AnnotatedStructure):
         self.virtual_size = virtual_size
         return self
 
-    def offset_to_rva(self, offset):
+    def offset_to_rva(self, offset) -> Rva:
         local_offset = offset - self.pointer_to_raw_data
         assert 0 <= local_offset < self.size_of_raw_data
         return local_offset + self.virtual_address

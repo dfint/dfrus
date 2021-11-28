@@ -40,10 +40,12 @@ class Reference(MachineCodeItem):
 
     @classmethod
     def relative(cls, name, size=4):
+        assert isinstance(name, str)
         return cls(name=name, size=size, is_relative=True)
 
     @classmethod
-    def absolute(cls, value=None, name=None, size=4):
+    def absolute(cls, value: Optional[int] = None, name: Optional[str] = None, size=4):
+        assert name is None or isinstance(name, str)
         return cls(value=value, name=name, size=size, is_relative=False)
 
 
@@ -79,6 +81,7 @@ class MachineCodeBuilder:
         return self.add_bytes(b.to_bytes(1, "little") * n)
 
     def relative_reference(self, name: str, size: int):
+        assert isinstance(name, str)
         reference = Reference.relative(name=name, size=size)
         self._fields[name].append(reference)
         return self._add_item(reference)

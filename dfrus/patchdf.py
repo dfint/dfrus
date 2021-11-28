@@ -321,7 +321,7 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     return new_section_offset, relocation_table
 
 
-def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections):
+def apply_delayed_fixes(fixes, fn, new_section: Section, new_section_offset, relocs_to_add, sections: List[Section]):
     # Delayed fix
     for fix in fixes.values():
         src_off = fix.src_off
@@ -342,11 +342,12 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
         if dest_off is not None:
             dest_rva = sections[code_section].offset_to_rva(dest_off)
             mach.origin_address = hook_rva
-            if "dest" in mach.get_values():
-                mach.set_values(dest=dest_rva)
-            else:
+
+            if "dest" not in mach.get_values():
                 # Add jump from the hook
-                mach.byte(jmp_near).relative_reference(dest_rva, size=4)
+                mach.byte(jmp_near).relative_reference("dest", size=4)
+
+            mach.set_values(dest=dest_rva)
 
         assert mach is not None
         # Write the hook to the new section
