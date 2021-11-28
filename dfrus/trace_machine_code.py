@@ -43,7 +43,7 @@ def trace_code(fn: BinaryIO,
                 return line
             elif line.mnemonic.startswith("jmp"):
                 operand = line.operand1
-                assert isinstance(operand, ImmediateValueOperand)
+                assert isinstance(operand, ImmediateValueOperand), operand
                 if trace_config.trace_jmp is Trace.not_follow:
                     pass
                 elif trace_config.trace_jmp is Trace.follow:
@@ -55,7 +55,7 @@ def trace_code(fn: BinaryIO,
                         return trace_code(fn, operand.value, stop_cond, trace_config)
             elif line.mnemonic.startswith("j"):
                 operand = line.operand1
-                assert isinstance(operand, ImmediateValueOperand)
+                assert isinstance(operand, ImmediateValueOperand), operand
                 if trace_config.trace_jcc is Trace.not_follow:
                     pass
                 elif trace_config.trace_jcc is Trace.follow:
@@ -67,6 +67,10 @@ def trace_code(fn: BinaryIO,
                         return trace_code(fn, operand.value, stop_cond, trace_config)
             elif line.mnemonic.startswith("call"):
                 operand = line.operand1
+
+                if not isinstance(operand, ImmediateValueOperand):
+                    return line
+
                 assert isinstance(operand, ImmediateValueOperand)
                 if trace_config.trace_call is Trace.not_follow:
                     pass

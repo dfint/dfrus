@@ -243,7 +243,7 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                 metadata[(string, ref_rva + image_base)] = fix
 
     for offset, b in delayed_pokes.items():
-        fpoke(fn, offset, b)
+        fpoke(fn, offset, bytes(b))
 
     return fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove
 
@@ -398,7 +398,7 @@ def extract_function_information(image_base: int,
                 str_param = meta.string
                 if not functions[offset].string:
                     functions[offset].string.update(str_param)
-                elif str_param not in functions[offset].string:
+                elif str_param > functions[offset].string:
                     log.warning(
                         "Warning: possible function parameter recognition collision for sub_{:x}: {!r} not in {!r}"
                         .format(address, str_param, functions[offset].string)

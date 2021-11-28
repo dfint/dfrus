@@ -135,7 +135,7 @@ def analyze_reference_code(fn: BinaryIO,
                                 m.byte(jmp_near).relative_reference(name="return_addr", size=4)  # jmp near return_addr
 
                                 operand = line.operand1
-                                assert isinstance(operand, ImmediateValueOperand)
+                                assert isinstance(operand, ImmediateValueOperand), operand
 
                                 m.set_values(func=operand.value, return_addr=line.address + 5)
 
@@ -296,7 +296,7 @@ def analyze_reference_code(fn: BinaryIO,
                             return Fix(meta=meta)
                         elif line_data[0] == jmp_near:
                             operand = line.operand1
-                            assert isinstance(operand, ImmediateValueOperand)
+                            assert isinstance(operand, ImmediateValueOperand), operand
                             next_off_2 = operand.value
                             aft = read_bytes(fn, offset, count_after)
 
