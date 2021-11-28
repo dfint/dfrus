@@ -1,4 +1,3 @@
-import logging
 import os.path
 import sys
 from contextlib import contextmanager
@@ -68,10 +67,7 @@ def destination_file_context(src, dest):
 def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, original_codepage="cp437",
         dict_slice=None, debug=False, stdout=None, stderr=None):
 
-    log = init_logger(stdout, stderr)
-
-    if debug:  # default level is INFO
-        log.setLevel(logging.DEBUG)
+    log = init_logger(stdout, stderr, debug)
 
     if not path or not os.path.exists(path):
         df1 = "Dwarf Fortress.exe"
