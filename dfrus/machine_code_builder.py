@@ -150,6 +150,9 @@ class MachineCodeBuilder:
 
         return buffer.getvalue()
 
+    def __bytes__(self):
+        return self.build()
+
     def __iadd__(self, other: Union["MachineCodeBuilder", bytes]):
         assert isinstance(other, (MachineCodeBuilder, bytes))
 

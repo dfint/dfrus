@@ -49,7 +49,7 @@ def get_fix_for_moves(get_length_info: MovesSeriesAnalysisResult, newlen, string
     mach.duplicate_byte(nop, get_length_info.length - len(mach))
 
     # Write replacement code
-    pokes = {0: mach.build()}
+    pokes = {0: mach}
 
     # Nop-out old instructions
     if get_length_info.nops:

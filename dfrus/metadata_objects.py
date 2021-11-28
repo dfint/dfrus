@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, fields
-from typing import Optional, Set, Mapping, Iterable
+from typing import Optional, Set, Mapping, Iterable, Union
 
 from .machine_code_builder import MachineCodeBuilder
 from .trace_machine_code import FunctionInformation
@@ -18,7 +18,7 @@ class Metadata:
 @dataclass
 class Fix:
     new_code: Optional[MachineCodeBuilder] = None
-    pokes: Optional[Mapping[int, bytes]] = None
+    pokes: Optional[Mapping[int, Union[bytes, MachineCodeBuilder]]] = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
     added_relocs: Iterable[int] = field(default_factory=list)
