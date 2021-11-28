@@ -365,7 +365,8 @@ def apply_delayed_fixes(fixes: Mapping[Any, Fix],  # FIXME
 
         assert mach is not None
         # Write the hook to the new section
-        new_section_offset = add_to_new_section(fn, new_section_offset, mach.build(), padding_byte=int3)
+        new_section_offset = add_to_new_section(fn, new_section_offset, mach.build(),
+                                                padding_byte=int3.to_bytes(1, "little"))
 
         # If there are absolute references in the code, add them to relocation table
         if fix.added_relocs or list(mach.absolute_references):
