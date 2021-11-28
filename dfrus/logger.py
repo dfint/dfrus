@@ -21,6 +21,7 @@ def create_rotating_file_handler(filename) -> RotatingFileHandler:
                                   "%(message)s")
 
     file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.WARNING)
     return file_handler
 
 

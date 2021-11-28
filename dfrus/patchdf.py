@@ -211,8 +211,8 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                                                      string_address=string_address,
                                                      original_string_address=original_string_address)
                     except Exception:
-                        log.exception("Catched {} exception on string {!r} at reference 0x{:x}"
-                                      .format(sys.exc_info()[0], string, ref_rva + image_base))
+                        log.exception("Caught {} exception on a string {!r} (translation {!r}) at reference 0x{:x}"
+                                      .format(sys.exc_info()[0], string, translation, ref_rva + image_base))
                         raise
                 else:
                     fix = Fix(meta=Metadata(fixed="not needed"))
