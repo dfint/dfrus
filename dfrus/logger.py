@@ -15,7 +15,7 @@ def get_logger() -> logging.Logger:
 
 
 def create_rotating_file_handler(filename) -> RotatingFileHandler:
-    file_handler = RotatingFileHandler(filename, maxBytes=1024**2, backupCount=1, encoding="utf-8")
+    file_handler = RotatingFileHandler(filename, maxBytes=1024**2, backupCount=0, encoding="utf-8")
 
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] (%(filename)s).%(funcName)s(%(lineno)d): "
                                   "%(message)s")

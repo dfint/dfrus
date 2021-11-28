@@ -70,7 +70,7 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
 
     log = init_logger(stdout, stderr)
 
-    if debug:
+    if debug:  # default level is INFO
         log.setLevel(logging.DEBUG)
 
     if not path or not os.path.exists(path):
@@ -108,7 +108,7 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
             if pe.image_file_header.machine != 0x014C:
                 raise ValueError("Only 32-bit versions are supported.")
             
-            fix_df_exe(fn, pe, codepage, original_codepage, trans_dict, debug)
+            fix_df_exe(fn, pe, codepage, original_codepage, trans_dict)
 
 
 class SliceParam(click.ParamType):

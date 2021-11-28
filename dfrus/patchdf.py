@@ -21,12 +21,10 @@ from .pretty_printing import myrepr, format_hex_list
 from .search_charmap import search_charmap
 from .trace_machine_code import FunctionInformation
 
-# from warnings import warn
-
 code_section, rdata_section, data_section = range(3)
 
 
-def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str], debug=False):
+def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str]):
     log = get_logger()
 
     log.info("Finding cross-references...")
@@ -43,8 +41,7 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     if codepage:
         fix_unicode_table(codepage, file, sections, xref_table)
 
-    if debug:
-        log.info("Preparing additional data section...")
+    log.debug("Preparing additional data section...")
 
     last_section = sections[-1]
 
@@ -68,16 +65,15 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
 
     strings = list(extract_strings(file, xref_table, encoding=original_codepage, arrays=True))
 
-    if debug:
-        log.info("{} strings extracted.".format(len(strings)))
+    log.debug("{} strings extracted.".format(len(strings)))
 
-        log.info("Leaving only strings, which have translations.")
-        strings = [x for x in strings if x[1] in trans_table]
-        log.info("{} strings remaining.".format(len(strings)))
-        if 0 < len(strings) <= 16:
-            log.info("All remaining strings:")
-            for offset, string, *_ in strings:
-                log.info("0x{:x} : {!r}".format(offset, string))
+    log.debug("Leaving only strings, which have translations.")
+    strings = [x for x in strings if x[1] in trans_table]
+    log.debug("{} strings remaining.".format(len(strings)))
+    if 0 < len(strings) <= 16:
+        log.debug("All remaining strings:")
+        for offset, string, *_ in strings:
+            log.debug("0x{:x} : {!r}".format(offset, string))
 
     encoding = codepage if codepage else "cp437"
 
@@ -90,18 +86,16 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
 
     functions = extract_function_information(image_base, metadata, sections)
 
-    if debug:
-        log.debug("\nGuessed function parameters:")
-        for address, meta in sorted(functions.items(), key=itemgetter(0)):
-            log.debug("sub_{:x}: {!r}".format(sections[code_section].offset_to_rva(address) + image_base, meta))
+    log.debug("Guessed function parameters:")
+    for address, meta in sorted(functions.items(), key=itemgetter(0)):
+        log.debug("sub_{:x}: {!r}".format(sections[code_section].offset_to_rva(address) + image_base, meta))
 
     not_fixed, status_unknown = add_strlens(fixes, functions, metadata)
-    if debug:
-        for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
-            log.debug("Length not fixed: {} (reference from 0x{:x})".format(myrepr(string), ref), meta)
+    for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
+        log.debug("Length not fixed: {} (reference from 0x{:x}), metadata: {}".format(myrepr(string), ref, meta))
 
-        for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
-            log.debug("Status unknown: {} (reference from 0x{:x})".format(myrepr(string), ref), meta)
+    for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
+        log.debug("Status unknown: {} (reference from 0x{:x}), metadata: {}".format(myrepr(string), ref, meta))
 
     new_section_offset = apply_delayed_fixes(fixes, file, new_section, new_section_offset, relocs_to_add, sections)
 
@@ -111,7 +105,6 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
             log.warning("Trying to remove some relocations which weren't in the original list: " +
                         format_hex_list(item + image_base for item in (relocs_to_remove - relocatable_items)))
 
-        if debug:
             log.debug("\nRemoved relocations:")
             log.debug(format_hex_list(relocs_to_remove, wrap_at=80))
             log.debug("\nAdded relocations:")
