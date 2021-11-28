@@ -2,7 +2,7 @@ import io
 import sys
 from collections import defaultdict, OrderedDict
 from operator import itemgetter
-from typing import Tuple, Set, Mapping, MutableMapping, List
+from typing import Tuple, Set, Mapping, MutableMapping, List, cast
 
 from .analyze_and_provide_fix import analyze_reference_code
 from .binio import fpoke4, fpoke, to_dword
@@ -302,7 +302,7 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     new_size = reloc_table.size
     data_directory = pe.image_data_directory
     relocation_table_offset = sections.rva_to_offset(data_directory.basereloc.virtual_address)
-    relocation_table_size = data_directory.basereloc.size
+    relocation_table_size = cast(data_directory.basereloc.size, int)
     relocation_section = sections[sections.which_section(offset=relocation_table_offset)]
     if new_size <= relocation_section.size_of_raw_data:
         file.seek(relocation_table_offset)
