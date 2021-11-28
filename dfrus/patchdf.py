@@ -2,7 +2,7 @@ import io
 import sys
 from collections import defaultdict, OrderedDict
 from operator import itemgetter
-from typing import Tuple, Set, Mapping, MutableMapping, List, cast
+from typing import Tuple, Set, Mapping, MutableMapping, List, cast, BinaryIO, Any
 
 from .analyze_and_provide_fix import analyze_reference_code
 from .binio import fpoke4, fpoke, to_dword
@@ -15,21 +15,22 @@ from .machine_code_utils import mach_strlen
 from .metadata_objects import Metadata, Fix
 from .new_section import add_new_section, add_to_new_section, create_section_blueprint
 from .opcodes import *
-from .patch_charmap import patch_unicode_table, get_encoder
-from .peclasses import Section, RelocationTable, PortableExecutable
+from .patch_charmap import patch_unicode_table, get_encoder, Encoder
+from .peclasses import Section, RelocationTable, PortableExecutable, SectionTable
 from .pretty_printing import myrepr, format_hex_list
 from .search_charmap import search_charmap
 from .trace_machine_code import FunctionInformation
+from .type_aliases import Offset
 
 code_section, rdata_section, data_section = range(3)
 
 
-def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str]):
+def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_table: Mapping[str, str]):
     log = get_logger()
 
     log.info("Finding cross-references...")
 
-    image_base = pe.image_optional_header.image_base
+    image_base = cast(int, pe.image_optional_header.image_base)
     sections = pe.section_table
 
     # Getting addresses of all relocatable entries
@@ -149,8 +150,16 @@ def fix_unicode_table(codepage, fn, sections, xref_table):
             log.info("Done.")
 
 
-def process_strings(encoder_function, encoding, fn, image_base, new_section, new_section_offset, sections,
-                    strings, trans_table, xref_table) -> \
+def process_strings(encoder_function: Encoder.encode,
+                    encoding: str,
+                    fn: BinaryIO,
+                    image_base: int,
+                    new_section: Section,
+                    new_section_offset: int,
+                    sections: SectionTable,
+                    strings,
+                    trans_table,
+                    xref_table) -> \
         Tuple[MutableMapping[int, Fix], MutableMapping[Tuple[str, int], Fix], int, Set[int], Set[int]]:
     # return fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove
 
@@ -321,7 +330,12 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     return new_section_offset, relocation_table
 
 
-def apply_delayed_fixes(fixes, fn, new_section: Section, new_section_offset, relocs_to_add, sections: List[Section]):
+def apply_delayed_fixes(fixes: Mapping[Any, Fix],  # FIXME
+                        fn: BinaryIO,
+                        new_section: Section,
+                        new_section_offset: int,
+                        relocs_to_add: Set[int],
+                        sections: SectionTable) -> Offset:
     # Delayed fix
     for fix in fixes.values():
         src_off = fix.src_off
@@ -360,7 +374,7 @@ def apply_delayed_fixes(fixes, fn, new_section: Section, new_section_offset, rel
             if fix.added_relocs:
                 new_refs.update(fix.added_relocs)
 
-            relocs_to_add.add_items(hook_rva + item for item in new_refs)
+            relocs_to_add.update(hook_rva + item for item in new_refs)
 
         if fix.pokes:
             for off, b in fix.pokes.items():
@@ -372,15 +386,16 @@ def apply_delayed_fixes(fixes, fn, new_section: Section, new_section_offset, rel
     return new_section_offset
 
 
-def extract_function_information(image_base: int,
+def extract_function_information(image_base: Offset,
                                  metadata: Mapping[Tuple[str, int], Fix],
-                                 sections: List[Section]) -> Mapping[int, Metadata]:
+                                 sections: List[Section]) \
+        -> Mapping[Offset, Metadata]:
     """
     Extract information of functions parameters
     """
     log = get_logger()
 
-    functions: MutableMapping[int, Metadata] = defaultdict(Metadata)
+    functions: MutableMapping[Offset, Metadata] = defaultdict(Metadata)
     for fix in metadata.values():
         meta = fix.meta
         assert meta is not None
