@@ -50,20 +50,10 @@ def create_stream_handlers(stdout, stderr) -> Iterable[logging.StreamHandler]:
     return []
 
 
-def handle_exception(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, KeyboardInterrupt):
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
-
-    get_logger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
-
-
 def init_logger(stdout, stderr) -> logging.Logger:
     log = get_logger()
 
     for handler in create_stream_handlers(stdout, stderr):
         log.addHandler(handler)
-
-    sys.excepthook = handle_exception
 
     return log

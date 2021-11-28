@@ -107,8 +107,12 @@ def run(path: str, dest: str, trans_table: Sequence[Tuple[str, str]], codepage, 
             
             if pe.image_file_header.machine != 0x014C:
                 raise ValueError("Only 32-bit versions are supported.")
-            
-            fix_df_exe(fn, pe, codepage, original_codepage, trans_dict)
+
+            try:
+                fix_df_exe(fn, pe, codepage, original_codepage, trans_dict)
+            except Exception:
+                log.exception("An exception occurred")
+                raise
 
 
 class SliceParam(click.ParamType):
