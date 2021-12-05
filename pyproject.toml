@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dfrus"
-version = "0.0.9"
+version = "0.0.10"
 description = "Patcher for text embedded to the executable of the Dwarf Fortress game"
 authors = ["insolor <insolor@gmail.com>"]
 license = "MIT"
