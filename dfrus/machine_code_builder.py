@@ -21,7 +21,7 @@ from collections import defaultdict
 from copy import copy, deepcopy
 from typing import List, Optional, Dict, Union, Iterable, Tuple
 
-from attr import dataclass
+from dataclasses import dataclass
 
 from .binio import to_unsigned
 
