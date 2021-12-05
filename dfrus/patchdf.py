@@ -2,7 +2,7 @@ import io
 import sys
 from collections import defaultdict, OrderedDict
 from operator import itemgetter
-from typing import Tuple, Set, Mapping, MutableMapping, List
+from typing import Tuple, Set, Mapping, MutableMapping, List, cast, BinaryIO, Any
 
 from .analyze_and_provide_fix import analyze_reference_code
 from .binio import fpoke4, fpoke, to_dword
@@ -15,23 +15,22 @@ from .machine_code_utils import mach_strlen
 from .metadata_objects import Metadata, Fix
 from .new_section import add_new_section, add_to_new_section, create_section_blueprint
 from .opcodes import *
-from .patch_charmap import patch_unicode_table, get_encoder
-from .peclasses import Section, RelocationTable, PortableExecutable
+from .patch_charmap import patch_unicode_table, get_encoder, Encoder
+from .peclasses import Section, RelocationTable, PortableExecutable, SectionTable
 from .pretty_printing import myrepr, format_hex_list
 from .search_charmap import search_charmap
 from .trace_machine_code import FunctionInformation
-
-# from warnings import warn
+from .type_aliases import Offset
 
 code_section, rdata_section, data_section = range(3)
 
 
-def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, str], debug=False):
+def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_table: Mapping[str, str]):
     log = get_logger()
 
     log.info("Finding cross-references...")
 
-    image_base = pe.image_optional_header.image_base
+    image_base = cast(int, pe.image_optional_header.image_base)
     sections = pe.section_table
 
     # Getting addresses of all relocatable entries
@@ -43,8 +42,7 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
     if codepage:
         fix_unicode_table(codepage, file, sections, xref_table)
 
-    if debug:
-        log.info("Preparing additional data section...")
+    log.debug("Preparing additional data section...")
 
     last_section = sections[-1]
 
@@ -68,16 +66,15 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
 
     strings = list(extract_strings(file, xref_table, encoding=original_codepage, arrays=True))
 
-    if debug:
-        log.info("{} strings extracted.".format(len(strings)))
+    log.debug("{} strings extracted.".format(len(strings)))
 
-        log.info("Leaving only strings, which have translations.")
-        strings = [x for x in strings if x[1] in trans_table]
-        log.info("{} strings remaining.".format(len(strings)))
-        if 0 < len(strings) <= 16:
-            log.info("All remaining strings:")
-            for offset, string, *_ in strings:
-                log.info("0x{:x} : {!r}".format(offset, string))
+    log.debug("Leaving only strings, which have translations.")
+    strings = [x for x in strings if x[1] in trans_table]
+    log.debug("{} strings remaining.".format(len(strings)))
+    if 0 < len(strings) <= 16:
+        log.debug("All remaining strings:")
+        for offset, string, *_ in strings:
+            log.debug("0x{:x} : {!r}".format(offset, string))
 
     encoding = codepage if codepage else "cp437"
 
@@ -90,18 +87,16 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
 
     functions = extract_function_information(image_base, metadata, sections)
 
-    if debug:
-        log.debug("\nGuessed function parameters:")
-        for address, meta in sorted(functions.items(), key=itemgetter(0)):
-            log.debug("sub_{:x}: {!r}".format(sections[code_section].offset_to_rva(address) + image_base, meta))
+    log.debug("Guessed function parameters:")
+    for address, meta in sorted(functions.items(), key=itemgetter(0)):
+        log.debug("sub_{:x}: {!r}".format(sections[code_section].offset_to_rva(address) + image_base, meta))
 
     not_fixed, status_unknown = add_strlens(fixes, functions, metadata)
-    if debug:
-        for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
-            log.debug("Length not fixed: {} (reference from 0x{:x})".format(myrepr(string), ref), meta)
+    for ref, (string, meta) in sorted(not_fixed.items(), key=lambda x: x[0]):
+        log.debug("Length not fixed: {} (reference from 0x{:x}), metadata: {}".format(myrepr(string), ref, meta))
 
-        for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
-            log.debug("Status unknown: {} (reference from 0x{:x})".format(myrepr(string), ref), meta)
+    for ref, (string, meta) in sorted(status_unknown.items(), key=lambda x: x[0]):
+        log.debug("Status unknown: {} (reference from 0x{:x}), metadata: {}".format(myrepr(string), ref, meta))
 
     new_section_offset = apply_delayed_fixes(fixes, file, new_section, new_section_offset, relocs_to_add, sections)
 
@@ -111,7 +106,6 @@ def fix_df_exe(file, pe, codepage, original_codepage, trans_table: Mapping[str, 
             log.warning("Trying to remove some relocations which weren't in the original list: " +
                         format_hex_list(item + image_base for item in (relocs_to_remove - relocatable_items)))
 
-        if debug:
             log.debug("\nRemoved relocations:")
             log.debug(format_hex_list(relocs_to_remove, wrap_at=80))
             log.debug("\nAdded relocations:")
@@ -156,8 +150,16 @@ def fix_unicode_table(codepage, fn, sections, xref_table):
             log.info("Done.")
 
 
-def process_strings(encoder_function, encoding, fn, image_base, new_section, new_section_offset, sections,
-                    strings, trans_table, xref_table) -> \
+def process_strings(encoder_function: Encoder.encode,
+                    encoding: str,
+                    fn: BinaryIO,
+                    image_base: int,
+                    new_section: Section,
+                    new_section_offset: int,
+                    sections: SectionTable,
+                    strings,
+                    trans_table,
+                    xref_table) -> \
         Tuple[MutableMapping[int, Fix], MutableMapping[Tuple[str, int], Fix], int, Set[int], Set[int]]:
     # return fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove
 
@@ -211,8 +213,8 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                                                      string_address=string_address,
                                                      original_string_address=original_string_address)
                     except Exception:
-                        log.exception("Catched {} exception on string {!r} at reference 0x{:x}"
-                                      .format(sys.exc_info()[0], string, ref_rva + image_base))
+                        log.exception("Caught {} exception on a string {!r} (translation {!r}) at reference 0x{:x}"
+                                      .format(sys.exc_info()[0], string, translation, ref_rva + image_base))
                         raise
                 else:
                     fix = Fix(meta=Metadata(fixed="not needed"))
@@ -243,7 +245,7 @@ def process_strings(encoder_function, encoding, fn, image_base, new_section, new
                 metadata[(string, ref_rva + image_base)] = fix
 
     for offset, b in delayed_pokes.items():
-        fpoke(fn, offset, b)
+        fpoke(fn, offset, bytes(b))
 
     return fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove
 
@@ -302,7 +304,7 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     new_size = reloc_table.size
     data_directory = pe.image_data_directory
     relocation_table_offset = sections.rva_to_offset(data_directory.basereloc.virtual_address)
-    relocation_table_size = data_directory.basereloc.size
+    relocation_table_size = cast(int, data_directory.basereloc.size)
     relocation_section = sections[sections.which_section(offset=relocation_table_offset)]
     if new_size <= relocation_section.size_of_raw_data:
         file.seek(relocation_table_offset)
@@ -328,7 +330,12 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     return new_section_offset, relocation_table
 
 
-def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_add, sections):
+def apply_delayed_fixes(fixes: Mapping[Any, Fix],  # FIXME
+                        fn: BinaryIO,
+                        new_section: Section,
+                        new_section_offset: int,
+                        relocs_to_add: Set[int],
+                        sections: SectionTable) -> Offset:
     # Delayed fix
     for fix in fixes.values():
         src_off = fix.src_off
@@ -349,15 +356,17 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
         if dest_off is not None:
             dest_rva = sections[code_section].offset_to_rva(dest_off)
             mach.origin_address = hook_rva
-            if "dest" in mach.get_values():
-                mach.set_values(dest=dest_rva)
-            else:
+
+            if "dest" not in mach.get_values():
                 # Add jump from the hook
-                mach.byte(jmp_near).relative_reference(dest_rva)
+                mach.byte(jmp_near).relative_reference("dest", size=4)
+
+            mach.set_values(dest=dest_rva)
 
         assert mach is not None
         # Write the hook to the new section
-        new_section_offset = add_to_new_section(fn, new_section_offset, mach.build(), padding_byte=int3)
+        new_section_offset = add_to_new_section(fn, new_section_offset, mach.build(),
+                                                padding_byte=int3.to_bytes(1, "little"))
 
         # If there are absolute references in the code, add them to relocation table
         if fix.added_relocs or list(mach.absolute_references):
@@ -366,7 +375,7 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
             if fix.added_relocs:
                 new_refs.update(fix.added_relocs)
 
-            relocs_to_add.add_items(hook_rva + item for item in new_refs)
+            relocs_to_add.update(hook_rva + item for item in new_refs)
 
         if fix.pokes:
             for off, b in fix.pokes.items():
@@ -378,15 +387,16 @@ def apply_delayed_fixes(fixes, fn, new_section, new_section_offset, relocs_to_ad
     return new_section_offset
 
 
-def extract_function_information(image_base: int,
+def extract_function_information(image_base: Offset,
                                  metadata: Mapping[Tuple[str, int], Fix],
-                                 sections: List[Section]) -> Mapping[int, Metadata]:
+                                 sections: List[Section]) \
+        -> Mapping[Offset, Metadata]:
     """
     Extract information of functions parameters
     """
     log = get_logger()
 
-    functions: MutableMapping[int, Metadata] = defaultdict(Metadata)
+    functions: MutableMapping[Offset, Metadata] = defaultdict(Metadata)
     for fix in metadata.values():
         meta = fix.meta
         assert meta is not None
@@ -398,7 +408,7 @@ def extract_function_information(image_base: int,
                 str_param = meta.string
                 if not functions[offset].string:
                     functions[offset].string.update(str_param)
-                elif str_param not in functions[offset].string:
+                elif str_param > functions[offset].string:
                     log.warning(
                         "Warning: possible function parameter recognition collision for sub_{:x}: {!r} not in {!r}"
                         .format(address, str_param, functions[offset].string)

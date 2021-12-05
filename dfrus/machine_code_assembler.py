@@ -75,7 +75,7 @@ class MachineCodeAssembler(MachineCodeBuilder):
         return self.byte(push_imm8).byte(new_len)
 
     def call_near(self, label: str):
-        return self.byte(call_near).relative_reference(label)
+        return self.byte(call_near).relative_reference(label, size=4)
 
 
 def asm() -> MachineCodeAssembler:

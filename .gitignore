@@ -8,3 +8,4 @@ htmlcov
 .coverage
 dict.csv
 *.log
+*.log.*

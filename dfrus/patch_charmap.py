@@ -1,7 +1,7 @@
 import codecs
 import functools
 import unicodedata
-from typing import Tuple, Mapping, Union, Iterable, Dict, BinaryIO, Callable
+from typing import Tuple, Mapping, Union, Iterable, Dict, BinaryIO
 
 from .binio import fpoke4
 from .type_aliases import Offset
@@ -114,7 +114,7 @@ class Encoder:
 _encoders = {"viscii": Encoder(_additional_codepages["viscii"])}
 
 
-def get_encoder(encoding: str) -> Callable[[str], Tuple[bytes, int]]:
+def get_encoder(encoding: str) -> Encoder.encode:
     try:
         return codecs.getencoder(encoding)
     except LookupError as ex:

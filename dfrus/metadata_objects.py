@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, fields
-from typing import Optional, Set, Mapping, Iterable
+from typing import Optional, Set, Mapping, Iterable, Union
 
 from .machine_code_builder import MachineCodeBuilder
 from .trace_machine_code import FunctionInformation
@@ -18,7 +18,7 @@ class Metadata:
 @dataclass
 class Fix:
     new_code: Optional[MachineCodeBuilder] = None
-    pokes: Optional[Mapping[int, bytes]] = None
+    pokes: Optional[Mapping[int, Union[bytes, MachineCodeBuilder]]] = None
     src_off: Optional[int] = None
     dest_off: Optional[int] = None
     added_relocs: Iterable[int] = field(default_factory=list)
@@ -34,7 +34,10 @@ class Fix:
         new_code = fix.new_code
         assert new_code is not None
         old_code = self.new_code
-        assert old_code is not None and new_code is not None
-        if new_code.build() not in old_code.build():  # FIXME: probably this check needs to be optimized
+        assert new_code is not None
+        if old_code is None:
+            fix.new_code = new_code
+            self.update(fix)
+        elif new_code.build() not in old_code.build():  # FIXME: probably this check needs to be optimized
             fix.new_code = new_code + old_code
             self.update(fix)

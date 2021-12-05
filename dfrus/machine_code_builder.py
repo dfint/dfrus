@@ -21,7 +21,7 @@ from collections import defaultdict
 from copy import copy, deepcopy
 from typing import List, Optional, Dict, Union, Iterable, Tuple
 
-from attr import dataclass
+from dataclasses import dataclass
 
 from .binio import to_unsigned
 
@@ -40,10 +40,12 @@ class Reference(MachineCodeItem):
 
     @classmethod
     def relative(cls, name, size=4):
+        assert isinstance(name, str)
         return cls(name=name, size=size, is_relative=True)
 
     @classmethod
-    def absolute(cls, value=None, name=None, size=4):
+    def absolute(cls, value: Optional[int] = None, name: Optional[str] = None, size=4):
+        assert name is None or isinstance(name, str)
         return cls(value=value, name=name, size=size, is_relative=False)
 
 
@@ -79,6 +81,7 @@ class MachineCodeBuilder:
         return self.add_bytes(b.to_bytes(1, "little") * n)
 
     def relative_reference(self, name: str, size: int):
+        assert isinstance(name, str)
         reference = Reference.relative(name=name, size=size)
         self._fields[name].append(reference)
         return self._add_item(reference)
@@ -149,6 +152,9 @@ class MachineCodeBuilder:
                     buffer.write(value.to_bytes(item.size, signed=False, byteorder=self.byteorder))
 
         return buffer.getvalue()
+
+    def __bytes__(self):
+        return self.build()
 
     def __iadd__(self, other: Union["MachineCodeBuilder", bytes]):
         assert isinstance(other, (MachineCodeBuilder, bytes))
