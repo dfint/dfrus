@@ -1,8 +1,9 @@
 from collections import defaultdict
 from typing import List, Iterable, BinaryIO, Mapping
 
+from peclasses.section_table import SectionTable
+
 from .binio import from_dword, read_bytes
-from .peclasses import SectionTable
 
 code, rdata, data = range(3)
 

@@ -595,6 +595,8 @@ def disasm(s: bytes, start_address=0) -> Iterator[DisasmLine]:
 
 
 def _main(argv):
+    from peclasses.portable_executable import PortableExecutable
+
     if len(argv) < 2:
         pass
     else:
@@ -620,5 +622,4 @@ def _main(argv):
 
 if __name__ == "__main__":
     import sys
-    from .peclasses import PortableExecutable
     _main(sys.argv)

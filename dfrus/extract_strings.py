@@ -2,10 +2,10 @@ from collections import Counter
 from typing import Tuple
 
 import click
+from peclasses.portable_executable import PortableExecutable
 
 from .cross_references import get_cross_references
 from .disasm import align
-from .peclasses import PortableExecutable
 from .pretty_printing import myrepr
 
 forbidden = set(b"$^")

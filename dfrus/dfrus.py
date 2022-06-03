@@ -5,11 +5,11 @@ from shutil import copy
 from typing import Sequence, Tuple, Union, Dict, Iterable
 
 import click
+from peclasses.portable_executable import PortableExecutable
 
 from .dictionary_loaders import load_trans_file
 from .logger import get_logger, init_logger
 from .patchdf import fix_df_exe
-from .peclasses import PortableExecutable
 
 
 def slice_translation(trans_table: Union[Dict[str, str], Iterable[Tuple[str, str]]], bounds) -> Dict[str, str]:

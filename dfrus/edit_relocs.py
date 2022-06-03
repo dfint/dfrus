@@ -3,8 +3,8 @@ from functools import partial
 from typing import Callable, Set, BinaryIO, Sequence, List
 
 import click
-
-from .peclasses import PortableExecutable, RelocationTable
+from peclasses.portable_executable import PortableExecutable
+from peclasses.relocation_table import RelocationTable
 
 
 def int_literal_converter(value: str) -> int:

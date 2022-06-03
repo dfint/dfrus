@@ -4,6 +4,10 @@ from collections import defaultdict, OrderedDict
 from operator import itemgetter
 from typing import Tuple, Set, Mapping, MutableMapping, List, cast, BinaryIO, Any
 
+from peclasses.portable_executable import PortableExecutable
+from peclasses.relocation_table import RelocationTable
+from peclasses.section_table import Section, SectionTable
+
 from .analyze_and_provide_fix import analyze_reference_code
 from .binio import fpoke4, fpoke, to_dword
 from .cross_references import get_cross_references
@@ -13,10 +17,9 @@ from .logger import get_logger
 from .machine_code_assembler import asm
 from .machine_code_utils import mach_strlen
 from .metadata_objects import Metadata, Fix
-from .new_section import add_new_section, add_to_new_section, create_section_blueprint
+from .new_section import add_to_new_section, create_section_blueprint
 from .opcodes import *
 from .patch_charmap import patch_unicode_table, get_encoder, Encoder
-from .peclasses import Section, RelocationTable, PortableExecutable, SectionTable
 from .pretty_printing import myrepr, format_hex_list
 from .search_charmap import search_charmap
 from .trace_machine_code import FunctionInformation
@@ -122,7 +125,7 @@ def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_
     # Add new section to the executable
     if new_section_offset > new_section.pointer_to_raw_data:
         log.info("Adding new data section...")
-        add_new_section(pe, new_section, new_section_offset)
+        pe.add_new_section(new_section, new_section.pointer_to_raw_data - new_section_offset)
 
     # Check if the patched file is not broken
     log.info("Final check...")
