@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Tuple
+from typing import Tuple, cast
 
 import click
 from peclasses.portable_executable import PortableExecutable
@@ -137,10 +137,12 @@ def _main(ascii_only, executable, output_file, encoding):
     """
     pe = PortableExecutable(executable)
 
-    xrefs = get_cross_references(executable,
-                                 pe.relocation_table,
-                                 pe.section_table,
-                                 pe.image_optional_header.image_base)
+    xrefs = get_cross_references(
+        executable,
+        pe.relocation_table,
+        pe.section_table,
+        cast(int, pe.optional_header.image_base)
+    )
 
     strings = list(extract_strings(executable, xrefs, encoding=encoding, arrays=True))
     count = Counter(x[1] for x in strings)

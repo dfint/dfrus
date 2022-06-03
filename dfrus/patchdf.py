@@ -33,7 +33,7 @@ def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_
 
     log.info("Finding cross-references...")
 
-    image_base = cast(int, pe.image_optional_header.image_base)
+    image_base = cast(int, pe.optional_header.image_base)
     sections = pe.section_table
 
     # Getting addresses of all relocatable entries
@@ -57,9 +57,9 @@ def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_
     new_section = create_section_blueprint(
         b".new",
         align(last_section.virtual_address + last_section.virtual_size,
-              pe.image_optional_header.section_alignment),
+              pe.optional_header.section_alignment),
         align(last_section.pointer_to_raw_data + last_section.size_of_raw_data,
-              pe.image_optional_header.file_alignment),
+              pe.optional_header.file_alignment),
     )
 
     new_section_offset = new_section.pointer_to_raw_data
@@ -305,7 +305,7 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     sections = pe.section_table
     reloc_table = RelocationTable.build(relocation_table)
     new_size = reloc_table.size
-    data_directory = pe.image_data_directory
+    data_directory = pe.data_directory
     relocation_table_offset = sections.rva_to_offset(data_directory.basereloc.virtual_address)
     relocation_table_size = cast(int, data_directory.basereloc.size)
     relocation_section = sections[sections.which_section(offset=relocation_table_offset)]

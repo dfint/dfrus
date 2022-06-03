@@ -23,7 +23,7 @@ def list_int_literal_converter(values: List[str]) -> List[int]:
 
 def common(file: BinaryIO, function: Callable[[Set[int]], Set[int]]):
     pe = PortableExecutable(file)
-    data_directory = pe.image_data_directory
+    data_directory = pe.data_directory
     sections = pe.section_table
     reloc_rva, reloc_size = data_directory.basereloc
     reloc_off = sections.rva_to_offset(reloc_rva)
