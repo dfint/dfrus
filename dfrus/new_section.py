@@ -3,6 +3,7 @@ from ctypes import sizeof
 from .binio import fpoke
 from .disasm import align
 from .peclasses import PortableExecutable, Section
+from .type_aliases import Offset
 
 
 def create_section_blueprint(section_name, virtual_address, physical_address):
@@ -23,7 +24,7 @@ def add_to_new_section(fn, new_section_offset, s: bytes, alignment=4, padding_by
     return new_section_offset + aligned
 
 
-def add_new_section(pe: PortableExecutable, new_section, new_section_offset):
+def add_new_section(pe: PortableExecutable, new_section: Section, new_section_offset: Offset):
     fn = pe.file
     sections = pe.section_table
     section_alignment = pe.image_optional_header.section_alignment
@@ -33,8 +34,7 @@ def add_new_section(pe: PortableExecutable, new_section, new_section_offset):
 
     # Align file size
     if file_size > new_section_offset:
-        fn.seek(file_size - 1)
-        fn.write(b"\0")
+        fn.truncate(file_size)
 
     # Set the new section virtual size
     new_section.virtual_size = new_section_offset - new_section.pointer_to_raw_data
