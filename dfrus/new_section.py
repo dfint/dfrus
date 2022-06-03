@@ -40,7 +40,8 @@ def add_new_section(pe: PortableExecutable, new_section: Section, new_section_of
     new_section.virtual_size = new_section_offset - new_section.pointer_to_raw_data
     # Write the new section info
     fn.seek(pe.image_dos_header.e_lfanew + sizeof(pe.image_nt_headers) + len(sections) * sizeof(Section))
-    new_section.write(fn)
+    fn.write(new_section)
+
     # Fix number of sections
     pe.image_file_header.number_of_sections = len(sections) + 1
     # Fix ImageSize field of the PE header
