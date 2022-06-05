@@ -24,15 +24,12 @@ class TraceConfig:
     trace_call: Trace
 
 
-def trace_code(fn: BinaryIO,
-               offset: int,
-               stop_cond: Callable[[DisasmLine], bool],
-               trace_config: Optional[TraceConfig] = None) -> Optional[DisasmLine]:
+def trace_code(
+    fn: BinaryIO, offset: int, stop_cond: Callable[[DisasmLine], bool], trace_config: Optional[TraceConfig] = None
+) -> Optional[DisasmLine]:
 
     if trace_config is None:
-        trace_config = TraceConfig(trace_jmp=Trace.follow,
-                                   trace_jcc=Trace.forward_only,
-                                   trace_call=Trace.stop)
+        trace_config = TraceConfig(trace_jmp=Trace.follow, trace_jcc=Trace.forward_only, trace_call=Trace.stop)
 
     s = read_bytes(fn, offset, count_after)
     with suppress(IndexError):
@@ -97,8 +94,9 @@ class FunctionInformation:
 
 
 def which_func(fn, offset, stop_cond=lambda _: False) -> FunctionInformation:
-    disasm_line = trace_code(fn, offset, stop_cond=lambda current_line:
-                             str(current_line).startswith("rep") or stop_cond(current_line))
+    disasm_line = trace_code(
+        fn, offset, stop_cond=lambda current_line: str(current_line).startswith("rep") or stop_cond(current_line)
+    )
 
     if disasm_line is None:
         return FunctionInformation("not reached")

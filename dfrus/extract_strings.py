@@ -40,7 +40,7 @@ def check_string(buf: bytes, encoding: str) -> Tuple[int, int]:
             string_length = i
             break
 
-        current_byte = bytes(buf[i:i + 1])
+        current_byte = bytes(buf[i : i + 1])
         if not is_allowed(c) or not possible_to_decode(current_byte, encoding):
             break
         elif current_byte.isalpha():
@@ -59,7 +59,7 @@ def check_string_array(buf, offset, encoding="cp437"):
                 start = None
                 end = None
 
-            if not is_allowed(c) or not possible_to_decode(buf[i:i + 1], encoding):
+            if not is_allowed(c) or not possible_to_decode(buf[i : i + 1], encoding):
                 if start:
                     start = None
                 continue
@@ -138,10 +138,7 @@ def _main(ascii_only, executable, output_file, encoding):
     pe = PortableExecutable(executable)
 
     xrefs = get_cross_references(
-        executable,
-        pe.relocation_table,
-        pe.section_table,
-        cast(int, pe.optional_header.image_base)
+        executable, pe.relocation_table, pe.section_table, cast(int, pe.optional_header.image_base)
     )
 
     strings = list(extract_strings(executable, xrefs, encoding=encoding, arrays=True))

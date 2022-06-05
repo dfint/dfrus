@@ -7,7 +7,7 @@ from .opcodes import Reg, RegType
 
 
 def asmhex(n):
-    assert(n >= 0)
+    assert n >= 0
     if n < 0xA:
         return str(n)
     else:

@@ -46,16 +46,18 @@ _additional_codepages: Mapping[str, Mapping[int, Union[int, Iterable[int]]]] = {
         0xC0: map(ord_utf16, "ÀÁÂÃẢĂẳẵÈÉÊẺÌÍĨỳ"),
         0xD0: map(ord_utf16, "ĐứÒÓÔạỷừửÙÚỹỵÝỡư"),
         0xE0: map(ord_utf16, "àáâãảăữẫèéêẻìíĩỉ"),
-        0xF0: map(ord_utf16, "đựòóôõỏọụùúũủýợỮ")
-    }
+        0xF0: map(ord_utf16, "đựòóôõỏọụùúũủýợỮ"),
+    },
 }
 
 
 def generate_charmap_table_patch(enc1: str, enc2: str) -> Mapping[int, int]:
     bt = bytes(range(0x80, 0x100))
-    return dict((i, ord_utf16(b))
-                for i, (a, b) in enumerate(zip(bt.decode(enc1), bt.decode(enc2, errors="replace")), start=0x80)
-                if a != b and b.isalpha())
+    return dict(
+        (i, ord_utf16(b))
+        for i, (a, b) in enumerate(zip(bt.decode(enc1), bt.decode(enc2, errors="replace")), start=0x80)
+        if a != b and b.isalpha()
+    )
 
 
 @functools.lru_cache(maxsize=None)

@@ -17,12 +17,14 @@ def write_dwords(file_object: BinaryIO, dwords: Iterable[int]) -> None:
         write_dword(file_object, x)
 
 
-def write_string(file_object: BinaryIO,
-                 string: str,
-                 offset: Optional[int] = None,
-                 new_len: Optional[int] = None,
-                 encoding: Optional[str] = None) -> None:
-    
+def write_string(
+    file_object: BinaryIO,
+    string: str,
+    offset: Optional[int] = None,
+    new_len: Optional[int] = None,
+    encoding: Optional[str] = None,
+) -> None:
+
     if offset is not None:
         file_object.seek(offset)
 
@@ -37,9 +39,7 @@ def write_string(file_object: BinaryIO,
     file_object.write(bs.ljust(new_len, b"\0"))
 
 
-def fpoke4(file_object: BinaryIO,
-           offset: Offset,
-           x: Union[int, Iterable[int]]) -> None:
+def fpoke4(file_object: BinaryIO, offset: Offset, x: Union[int, Iterable[int]]) -> None:
 
     file_object.seek(offset)
     if isinstance(x, int):
@@ -48,9 +48,7 @@ def fpoke4(file_object: BinaryIO,
         write_dwords(file_object, x)
 
 
-def fpoke(file_object: BinaryIO,
-          offset: Offset,
-          x: Union[int, Iterable[int]]):
+def fpoke(file_object: BinaryIO, offset: Offset, x: Union[int, Iterable[int]]):
 
     assert offset >= 0, offset
     file_object.seek(offset)
@@ -61,8 +59,8 @@ def fpoke(file_object: BinaryIO,
 
 
 def to_signed(x: int, width: int) -> int:
-    pow2w = 2 ** width
-    assert (x < pow2w)
+    pow2w = 2**width
+    assert x < pow2w
     if x & (pow2w // 2):
         x -= pow2w
     return x
@@ -74,7 +72,7 @@ def to_unsigned(x: int, width: int) -> int:
     :param x: original value
     :param width in bits
     """
-    pow2w = 2 ** width
+    pow2w = 2**width
     if x < 0:
         x += pow2w
     assert 0 <= x < pow2w

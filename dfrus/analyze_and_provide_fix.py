@@ -8,13 +8,13 @@ from .machine_code_utils import mach_strlen
 from .metadata_objects import Metadata, Fix
 from .moves_series import get_fix_for_moves, analyze_moves_series
 from .opcodes import *
-from .operand import (RegisterOperand, RelativeMemoryReference, ImmediateValueOperand)
+from .operand import RegisterOperand, RelativeMemoryReference, ImmediateValueOperand
 from .trace_machine_code import FunctionInformation, which_func
 
 
 def find_instruction(s, instruction):
     for line in disasm(s):
-        assert (line.mnemonic != "db")
+        assert line.mnemonic != "db"
         if line.data[0] == instruction:
             return line.address
     return None
@@ -25,12 +25,9 @@ count_after = 0x100
 count_after_for_get_length = 0x2000
 
 
-def analyze_reference_code(fn: BinaryIO,
-                           offset: int,
-                           old_len: int,
-                           new_len: int,
-                           string_address: int,
-                           original_string_address: int) -> Fix:
+def analyze_reference_code(
+    fn: BinaryIO, offset: int, old_len: int, new_len: int, string_address: int, original_string_address: int
+) -> Fix:
     """
     Analyze a machine code around a reference to a string and provide a fix for the code if needed
     """
@@ -40,8 +37,8 @@ def analyze_reference_code(fn: BinaryIO,
     aft = read_bytes(fn, next_off, count_after)
     jmp = None
     old_next = next_off
-    if aft[0] in {jmp_short, jmp_near} or aft[0] & 0xf0 == jcc_short:
-        if aft[0] == jmp_short or aft[0] & 0xf0 == jcc_short:
+    if aft[0] in {jmp_short, jmp_near} or aft[0] & 0xF0 == jcc_short:
+        if aft[0] == jmp_short or aft[0] & 0xF0 == jcc_short:
             displacement = to_signed(aft[1], width=8)
             next_off += 2 + displacement
         elif aft[0] == jmp_near:
@@ -49,7 +46,7 @@ def analyze_reference_code(fn: BinaryIO,
             next_off += 5 + displacement
         jmp = aft[0]
         aft = read_bytes(fn, next_off, count_after)
-    elif aft[0] == call_near or (aft[0] == 0x0f and aft[1] == x0f_jcc_near):
+    elif aft[0] == call_near or (aft[0] == 0x0F and aft[1] == x0f_jcc_near):
         aft = bytes()
 
     meta = Metadata()
@@ -106,7 +103,7 @@ def analyze_reference_code(fn: BinaryIO,
                         mov_esp_edi = False
 
                         for line in disasm(aft, next_off):
-                            assert (line.mnemonic != "db")
+                            assert line.mnemonic != "db"
                             str_line = str(line)
                             if str_line.startswith("mov [esp") and str_line.endswith("], edi"):
                                 # Check if the value of edi is used in "mov [esp+N], edi"
@@ -142,7 +139,7 @@ def analyze_reference_code(fn: BinaryIO,
                                 ret_value = Fix(
                                     src_off=line.address + 1,
                                     new_code=m,
-                                    pokes={line.address: bytes([jmp_near])}  # Replace call with jump
+                                    pokes={line.address: bytes([jmp_near])},  # Replace call with jump
                                 )
                                 ret_value.meta = meta
                                 return ret_value
@@ -161,40 +158,38 @@ def analyze_reference_code(fn: BinaryIO,
                     meta.fixed = "yes"
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
-                    ret_value = Fix(
-                        src_off=old_next + 1,
-                        new_code=asm().push_imm8(new_len),
-                        dest_off=next_off + 2
-                    )
+                    ret_value = Fix(src_off=old_next + 1, new_code=asm().push_imm8(new_len), dest_off=next_off + 2)
                     ret_value.meta = meta
                     return ret_value
                 else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
-                        displacement = from_dword(aft[i + 1:i + 5], signed=True)
+                        displacement = from_dword(aft[i + 1 : i + 5], signed=True)
                         ret_value = Fix(
                             src_off=next_off + i + 1,
                             new_code=mach_strlen(
                                 # mov [ESP+8], ECX
-                                asm().byte(mov_rm_reg | 1).modrm(1, Reg.ecx, 4).sib(0, 4, Reg.esp).byte(8)
+                                asm()
+                                .byte(mov_rm_reg | 1)
+                                .modrm(1, Reg.ecx, 4)
+                                .sib(0, 4, Reg.esp)
+                                .byte(8)
                             ),
-                            dest_off=next_off + i + 5 + displacement
+                            dest_off=next_off + i + 5 + displacement,
                         )
                         ret_value.meta = meta
                         return ret_value
-            elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xf8 == join_byte(3, Reg.edi, 0):
+            elif pre[-2] == mov_reg_rm | 1 and pre[-1] & 0xF8 == join_byte(3, Reg.edi, 0):
                 # mov edi, reg
                 meta.length = "edi"
                 # There"s no code in DF that passes this condition. Left just in case.
                 # TODO: Drop it
                 i = find_instruction(aft, call_near)
                 if i is not None:
-                    displacement = from_dword(aft[i + 1:i + 5], signed=True)
+                    displacement = from_dword(aft[i + 1 : i + 5], signed=True)
                     ret_value = Fix(
                         src_off=next_off + i + 1,
-                        new_code=mach_strlen(
-                            asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
-                        ),
+                        new_code=mach_strlen(asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)),  # mov edi, ecx
                         dest_off=next_off + i + 5 + displacement,
                     )
                     ret_value.meta = meta
@@ -208,27 +203,21 @@ def analyze_reference_code(fn: BinaryIO,
                     return Fix(meta=meta)
                 elif jmp == jmp_near:
                     m = asm().mov_reg_imm(Reg.edi, new_len)  # mov edi, new_len
-                    ret_value = Fix(
-                        src_off=old_next + 1,
-                        new_code=m,
-                        dest_off=next_off + 5
-                    )
+                    ret_value = Fix(src_off=old_next + 1, new_code=m, dest_off=next_off + 5)
                     ret_value.meta = meta
                     return ret_value
                 else:  # jmp == jmp_short
                     i = find_instruction(aft, call_near)
                     if i is not None:
-                        displacement = from_dword(aft[i + 1:i + 5], signed=True)
+                        displacement = from_dword(aft[i + 1 : i + 5], signed=True)
                         ret_value = Fix(
                             src_off=next_off + i + 1,
-                            new_code=mach_strlen(
-                                asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)  # mov edi, ecx
-                            ),
+                            new_code=mach_strlen(asm().byte(mov_reg_rm | 1).modrm(3, Reg.edi, Reg.ecx)),  # mov edi, ecx
                             dest_off=next_off + i + 5 + displacement,
                         )
                         ret_value.meta = meta
                         return ret_value
-            elif pre[-4] == lea and pre[-3] & 0xf8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
+            elif pre[-4] == lea and pre[-3] & 0xF8 == join_byte(1, Reg.edi, 0) and pre[-2] != 0:
                 # Possible to be `lea edi, [reg+N]`
                 displacement = to_signed(pre[-2], 8)
                 if displacement == old_len:
@@ -237,8 +226,13 @@ def analyze_reference_code(fn: BinaryIO,
                     fpoke(fn, offset - 2, new_len)
                     meta.fixed = "yes"
                     return Fix(meta=meta)
-            elif (aft and aft[0] == mov_reg_rm | 1 and aft[1] & 0xf8 == join_byte(3, Reg.ecx, 0) and
-                  aft[2] == push_imm8 and aft[3] == old_len):
+            elif (
+                aft
+                and aft[0] == mov_reg_rm | 1
+                and aft[1] & 0xF8 == join_byte(3, Reg.ecx, 0)
+                and aft[2] == push_imm8
+                and aft[3] == old_len
+            ):
                 # mov ecx, reg; push imm8
                 meta.length = "push"
                 if not jmp:
@@ -273,7 +267,7 @@ def analyze_reference_code(fn: BinaryIO,
                 meta.length = "ecx*4"
                 meta.fixed = "yes"
                 return Fix(meta=meta)
-            elif pre[-4] == lea and pre[-3] & 0xf8 == mod_1_ecx_0 and pre[-2] == dword_count:
+            elif pre[-4] == lea and pre[-3] & 0xF8 == mod_1_ecx_0 and pre[-2] == dword_count:
                 # lea ecx, [reg+dword_count]  ; assuming that reg value == 0
                 fpoke(fn, offset - 2, new_dword_count)
                 meta.length = "ecx*4"
@@ -303,7 +297,7 @@ def analyze_reference_code(fn: BinaryIO,
                             skip = None
                             if match_mov_reg_imm32(aft[:5], Reg.ecx, dword_count):
                                 skip = 5
-                            elif aft[0] == lea and aft[1] & 0xf8 == mod_1_ecx_0 and aft[2] == dword_count:
+                            elif aft[0] == lea and aft[1] & 0xF8 == mod_1_ecx_0 and aft[2] == dword_count:
                                 skip = 3
 
                             if skip is not None:
@@ -311,7 +305,7 @@ def analyze_reference_code(fn: BinaryIO,
                                 ret_value = Fix(
                                     src_off=line.address + 1,
                                     new_code=asm().mov_reg_imm(Reg.ecx, dword_count),
-                                    dest_off=next_off_2 + skip
+                                    dest_off=next_off_2 + skip,
                                 )
                                 ret_value.meta = meta
                                 return ret_value
@@ -323,7 +317,7 @@ def analyze_reference_code(fn: BinaryIO,
                             meta.length = "ecx*4"
                             meta.fixed = "yes"
                             return Fix(meta=meta)
-                        elif line_data[0] == lea and line_data[1] & 0xf8 == mod_1_ecx_0 and line_data[2] == dword_count:
+                        elif line_data[0] == lea and line_data[1] & 0xF8 == mod_1_ecx_0 and line_data[2] == dword_count:
                             fpoke(fn, line.address + 2, new_dword_count)
                             meta.length = "ecx*4"
                             meta.fixed = "yes"
@@ -332,10 +326,13 @@ def analyze_reference_code(fn: BinaryIO,
         else:
             meta.string.add(["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"][reg])
         return Fix(meta=meta)
-    elif (pre[-1] & 0xFE == mov_acc_mem or (pre[-2] & 0xFE == mov_reg_rm and
-                                            pre[-1] & 0xC7 == join_byte(0, 0, 5)) or  # mov
-          pre[-3] == 0x0F and pre[-2] in {x0f_movups, x0f_movaps} and
-          pre[-1] & 0xC7 == join_byte(0, 0, 5)):  # movups or movaps
+    elif (
+        pre[-1] & 0xFE == mov_acc_mem
+        or (pre[-2] & 0xFE == mov_reg_rm and pre[-1] & 0xC7 == join_byte(0, 0, 5))
+        or pre[-3] == 0x0F  # mov
+        and pre[-2] in {x0f_movups, x0f_movaps}
+        and pre[-1] & 0xC7 == join_byte(0, 0, 5)
+    ):  # movups or movaps
         # mov eax, [addr] or mov reg, [addr]
         meta.string.add("mov")
 

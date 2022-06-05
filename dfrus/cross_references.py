@@ -8,11 +8,9 @@ from .binio import from_dword, read_bytes
 code, rdata, data = range(3)
 
 
-def get_cross_references(file: BinaryIO,
-                         relocation_table: Iterable[int],
-                         sections: SectionTable,
-                         image_base: int) \
-        -> Mapping[int, List[int]]:
+def get_cross_references(
+    file: BinaryIO, relocation_table: Iterable[int], sections: SectionTable, image_base: int
+) -> Mapping[int, List[int]]:
 
     xrefs = defaultdict(list)
     code_section_end_rva = sections[code].virtual_address + sections[code].virtual_size
@@ -23,7 +21,7 @@ def get_cross_references(file: BinaryIO,
     for reloc in relocation_table:
         reloc_off = sections.rva_to_offset(reloc)
         local_off = reloc_off - base_offset
-        obj_rva = from_dword(buffer[local_off:local_off+4]) - image_base
+        obj_rva = from_dword(buffer[local_off : local_off + 4]) - image_base
         reloc += sections[code].pointer_to_raw_data
         if code_section_end_rva < obj_rva:
             obj_off = sections.rva_to_offset(obj_rva)

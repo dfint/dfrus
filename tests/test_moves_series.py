@@ -6,11 +6,11 @@ from dfrus.opcodes import *
 from dfrus.operand import RelativeMemoryReference, AbsoluteMemoryReference
 
 test_data_1 = bytes.fromhex(
-    "8B 0D 50 4B 52 00 "    # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
-    "8B F0 "                # 4c1da0     mov         esi, eax
-    "A1 4C 4B 52 00 "       # 4c1da2     mov         eax, [524b4ch] ; [aFainted]
-    "89 44 24 20 "          # 4c1da7     mov         [esp+20h], eax
-    "89 4C 24 24"           # 4c1dab     mov         [esp+24h], ecx
+    "8B 0D 50 4B 52 00 "  # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]
+    "8B F0 "  # 4c1da0     mov         esi, eax
+    "A1 4C 4B 52 00 "  # 4c1da2     mov         eax, [524b4ch] ; [aFainted]
+    "89 44 24 20 "  # 4c1da7     mov         [esp+20h], eax
+    "89 4C 24 24"  # 4c1dab     mov         [esp+24h], ecx
 )
 
 
@@ -144,9 +144,7 @@ test_data_nausea = bytes.fromhex(
 
 
 def test_analyze_moves_series_nausea():
-    saved = bytes.fromhex(
-        "B9 0A 00 00 00 "  # mov ecx, 0Ah
-    )
+    saved = bytes.fromhex("B9 0A 00 00 00 ")  # mov ecx, 0Ah
     result = analyze_moves_series(test_data_nausea, len("nausea"))
     assert result == MovesSeriesAnalysisResult(
         deleted_relocs={3, 45, 52, 59, 65, 72},
@@ -172,10 +170,7 @@ test_data_whimper_gnaw_intersection = bytes.fromhex(
 
 
 def test_analyze_moves_series_whimper_gnaw_intersection():
-    saved = bytes.fromhex(
-        "85 C0 "  # test eax, eax
-        "0F 95 C2 "  # setnz dl
-    )
+    saved = bytes.fromhex("85 C0 " "0F 95 C2 ")  # test eax, eax  # setnz dl
     result = analyze_moves_series(test_data_whimper_gnaw_intersection, len("whimper"), 0x541F00)
     assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 9, 17, 35},
@@ -218,23 +213,23 @@ def test_analyze_moves_series_tanning_tan_intersection():
 
 
 test_data_stimulant = bytes.fromhex(
-    "8b155c645400"                  # mov         edx, [0054645c] ; "stim"
-    "b90a000000"                    # mov         ecx, 0xa
-    "be34645400"                    # mov         esi, 00546434
-    "bf56de6200"                    # mov         edi, 0062de56
-    "f3a5"                          # repz movsd
-    "8b0d60645400"                  # mov         ecx, [00546460] ; "ulan"
-    "891527c96200"                  # mov         [0062c927], edx
-    "0fb71564645400"                # movzx       edx, word ptr [00546464] ; "t\0"
-    "890d2bc96200"                  # mov         [0062c92b], ecx
-    "6689152fc96200"                # mov         [0062c92f], dx
-    "8b1588645400"                  # mov         edx, [00546488]
+    "8b155c645400"  # mov         edx, [0054645c] ; "stim"
+    "b90a000000"  # mov         ecx, 0xa
+    "be34645400"  # mov         esi, 00546434
+    "bf56de6200"  # mov         edi, 0062de56
+    "f3a5"  # repz movsd
+    "8b0d60645400"  # mov         ecx, [00546460] ; "ulan"
+    "891527c96200"  # mov         [0062c927], edx
+    "0fb71564645400"  # movzx       edx, word ptr [00546464] ; "t\0"
+    "890d2bc96200"  # mov         [0062c92b], ecx
+    "6689152fc96200"  # mov         [0062c92f], dx
+    "8b1588645400"  # mov         edx, [00546488]
 )
 
 
 def test_analyze_moves_series_stimulant():
     saved = bytes.fromhex("B9 0A 00 00 00")  # mov ecx, 0Ah
-    result = analyze_moves_series(test_data_stimulant, len("stimulant"), 0x54645c)
+    result = analyze_moves_series(test_data_stimulant, len("stimulant"), 0x54645C)
     assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 25, 31, 38, 44, 51},
         dest=AbsoluteMemoryReference(0x62C927),
@@ -245,7 +240,7 @@ def test_analyze_moves_series_stimulant():
 
 
 def test_mach_memcpy_stimulant():
-    result = analyze_moves_series(test_data_stimulant, len("stimulant"), 0x54645c)
+    result = analyze_moves_series(test_data_stimulant, len("stimulant"), 0x54645C)
     dest = result.dest
     string_addr = 0x123456
     newlen = len("стимулятор")
@@ -264,21 +259,21 @@ def test_mach_memcpy_stimulant():
 
 
 test_data_linen_apron = bytes.fromhex(
-    "8b0d180b5500"                  # mov         ecx, [00550b18]
-    "8b151c0b5500"                  # mov         edx, [00550b1c]
-    "a1200b5500"                    # mov         eax, [00550b20]
-    "890dc92d7006"                  # mov         [06702dc9], ecx
-    "8915cd2d7006"                  # mov         [06702dcd], edx
-    "bac02d7006"                    # mov         edx, 06702dc0
-    "b918065500"                    # mov         ecx, 00550618
-    "c6051a2e700653"                # mov         byte ptr [06702e1a], 0x53
-    "a3d12d7006"                    # mov         [06702dd1], eax
+    "8b0d180b5500"  # mov         ecx, [00550b18]
+    "8b151c0b5500"  # mov         edx, [00550b1c]
+    "a1200b5500"  # mov         eax, [00550b20]
+    "890dc92d7006"  # mov         [06702dc9], ecx
+    "8915cd2d7006"  # mov         [06702dcd], edx
+    "bac02d7006"  # mov         edx, 06702dc0
+    "b918065500"  # mov         ecx, 00550618
+    "c6051a2e700653"  # mov         byte ptr [06702e1a], 0x53
+    "a3d12d7006"  # mov         [06702dd1], eax
     "90"
 )
 
 
 def test_analyze_moves_series_linen_apron():
-    result = analyze_moves_series(test_data_linen_apron, len("Linen apron"), 0x550b18)
+    result = analyze_moves_series(test_data_linen_apron, len("Linen apron"), 0x550B18)
     assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 8, 13, 19, 25, 47},
         dest=AbsoluteMemoryReference(0x6702DC9),
@@ -288,19 +283,19 @@ def test_analyze_moves_series_linen_apron():
 
 
 test_data_smoked = bytes.fromhex(
-    "8b15605b5400"                  # mov         edx, [00545b60]
-    "a1645b5400"                    # mov         eax, [00545b64]
-    "668b0d685b5400"                # mov         cx, [00545b68]
-    "893dcca38901"                  # mov         [0189a3cc], edi
-    "33ff"                          # xor         edi, edi
-    "891d8ca38901"                  # mov         [0189a38c], ebx
-    "893dc4a38901"                  # mov         [0189a3c4], edi
-    "c605c2a3890101"                # mov         byte ptr [0189a3c2], 0x1
-    "89351ca38901"                  # mov         [0189a31c], esi
-    "c60524a3890164"                # mov         byte ptr [0189a324], 0x64
-    "891525a38901"                  # mov         [0189a325], edx
-    "a329a38901"                    # mov         [0189a329], eax
-    "66890d2da38901"                # mov         [0189a32d], cx
+    "8b15605b5400"  # mov         edx, [00545b60]
+    "a1645b5400"  # mov         eax, [00545b64]
+    "668b0d685b5400"  # mov         cx, [00545b68]
+    "893dcca38901"  # mov         [0189a3cc], edi
+    "33ff"  # xor         edi, edi
+    "891d8ca38901"  # mov         [0189a38c], ebx
+    "893dc4a38901"  # mov         [0189a3c4], edi
+    "c605c2a3890101"  # mov         byte ptr [0189a3c2], 0x1
+    "89351ca38901"  # mov         [0189a31c], esi
+    "c60524a3890164"  # mov         byte ptr [0189a324], 0x64
+    "891525a38901"  # mov         [0189a325], edx
+    "a329a38901"  # mov         [0189a329], eax
+    "66890d2da38901"  # mov         [0189a32d], cx
     "90"
 )
 
@@ -316,48 +311,48 @@ def test_analyze_moves_series_smoked():
 
 
 test_data_mild_low_pressure = bytes.fromhex(
-    "8b3580ac5700"                  # mov         esi, [0057ac80]
-    "8935beaae10a"                  # mov         [0ae1aabe], esi
-    "8b3584ac5700"                  # mov         esi, [0057ac84]
-    "881d34aae10a"                  # mov         [0ae1aa34], bl
-    "0fb61d6cac5700"                # movzx       ebx, byte ptr [0057ac6c]
-    "8935c2aae10a"                  # mov         [0ae1aac2], esi
-    "8b3588ac5700"                  # mov         esi, [0057ac88]
-    "881d51aae10a"                  # mov         [0ae1aa51], bl
-    "0fb61d7eac5700"                # movzx       ebx, byte ptr [0057ac7e]
-    "8935c6aae10a"                  # mov         [0ae1aac6], esi
-    "8b358cac5700"                  # mov         esi, [0057ac8c]
-    "890dd8a9e10a"                  # mov         [0ae1a9d8], ecx
-    "0fb70d3cac5700"                # movzx       ecx, word ptr [0057ac3c]
-    "8935caaae10a"                  # mov         [0ae1aaca], esi
-    "0fb73590ac5700"                # movzx       esi, word ptr [0057ac90]
-    "a3d4a9e10a"                    # mov         [0ae1a9d4], eax
-    "a138ac5700"                    # mov         eax, [0057ac38]
-    "8915dca9e10a"                  # mov         [0ae1a9dc], edx
-    "8a153eac5700"                  # mov         dl, [0057ac3e]
-    "881d9daae10a"                  # mov         [0ae1aa9d], bl
-    "b314"                          # mov         bl, 0x14
-    "66890de4a9e10a"                # mov         [0ae1a9e4], cx
-    "a3e0a9e10a"                    # mov         [0ae1a9e0], eax
-    "8815e6a9e10a"                  # mov         [0ae1a9e6], dl
-    "c705f4a9e10a02050001"          # mov         dword ptr [0ae1a9f4], 01000502
-    "66c705f8a9e10a0302"            # mov         word ptr [0ae1a9f8], 0x203
-    "c7051baae10a03060103"          # mov         dword ptr [0ae1aa1b], 03010603
-    "b10a"                          # mov         cl, 0xa
-    "66c7051faae10a0a14"            # mov         word ptr [0ae1aa1f], 0x140a
-    "c70542aae10a03060204"          # mov         dword ptr [0ae1aa42], 04020603
-    "66c70546aae10a0a1e"            # mov         word ptr [0ae1aa46], 0x1e0a
-    "c60548aae10a00"                # mov         byte ptr [0ae1aa48], 0x0
-    "c70569aae10a03060304"          # mov         dword ptr [0ae1aa69], 04030603
-    "66c7056daae10a083c"            # mov         word ptr [0ae1aa6d], 0x3c08
-    "c6056faae10a08"                # mov         byte ptr [0ae1aa6f], 0x8
-    "c70590aae10a02040604"          # mov         dword ptr [0ae1aa90], 04060402
-    "66c70594aae10a0a50"            # mov         word ptr [0ae1aa94], 0x500a
-    "c60596aae10a0c"                # mov         byte ptr [0ae1aa96], 0xc
-    "c705b7aae10a01020a0a"          # mov         dword ptr [0ae1aab7], 0a0a0201
-    "66c705bbaae10a1450"            # mov         word ptr [0ae1aabb], 0x5014
-    "881dbdaae10a"                  # mov         [0ae1aabd], bl
-    "668935ceaae10a"                # mov         [0ae1aace], si
+    "8b3580ac5700"  # mov         esi, [0057ac80]
+    "8935beaae10a"  # mov         [0ae1aabe], esi
+    "8b3584ac5700"  # mov         esi, [0057ac84]
+    "881d34aae10a"  # mov         [0ae1aa34], bl
+    "0fb61d6cac5700"  # movzx       ebx, byte ptr [0057ac6c]
+    "8935c2aae10a"  # mov         [0ae1aac2], esi
+    "8b3588ac5700"  # mov         esi, [0057ac88]
+    "881d51aae10a"  # mov         [0ae1aa51], bl
+    "0fb61d7eac5700"  # movzx       ebx, byte ptr [0057ac7e]
+    "8935c6aae10a"  # mov         [0ae1aac6], esi
+    "8b358cac5700"  # mov         esi, [0057ac8c]
+    "890dd8a9e10a"  # mov         [0ae1a9d8], ecx
+    "0fb70d3cac5700"  # movzx       ecx, word ptr [0057ac3c]
+    "8935caaae10a"  # mov         [0ae1aaca], esi
+    "0fb73590ac5700"  # movzx       esi, word ptr [0057ac90]
+    "a3d4a9e10a"  # mov         [0ae1a9d4], eax
+    "a138ac5700"  # mov         eax, [0057ac38]
+    "8915dca9e10a"  # mov         [0ae1a9dc], edx
+    "8a153eac5700"  # mov         dl, [0057ac3e]
+    "881d9daae10a"  # mov         [0ae1aa9d], bl
+    "b314"  # mov         bl, 0x14
+    "66890de4a9e10a"  # mov         [0ae1a9e4], cx
+    "a3e0a9e10a"  # mov         [0ae1a9e0], eax
+    "8815e6a9e10a"  # mov         [0ae1a9e6], dl
+    "c705f4a9e10a02050001"  # mov         dword ptr [0ae1a9f4], 01000502
+    "66c705f8a9e10a0302"  # mov         word ptr [0ae1a9f8], 0x203
+    "c7051baae10a03060103"  # mov         dword ptr [0ae1aa1b], 03010603
+    "b10a"  # mov         cl, 0xa
+    "66c7051faae10a0a14"  # mov         word ptr [0ae1aa1f], 0x140a
+    "c70542aae10a03060204"  # mov         dword ptr [0ae1aa42], 04020603
+    "66c70546aae10a0a1e"  # mov         word ptr [0ae1aa46], 0x1e0a
+    "c60548aae10a00"  # mov         byte ptr [0ae1aa48], 0x0
+    "c70569aae10a03060304"  # mov         dword ptr [0ae1aa69], 04030603
+    "66c7056daae10a083c"  # mov         word ptr [0ae1aa6d], 0x3c08
+    "c6056faae10a08"  # mov         byte ptr [0ae1aa6f], 0x8
+    "c70590aae10a02040604"  # mov         dword ptr [0ae1aa90], 04060402
+    "66c70594aae10a0a50"  # mov         word ptr [0ae1aa94], 0x500a
+    "c60596aae10a0c"  # mov         byte ptr [0ae1aa96], 0xc
+    "c705b7aae10a01020a0a"  # mov         dword ptr [0ae1aab7], 0a0a0201
+    "66c705bbaae10a1450"  # mov         word ptr [0ae1aabb], 0x5014
+    "881dbdaae10a"  # mov         [0ae1aabd], bl
+    "668935ceaae10a"  # mov         [0ae1aace], si
     "90"
 )
 
@@ -373,30 +368,30 @@ def test_analyze_moves_series_mild_low_pressure():
 
 
 test_data_tribesman = bytes.fromhex(
-    "8b15743d5400"                  # mov         edx, [00543d74]
-    "a1783d5400"                    # mov         eax, [00543d78]
-    "8d0cff"                        # lea         ecx, [edi*9]
-    "8b0c8dc0eed00a"                # mov         ecx, [ecx*4+0ad0eec0]
-    "2b0de082d60a"                  # sub         ecx, [0ad682e0]
-    "8916"                          # mov         [esi], edx
-    "8b157c3d5400"                  # mov         edx, [00543d7c]
-    "894604"                        # mov         [esi+0x4], eax
-    "66a1803d5400"                  # mov         ax, [00543d80]
-    "83c40c"                        # add         esp, 0xc
-    "895608"                        # mov         [esi+0x8], edx
-    "6689460c"                      # mov         [esi+0xc], ax
-    "83f90a"                        # cmp         ecx, 0xa
-    "7d44"                          # jnl         0x1329f
+    "8b15743d5400"  # mov         edx, [00543d74]
+    "a1783d5400"  # mov         eax, [00543d78]
+    "8d0cff"  # lea         ecx, [edi*9]
+    "8b0c8dc0eed00a"  # mov         ecx, [ecx*4+0ad0eec0]
+    "2b0de082d60a"  # sub         ecx, [0ad682e0]
+    "8916"  # mov         [esi], edx
+    "8b157c3d5400"  # mov         edx, [00543d7c]
+    "894604"  # mov         [esi+0x4], eax
+    "66a1803d5400"  # mov         ax, [00543d80]
+    "83c40c"  # add         esp, 0xc
+    "895608"  # mov         [esi+0x8], edx
+    "6689460c"  # mov         [esi+0xc], ax
+    "83f90a"  # cmp         ecx, 0xa
+    "7d44"  # jnl         0x1329f
 )
 
 
 def test_get_length_tribesman():
     saved = bytes.fromhex(
-        "8d 0c ff"                  # lea         ecx, [edi*9]
-        "8b 0c 8d c0 ee d0 0a"      # mov         ecx, [ecx*4+0ad0eec0]
-        "2b 0d e0 82 d6 0a"         # sub         ecx, [0ad682e0]
+        "8d 0c ff"  # lea         ecx, [edi*9]
+        "8b 0c 8d c0 ee d0 0a"  # mov         ecx, [ecx*4+0ad0eec0]
+        "2b 0d e0 82 d6 0a"  # sub         ecx, [0ad682e0]
     )
-    result = analyze_moves_series(test_data_tribesman, len("for some time"), 0x543d74)
+    result = analyze_moves_series(test_data_tribesman, len("for some time"), 0x543D74)
     assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 7, 17, 23, 31, 40},
         added_relocs={6, 12},
@@ -408,42 +403,40 @@ def test_get_length_tribesman():
 
 
 test_data_tribesman_peasant_intersection = bytes.fromhex(
-    "66a1e4bf5400"                   # mov         ax, [0054bfe4]
-    "8b0ddcbf5400"                   # mov         ecx, [0054bfdc]
-    "8b15e0bf5400"                   # mov         edx, [0054bfe0]
-    "66894598"                       # mov         [ebp-00000068], ax
-    "eb0c"                           # jmp         skip
-    "8b0dd02b5500"                   # mov         ecx, [00552bd0]
-    "8b15d42b5500"                   # mov         edx, [00552bd4]
-                                     # skip:
-    "895594"                         # mov         [ebp-0000006c], edx
-    "894d90"                         # mov         [ebp-00000070], ecx
-    "8d4590"                         # lea         eax, [ebp-00000070]
+    "66a1e4bf5400"  # mov         ax, [0054bfe4]
+    "8b0ddcbf5400"  # mov         ecx, [0054bfdc]
+    "8b15e0bf5400"  # mov         edx, [0054bfe0]
+    "66894598"  # mov         [ebp-00000068], ax
+    "eb0c"  # jmp         skip
+    "8b0dd02b5500"  # mov         ecx, [00552bd0]
+    "8b15d42b5500"  # mov         edx, [00552bd4]
+    # skip:
+    "895594"  # mov         [ebp-0000006c], edx
+    "894d90"  # mov         [ebp-00000070], ecx
+    "8d4590"  # lea         eax, [ebp-00000070]
 )
 
 
 def test_get_length_tribesman_peasant_intersection():
-    result = analyze_moves_series(test_data_tribesman_peasant_intersection, len("tribesman"), 0x54bfdc)
+    result = analyze_moves_series(test_data_tribesman_peasant_intersection, len("tribesman"), 0x54BFDC)
     assert result == MovesSeriesAnalysisResult(
         deleted_relocs={2, 8, 14},
         dest=RelativeMemoryReference(base_reg=Reg.ebp, disp=-0x70),  # [ebp-0x70]
         length=22,
-        pokes={23: 0x0C+6},
+        pokes={23: 0x0C + 6},
     )
 
 
 test_data_has_arrived = bytes.fromhex(
-    "a1 002ff100"                     # mov         eax, [00f12f00]  ; +4
-    
-    "0f2805 a021f400"                 # movaps      xmm0, [00f421a0]  ; address doesn"t belong to the string
-    
-    "8901"                            # mov         [ecx], eax  ; -4
-    "a1 042ff100"                     # mov         eax, [00f12f04]  ; +4
-    "894104"                          # mov         [ecx+0x4], eax  ; -4
-    "a1 082ff100"                     # mov         eax, [00f12f08]  ; +4
-    "894108"                          # mov         [ecx+0x8], eax  ; -4
-    "66a1 0c2ff100"                   # mov         ax, [00f12f0c]  ; +2
-    "6689410c"                        # mov         [ecx+0xc], ax  ; -2 - in total 14 bytes copied
+    "a1 002ff100"  # mov         eax, [00f12f00]  ; +4
+    "0f2805 a021f400"  # movaps      xmm0, [00f421a0]  ; address doesn"t belong to the string
+    "8901"  # mov         [ecx], eax  ; -4
+    "a1 042ff100"  # mov         eax, [00f12f04]  ; +4
+    "894104"  # mov         [ecx+0x4], eax  ; -4
+    "a1 082ff100"  # mov         eax, [00f12f08]  ; +4
+    "894108"  # mov         [ecx+0x8], eax  ; -4
+    "66a1 0c2ff100"  # mov         ax, [00f12f0c]  ; +2
+    "6689410c"  # mov         [ecx+0xc], ax  ; -2 - in total 14 bytes copied
 )
 
 
@@ -458,8 +451,7 @@ def test_get_length_has_arrived():
 
 
 test_data_select_item = bytes.fromhex(
-    "0f100544f9ea00"                 # movups      xmm0, [00eaf944]
-    "0f11832c050000"                 # movups      [ebx+0x52c], xmm0
+    "0f100544f9ea00" "0f11832c050000"  # movups      xmm0, [00eaf944]  # movups      [ebx+0x52c], xmm0
 )
 
 
@@ -473,16 +465,16 @@ def test_get_length_select_item():
 
 
 test_data_dnwwap = bytes.fromhex(
-    "0f100544ddeb00"                 # movups      xmm0, [00ebdd44] ; +16
-    "8d9610010000"                   # lea         edx, [esi+0x110] ; saved
-    "8bca"                           # mov         ecx, edx ; saved
-    "0f1102"                         # movups      [edx], xmm0 ; -16
-    "0f100554ddeb00"                 # movups      xmm0, [00ebdd54] ; +16
-    "0f114210"                       # movups      [edx+0x10], xmm0 ; -16
-    "f30f7e0564ddeb00"               # movq        xmm0, [00ebdd64] ; +8
-    "660fd64220"                     # movq        [edx+0x20], xmm0 ; -8
-    "66a16cddeb00"                   # mov         ax, [00ebdd6c] ; +2
-    "66894228"                       # mov         [edx+0x28], ax ; -2
+    "0f100544ddeb00"  # movups      xmm0, [00ebdd44] ; +16
+    "8d9610010000"  # lea         edx, [esi+0x110] ; saved
+    "8bca"  # mov         ecx, edx ; saved
+    "0f1102"  # movups      [edx], xmm0 ; -16
+    "0f100554ddeb00"  # movups      xmm0, [00ebdd54] ; +16
+    "0f114210"  # movups      [edx+0x10], xmm0 ; -16
+    "f30f7e0564ddeb00"  # movq        xmm0, [00ebdd64] ; +8
+    "660fd64220"  # movq        [edx+0x20], xmm0 ; -8
+    "66a16cddeb00"  # mov         ax, [00ebdd6c] ; +2
+    "66894228"  # mov         [edx+0x28], ax ; -2
 )
 
 
@@ -517,7 +509,7 @@ test_data_create_new_world = bytes.fromhex(
 
 
 def test_create_new_world():
-    original_string_address = 0xf2a8b8
+    original_string_address = 0xF2A8B8
     result = analyze_moves_series(test_data_create_new_world, len("Create New World!"), original_string_address)
     new_len = len("Создать новый мир!")
 

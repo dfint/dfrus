@@ -19,9 +19,8 @@ import io
 import uuid
 from collections import defaultdict
 from copy import copy, deepcopy
-from typing import List, Optional, Dict, Union, Iterable, Tuple
-
 from dataclasses import dataclass
+from typing import List, Optional, Dict, Union, Iterable, Tuple
 
 from .binio import to_unsigned
 
@@ -86,12 +85,7 @@ class MachineCodeBuilder:
         self._fields[name].append(reference)
         return self._add_item(reference)
 
-    def absolute_reference(
-            self,
-            name: Optional[str] = None,
-            value: Optional[int] = None,
-            size: int = 4
-    ):
+    def absolute_reference(self, name: Optional[str] = None, value: Optional[int] = None, size: int = 4):
 
         if name is None:
             name = "unnamed_" + uuid.uuid1().hex

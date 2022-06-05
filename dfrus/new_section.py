@@ -13,7 +13,7 @@ def create_section_blueprint(section_name, virtual_address, physical_address):
         virtual_size=0,  # for now
         pointer_to_raw_data=physical_address,
         size_of_raw_data=0xFFFFFFFF,  # for now
-        characteristics=chars.IMAGE_SCN_CNT_INITIALIZED_DATA | chars.IMAGE_SCN_MEM_READ | chars.IMAGE_SCN_MEM_EXECUTE
+        characteristics=chars.IMAGE_SCN_CNT_INITIALIZED_DATA | chars.IMAGE_SCN_MEM_READ | chars.IMAGE_SCN_MEM_EXECUTE,
     )
 
 

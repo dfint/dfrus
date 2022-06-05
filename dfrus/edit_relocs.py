@@ -64,8 +64,9 @@ def remove_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
         print("Range remove operation needs 2 arguments. Operation skipped.")
         return relocs
     elif len(items) > 2:
-        print("Range remove operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}."
-              .format(*items[:2]))
+        print(
+            "Range remove operation needs only 2 arguments. Using only two of them: 0x{:X}, 0x{:X}.".format(*items[:2])
+        )
     lower_bound, upper_bound = items[:2]
     relocs_in_range = list(filter(lambda x: lower_bound <= x <= upper_bound, relocs))
     if not relocs_in_range:
@@ -79,13 +80,10 @@ def remove_range(items: Sequence[int], relocs: Set[int]) -> Set[int]:
 @click.command()
 @click.argument("file", type=click.File(mode="rb+"))
 @click.argument("command", type=click.Choice(["add", "remove", "remove_range"]))
-@click.argument("items", nargs=-1, type=str, required=True,
-                callback=lambda _, __, values: list_int_literal_converter(values))
-def _main(
-        file: BinaryIO,
-        command: str,
-        items: List[int]
-):
+@click.argument(
+    "items", nargs=-1, type=str, required=True, callback=lambda _, __, values: list_int_literal_converter(values)
+)
+def _main(file: BinaryIO, command: str, items: List[int]):
     function = None
     if command == "add":
         function = partial(add_items, items)

@@ -56,10 +56,8 @@ def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_
     # New section prototype
     new_section = create_section_blueprint(
         b".new",
-        align(last_section.virtual_address + last_section.virtual_size,
-              pe.optional_header.section_alignment),
-        align(last_section.pointer_to_raw_data + last_section.size_of_raw_data,
-              pe.optional_header.file_alignment),
+        align(last_section.virtual_address + last_section.virtual_size, pe.optional_header.section_alignment),
+        align(last_section.pointer_to_raw_data + last_section.size_of_raw_data, pe.optional_header.file_alignment),
     )
 
     new_section_offset = new_section.pointer_to_raw_data
@@ -84,8 +82,16 @@ def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_
     encoder_function = get_encoder(encoding)
 
     fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove = process_strings(
-        encoder_function, encoding, file, image_base, new_section, new_section_offset,
-        sections, strings, trans_table, xref_table
+        encoder_function,
+        encoding,
+        file,
+        image_base,
+        new_section,
+        new_section_offset,
+        sections,
+        strings,
+        trans_table,
+        xref_table,
     )
 
     functions = extract_function_information(image_base, metadata, sections)
@@ -106,8 +112,10 @@ def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_
     # Write relocation table to the executable
     if relocs_to_add or relocs_to_remove:
         if relocs_to_remove - relocatable_items:
-            log.warning("Trying to remove some relocations which weren't in the original list: " +
-                        format_hex_list(item + image_base for item in (relocs_to_remove - relocatable_items)))
+            log.warning(
+                "Trying to remove some relocations which weren't in the original list: "
+                + format_hex_list(item + image_base for item in (relocs_to_remove - relocatable_items))
+            )
 
             log.debug("\nRemoved relocations:")
             log.debug(format_hex_list(relocs_to_remove, wrap_at=80))
@@ -117,8 +125,9 @@ def fix_df_exe(file, pe: PortableExecutable, codepage, original_codepage, trans_
         relocatable_items -= relocs_to_remove
         relocatable_items |= relocs_to_add
 
-        new_section_offset, relocation_table = update_relocation_table(pe, new_section, new_section_offset,
-                                                                       relocatable_items)
+        new_section_offset, relocation_table = update_relocation_table(
+            pe, new_section, new_section_offset, relocatable_items
+        )
 
         relocatable_items = set(relocation_table)
 
@@ -153,17 +162,18 @@ def fix_unicode_table(codepage, fn, sections, xref_table):
             log.info("Done.")
 
 
-def process_strings(encoder_function: Encoder.encode,
-                    encoding: str,
-                    fn: BinaryIO,
-                    image_base: int,
-                    new_section: Section,
-                    new_section_offset: int,
-                    sections: SectionTable,
-                    strings,
-                    trans_table,
-                    xref_table) -> \
-        Tuple[MutableMapping[int, Fix], MutableMapping[Tuple[str, int], Fix], int, Set[int], Set[int]]:
+def process_strings(
+    encoder_function: Encoder.encode,
+    encoding: str,
+    fn: BinaryIO,
+    image_base: int,
+    new_section: Section,
+    new_section_offset: int,
+    sections: SectionTable,
+    strings,
+    trans_table,
+    xref_table,
+) -> Tuple[MutableMapping[int, Fix], MutableMapping[Tuple[str, int], Fix], int, Set[int], Set[int]]:
     # return fixes, metadata, new_section_offset, relocs_to_add, relocs_to_remove
 
     log = get_logger()
@@ -193,8 +203,10 @@ def process_strings(encoder_function: Encoder.encode,
                 encoded_translation = encoder_function(translation)[0] + b"\0"
             except UnicodeEncodeError:
                 encoded_translation = encoder_function(translation, errors="replace")[0] + b"\0"
-                log.warning("Warning: some of characters in a translation strings can't be represented in {}, "
-                            "they will be replaced with ? marks.".format(encoding))
+                log.warning(
+                    "Warning: some of characters in a translation strings can't be represented in {}, "
+                    "they will be replaced with ? marks.".format(encoding)
+                )
                 log.warning("{!r}: {!r}".format(string, encoded_translation))
 
             if not is_long or off not in xref_table:
@@ -212,12 +224,20 @@ def process_strings(encoder_function: Encoder.encode,
                 ref_rva = sections.offset_to_rva(ref)
                 if 0 <= (ref - sections[code_section].pointer_to_raw_data) < sections[code_section].size_of_raw_data:
                     try:
-                        fix = analyze_reference_code(fn, offset=ref, old_len=len(string), new_len=len(translation),
-                                                     string_address=string_address,
-                                                     original_string_address=original_string_address)
+                        fix = analyze_reference_code(
+                            fn,
+                            offset=ref,
+                            old_len=len(string),
+                            new_len=len(translation),
+                            string_address=string_address,
+                            original_string_address=original_string_address,
+                        )
                     except Exception:
-                        log.exception("Caught {} exception on a string {!r} (translation {!r}) at reference 0x{:x}"
-                                      .format(sys.exc_info()[0], string, translation, ref_rva + image_base))
+                        log.exception(
+                            "Caught {} exception on a string {!r} (translation {!r}) at reference 0x{:x}".format(
+                                sys.exc_info()[0], string, translation, ref_rva + image_base
+                            )
+                        )
                         raise
                 else:
                     fix = Fix(meta=Metadata(fixed="not needed"))
@@ -299,8 +319,9 @@ def add_strlens(fixes, functions, metadata):
     return not_fixed, status_unknown
 
 
-def update_relocation_table(pe: PortableExecutable, new_section, new_section_offset, relocation_table) \
-        -> Tuple[int, RelocationTable]:
+def update_relocation_table(
+    pe: PortableExecutable, new_section, new_section_offset, relocation_table
+) -> Tuple[int, RelocationTable]:
     file = pe.file
     sections = pe.section_table
     reloc_table = RelocationTable.build(relocation_table)
@@ -333,12 +354,14 @@ def update_relocation_table(pe: PortableExecutable, new_section, new_section_off
     return new_section_offset, relocation_table
 
 
-def apply_delayed_fixes(fixes: Mapping[Any, Fix],  # FIXME
-                        fn: BinaryIO,
-                        new_section: Section,
-                        new_section_offset: int,
-                        relocs_to_add: Set[int],
-                        sections: SectionTable) -> Offset:
+def apply_delayed_fixes(
+    fixes: Mapping[Any, Fix],  # FIXME
+    fn: BinaryIO,
+    new_section: Section,
+    new_section_offset: int,
+    relocs_to_add: Set[int],
+    sections: SectionTable,
+) -> Offset:
     # Delayed fix
     for fix in fixes.values():
         src_off = fix.src_off
@@ -368,8 +391,9 @@ def apply_delayed_fixes(fixes: Mapping[Any, Fix],  # FIXME
 
         assert mach is not None
         # Write the hook to the new section
-        new_section_offset = add_to_new_section(fn, new_section_offset, mach.build(),
-                                                padding_byte=int3.to_bytes(1, "little"))
+        new_section_offset = add_to_new_section(
+            fn, new_section_offset, mach.build(), padding_byte=int3.to_bytes(1, "little")
+        )
 
         # If there are absolute references in the code, add them to relocation table
         if fix.added_relocs or list(mach.absolute_references):
@@ -390,10 +414,9 @@ def apply_delayed_fixes(fixes: Mapping[Any, Fix],  # FIXME
     return new_section_offset
 
 
-def extract_function_information(image_base: Offset,
-                                 metadata: Mapping[Tuple[str, int], Fix],
-                                 sections: List[Section]) \
-        -> Mapping[Offset, Metadata]:
+def extract_function_information(
+    image_base: Offset, metadata: Mapping[Tuple[str, int], Fix], sections: List[Section]
+) -> Mapping[Offset, Metadata]:
     """
     Extract information of functions parameters
     """
@@ -413,8 +436,9 @@ def extract_function_information(image_base: Offset,
                     functions[offset].string.update(str_param)
                 elif str_param > functions[offset].string:
                     log.warning(
-                        "Warning: possible function parameter recognition collision for sub_{:x}: {!r} not in {!r}"
-                        .format(address, str_param, functions[offset].string)
+                        "Warning: possible function parameter recognition collision for sub_{:x}: {!r} not in {!r}".format(
+                            address, str_param, functions[offset].string
+                        )
                     )
                     functions[offset].string.update(str_param)
 
@@ -423,8 +447,11 @@ def extract_function_information(image_base: Offset,
                 if functions[offset].length is None:
                     functions[offset].length = len_param
                 elif functions[offset].length != len_param:
-                    raise ValueError("Function parameter recognition collision for sub_{:x}: {!r} != {!r}"
-                                     .format(address, functions[offset].length, len_param))
+                    raise ValueError(
+                        "Function parameter recognition collision for sub_{:x}: {!r} != {!r}".format(
+                            address, functions[offset].length, len_param
+                        )
+                    )
 
     return functions
 

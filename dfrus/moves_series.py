@@ -9,8 +9,13 @@ from .machine_code_assembler import asm
 from .machine_code_utils import mach_memcpy
 from .metadata_objects import Metadata, Fix
 from .opcodes import ret_near, nop, Reg, RegType
-from .operand import (MemoryReference, RegisterOperand, RelativeMemoryReference, AbsoluteMemoryReference,
-                      ImmediateValueOperand)
+from .operand import (
+    MemoryReference,
+    RegisterOperand,
+    RelativeMemoryReference,
+    AbsoluteMemoryReference,
+    ImmediateValueOperand,
+)
 
 
 @dataclass
@@ -79,11 +84,13 @@ def is_empty(reg_state: Mapping[Reg, int], reg: Reg):
     return reg_state[reg.parent] is None or reg_state[reg.parent] == 0
 
 
-def analyze_moves_series(data: bytes,
-                         oldlen: int,
-                         original_string_address: int = None,
-                         reg_state: dict = None,
-                         dest: Optional[MemoryReference] = None) -> MovesSeriesAnalysisResult:
+def analyze_moves_series(
+    data: bytes,
+    oldlen: int,
+    original_string_address: int = None,
+    reg_state: dict = None,
+    dest: Optional[MemoryReference] = None,
+) -> MovesSeriesAnalysisResult:
     def belongs_to_the_string(ref_value):
         osa = original_string_address
         return osa is None or 0 <= ref_value - osa < oldlen
@@ -123,8 +130,9 @@ def analyze_moves_series(data: bytes,
             break
 
         if line.mnemonic == "db":
-            raise ValueError("Unknown instruction encountered: "
-                             + hexlify(data[line.address:line.address + 8]).decode())
+            raise ValueError(
+                "Unknown instruction encountered: " + hexlify(data[line.address : line.address + 8]).decode()
+            )
 
         if line.mnemonic.startswith("mov") and not line.mnemonic.startswith("movs"):
             assert line.operands is not None
@@ -132,11 +140,16 @@ def analyze_moves_series(data: bytes,
             if isinstance(left_operand, RegisterOperand):
                 # mov reg, [...]
                 # assert isinstance(right_operand, (RelativeMemoryReference))
-                if (not is_empty(reg_state, left_operand.reg)
-                        and isinstance(right_operand, RelativeMemoryReference)
-                        and left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}):
-                    warn(f"{left_operand} register is already marked as occupied. "
-                         f"String address: 0x{original_string_address:x}", stacklevel=2)
+                if (
+                    not is_empty(reg_state, left_operand.reg)
+                    and isinstance(right_operand, RelativeMemoryReference)
+                    and left_operand.reg not in {right_operand.base_reg, right_operand.index_reg}
+                ):
+                    warn(
+                        f"{left_operand} register is already marked as occupied. "
+                        f"String address: 0x{original_string_address:x}",
+                        stacklevel=2,
+                    )
 
                 if isinstance(right_operand, AbsoluteMemoryReference):
                     # mov reg, [mem]
@@ -165,25 +178,30 @@ def analyze_moves_series(data: bytes,
                         saved_mach += line.data
             elif isinstance(left_operand, MemoryReference):
                 # `mov [reg1+disp], reg2` or `mov [off], reg`
-                if (isinstance(right_operand, RegisterOperand)
-                        and right_operand.reg.type in {RegType.general, RegType.xmm}):
+                if isinstance(right_operand, RegisterOperand) and right_operand.reg.type in {
+                    RegType.general,
+                    RegType.xmm,
+                }:
                     if reg_state[right_operand.reg.parent] is None or reg_state[right_operand.reg.parent] < 0:
                         # It can be a part of a copying code of another string. Leave it as is.
                         not_moveable_after = not_moveable_after or offset
                         reg_state[right_operand.reg.parent] = None  # Mark the register as free
                     else:
-                        assert not (isinstance(left_operand, RelativeMemoryReference)
-                                    and left_operand.index_reg is not None)
+                        assert not (
+                            isinstance(left_operand, RelativeMemoryReference) and left_operand.index_reg is not None
+                        )
 
                         if reg_state[right_operand.reg.parent] == 0:
                             raise ValueError("Copying of a string to several different locations not supported.")
 
                         if dest is None:
                             dest = left_operand
-                        elif (isinstance(dest, RelativeMemoryReference)
-                              and isinstance(left_operand, RelativeMemoryReference)
-                              and dest.base_reg == left_operand.base_reg
-                              and dest.disp > left_operand.disp):
+                        elif (
+                            isinstance(dest, RelativeMemoryReference)
+                            and isinstance(left_operand, RelativeMemoryReference)
+                            and dest.base_reg == left_operand.base_reg
+                            and dest.disp > left_operand.disp
+                        ):
                             dest = left_operand
                         # elif (isinstance(dest, AbsoluteMemoryReference)
                         #       and isinstance(left_operand, AbsoluteMemoryReference)):
@@ -203,9 +221,9 @@ def analyze_moves_series(data: bytes,
 
                         reg_state[right_operand.reg.parent] = 0  # Mark the register as freed
                 elif is_moveable():
-                    if (isinstance(right_operand, AbsoluteMemoryReference)
-                            or (isinstance(right_operand, ImmediateValueOperand)
-                                and valid_reference(right_operand.value))):
+                    if isinstance(right_operand, AbsoluteMemoryReference) or (
+                        isinstance(right_operand, ImmediateValueOperand) and valid_reference(right_operand.value)
+                    ):
                         # TODO: check if this actually a reference. Until then just skip
                         not_moveable_after = not_moveable_after or offset
                         continue
@@ -225,8 +243,11 @@ def analyze_moves_series(data: bytes,
                     saved_mach += line.data
             else:
                 # Segment register etc.
-                raise ValueError("Unallowed left operand type: {}, type is {!r}, instruction is `{}`"
-                                 .format(left_operand, type(left_operand), str(line)))
+                raise ValueError(
+                    "Unallowed left operand type: {}, type is {!r}, instruction is `{}`".format(
+                        left_operand, type(left_operand), str(line)
+                    )
+                )
         elif line.mnemonic == "lea":
             assert line.operands is not None
             left_operand, right_operand = line.operands
@@ -235,9 +256,12 @@ def analyze_moves_series(data: bytes,
             assert isinstance(left_operand, RegisterOperand)
             assert isinstance(right_operand, RelativeMemoryReference)
             reg_state[left_operand.reg.parent] = -1
-            if (dest is not None and isinstance(dest, RelativeMemoryReference)
-                    and dest.base_reg == right_operand.base_reg
-                    and dest.disp == right_operand.disp):
+            if (
+                dest is not None
+                and isinstance(dest, RelativeMemoryReference)
+                and dest.base_reg == right_operand.base_reg
+                and dest.disp == right_operand.disp
+            ):
                 dest = RelativeMemoryReference(base_reg=left_operand.reg, disp=0)
 
             saved_mach += line.data
@@ -246,12 +270,13 @@ def analyze_moves_series(data: bytes,
                 not_moveable_after = not_moveable_after or offset
                 jump_destination = line.operand1
                 assert isinstance(jump_destination, ImmediateValueOperand)
-                data_after_jump = data[jump_destination.value:]
+                data_after_jump = data[jump_destination.value :]
                 if not data_after_jump:
                     raise ValueError("Cannot jump: jump destination not included in the passed machinecode.")
 
-                result = analyze_moves_series(data_after_jump, oldlen - copied_len - 1,
-                                              original_string_address, reg_state, dest)
+                result = analyze_moves_series(
+                    data_after_jump, oldlen - copied_len - 1, original_string_address, reg_state, dest
+                )
                 dest = result.dest
                 if "short" in line.mnemonic:
                     disp = line.data[1] + result.length
@@ -297,8 +322,11 @@ def analyze_moves_series(data: bytes,
 
             if is_moveable():
                 if line.operands:
-                    abs_refs = [operand for operand in line.operands
-                                if isinstance(operand, (AbsoluteMemoryReference, ImmediateValueOperand))]
+                    abs_refs = [
+                        operand
+                        for operand in line.operands
+                        if isinstance(operand, (AbsoluteMemoryReference, ImmediateValueOperand))
+                    ]
 
                     for ref in abs_refs:
                         if isinstance(ref, AbsoluteMemoryReference):
@@ -325,11 +353,7 @@ def analyze_moves_series(data: bytes,
         raise ValueError("Destination not recognized.")
 
     result = MovesSeriesAnalysisResult(
-        length=length,
-        dest=dest,
-        deleted_relocs=deleted_relocs,
-        saved_mach=saved_mach,
-        added_relocs=added_relocs
+        length=length, dest=dest, deleted_relocs=deleted_relocs, saved_mach=saved_mach, added_relocs=added_relocs
     )
 
     if nops:
