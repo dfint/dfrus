@@ -1,6 +1,6 @@
 # DFRUS
 
-[![Test](https://github.com/dfint/dfrus/workflows/Python%20package/badge.svg)](https://github.com/dfint/dfrus/actions?query=workflow%3A"Python+package")
+[![Test](https://github.com/dfint/dfrus/actions/workflows/test.yml/badge.svg)](https://github.com/dfint/dfrus/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/dfint/dfrus/branch/develop/graph/badge.svg?token=PKw7KdAswK)](https://codecov.io/gh/dfint/dfrus)
 [![Maintainability](https://api.codeclimate.com/v1/badges/a6f643592f957f04ad0e/maintainability)](https://codeclimate.com/github/dfint/dfrus/maintainability)
 ![Warning: Legacy!](https://img.shields.io/badge/Warning-Legacy!-red)
