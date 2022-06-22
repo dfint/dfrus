@@ -1,12 +1,13 @@
 from collections import Counter
-from typing import Tuple, cast
+from typing import Tuple, cast, NamedTuple, Optional, List, Iterator
 
 import click
 from peclasses.portable_executable import PortableExecutable
 
-from .cross_references import get_cross_references
-from .disasm import align
-from .pretty_printing import myrepr
+from dfrus.cross_references import get_cross_references
+from dfrus.disasm import align
+from dfrus.pretty_printing import myrepr
+from dfrus.type_aliases import Offset
 
 forbidden = set(b"$^")
 
@@ -88,12 +89,18 @@ def find_next_string_xref(s_xrefs, i, obj_off):
     return s_xrefs[i]
 
 
-def extract_strings(fn, xrefs, block_size=4096, encoding="cp437", arrays=False):
-    prev_string = None
-    current_string = None
+class ExtractedStringInfo(NamedTuple):
+    offset: Offset
+    string: str
+    cap_length: int
+
+
+def extract_strings(fn, xrefs, block_size=4096, encoding="cp437", arrays=False) -> Iterator[ExtractedStringInfo]:
+    prev_string: Optional[ExtractedStringInfo] = None
+    current_string: Optional[ExtractedStringInfo] = None
     s_xrefs = sorted(xrefs)
     for i, obj_off in enumerate(s_xrefs):
-        if prev_string is not None and obj_off <= prev_string[0] + len(prev_string[1]):
+        if prev_string is not None and obj_off <= prev_string.offset + len(prev_string.string):
             continue  # it's not the beginning of the string
 
         fn.seek(obj_off)
@@ -105,7 +112,7 @@ def extract_strings(fn, xrefs, block_size=4096, encoding="cp437", arrays=False):
             if not arrays:
                 s = buf[:s_len].decode(encoding=encoding)
                 cap_len = align(len(s) + 1)
-                current_string = (obj_off, s, cap_len)
+                current_string = ExtractedStringInfo(obj_off, s, cap_len)
                 yield current_string
             else:
                 upper_bound = find_next_string_xref(s_xrefs, i, obj_off + s_len) - obj_off
@@ -116,11 +123,11 @@ def extract_strings(fn, xrefs, block_size=4096, encoding="cp437", arrays=False):
                     # cap_len = align(len(s) + 1)
                     s = buf[:s_len].decode(encoding=encoding)
                     cap_len = align(len(s) + 1)
-                    current_string = (obj_off, s, cap_len)
+                    current_string = ExtractedStringInfo(obj_off, s, cap_len)
                     yield current_string
                 else:
                     for off, s, cap_len in string_array:
-                        current_string = (off, s.decode(encoding=encoding), cap_len)
+                        current_string = ExtractedStringInfo(off, s.decode(encoding=encoding), cap_len)
                         yield current_string
 
             prev_string = current_string
@@ -128,10 +135,13 @@ def extract_strings(fn, xrefs, block_size=4096, encoding="cp437", arrays=False):
 
 @click.command()
 @click.option("--ascii", "ascii_only", is_flag=True, default=False, help="Extract only ascii based strings")
+@click.option(
+    "--sort-by-xref", "sort_by_xref", is_flag=True, default=False, help="Sort extracted strings by cross-reference"
+)
 @click.argument("executable", type=click.File("rb"))
 @click.argument("output_file", type=click.Path(exists=False))
 @click.argument("encoding", default="cp437")
-def _main(ascii_only, executable, output_file, encoding):
+def _main(ascii_only, executable, output_file, encoding, sort_by_xref):
     """
     Extract strings embedded into a portable executable file (exe)
     """
@@ -141,21 +151,25 @@ def _main(ascii_only, executable, output_file, encoding):
         executable, pe.relocation_table, pe.section_table, cast(int, pe.optional_header.image_base)
     )
 
-    strings = list(extract_strings(executable, xrefs, encoding=encoding, arrays=True))
-    count = Counter(x[1] for x in strings)
+    strings: List[ExtractedStringInfo] = list(extract_strings(executable, xrefs, encoding=encoding, arrays=True))
+    count = Counter(x.string for x in strings)
+
+    if sort_by_xref:
+        strings = sorted(strings, key=lambda s: min(xrefs.get(s.offset, [0])))
+
     with open(output_file, "wt", encoding=encoding, errors="strict") as dump:
-        for offset, s, cap_len in strings:
-            if count[s] >= 1:
-                if ascii_only and any(ord(c) >= 0x80 for c in s):
+        for offset, string, cap_len in strings:
+            if count[string] >= 1:
+                if ascii_only and any(ord(c) >= 0x80 for c in string):
                     # Skip non-ascii characters
                     continue
 
-                assert cap_len >= len(s)
-                s = s.replace("\r", "\\r")
-                s = s.replace("\t", "\\t")
-                print(hex(offset), myrepr(s), cap_len, xrefs[offset])
-                print(s, file=dump)
-                count[s] = 0
+                assert cap_len >= len(string)
+                string = string.replace("\r", "\\r")
+                string = string.replace("\t", "\\t")
+                print(hex(offset), myrepr(string), cap_len, xrefs[offset])
+                print(string, file=dump)
+                count[string] = 0
 
 
 if __name__ == "__main__":
