@@ -1,7 +1,7 @@
 import codecs
 import functools
 import unicodedata
-from typing import Tuple, Mapping, Union, Iterable, Dict, BinaryIO
+from typing import BinaryIO, Dict, Iterable, Mapping, Tuple, Union
 
 from .binio import fpoke4
 from .type_aliases import Offset

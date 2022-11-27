@@ -1,7 +1,7 @@
 import pytest
 
 from dfrus.machine_code_match import get_start, match_mov_reg_imm32
-from dfrus.opcodes import nop, mov_acc_mem, Prefix, mov_rm_reg, Reg
+from dfrus.opcodes import Prefix, Reg, mov_acc_mem, mov_rm_reg, nop
 
 
 @pytest.mark.parametrize(

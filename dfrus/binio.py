@@ -1,4 +1,4 @@
-from typing import Iterable, BinaryIO, Optional, Union
+from typing import BinaryIO, Iterable, Optional, Union
 
 from .type_aliases import Offset
 

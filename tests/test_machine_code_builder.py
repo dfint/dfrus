@@ -2,7 +2,7 @@ import pytest
 
 from dfrus.disasm import join_byte
 from dfrus.machine_code_builder import MachineCodeBuilder
-from dfrus.opcodes import mov_rm_imm, Reg, call_near, mov_reg_imm, jmp_near
+from dfrus.opcodes import Reg, call_near, jmp_near, mov_reg_imm, mov_rm_imm
 
 
 def test_machine_code_builder_1():

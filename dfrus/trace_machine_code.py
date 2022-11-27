@@ -1,10 +1,10 @@
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Union, BinaryIO, Callable
+from typing import BinaryIO, Callable, Optional, Union
 
 from .binio import read_bytes
-from .disasm import disasm, DisasmLine
+from .disasm import DisasmLine, disasm
 from .operand import ImmediateValueOperand
 
 count_after = 0x100

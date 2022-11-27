@@ -20,7 +20,7 @@ import uuid
 from collections import defaultdict
 from copy import copy, deepcopy
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Union, Iterable, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 from .binio import to_unsigned
 

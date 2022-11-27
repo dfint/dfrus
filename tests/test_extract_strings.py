@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus.extract_strings import check_string_array, check_string
+from dfrus.extract_strings import check_string, check_string_array
 
 
 @pytest.mark.parametrize(

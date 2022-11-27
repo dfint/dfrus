@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Iterable, BinaryIO, Mapping
+from typing import BinaryIO, Iterable, List, Mapping
 
 from peclasses.section_table import SectionTable
 

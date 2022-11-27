@@ -1,14 +1,14 @@
 from typing import BinaryIO
 
-from .binio import from_dword, read_bytes, to_signed, fpoke, fpoke4
-from .disasm import disasm, DisasmLine, join_byte
+from .binio import fpoke, fpoke4, from_dword, read_bytes, to_signed
+from .disasm import DisasmLine, disasm, join_byte
 from .machine_code_assembler import asm
-from .machine_code_match import match_mov_reg_imm32, get_start
+from .machine_code_match import get_start, match_mov_reg_imm32
 from .machine_code_utils import mach_strlen
-from .metadata_objects import Metadata, Fix
-from .moves_series import get_fix_for_moves, analyze_moves_series
+from .metadata_objects import Fix, Metadata
+from .moves_series import analyze_moves_series, get_fix_for_moves
 from .opcodes import *
-from .operand import RegisterOperand, RelativeMemoryReference, ImmediateValueOperand
+from .operand import ImmediateValueOperand, RegisterOperand, RelativeMemoryReference
 from .trace_machine_code import FunctionInformation, which_func
 
 

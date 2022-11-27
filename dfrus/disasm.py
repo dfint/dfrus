@@ -1,15 +1,15 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple, Iterator, cast
+from typing import Iterator, Optional, Tuple, cast
 
 from .binio import to_signed
 from .opcodes import *
 from .operand import (
-    Operand,
+    AbsoluteMemoryReference,
     ImmediateValueOperand,
+    MemoryReference,
+    Operand,
     RegisterOperand,
     RelativeMemoryReference,
-    AbsoluteMemoryReference,
-    MemoryReference,
 )
 
 

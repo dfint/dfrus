@@ -1,5 +1,5 @@
 from collections import namedtuple
-from enum import IntEnum, Enum, auto
+from enum import Enum, IntEnum, auto
 
 
 class Cond(IntEnum):

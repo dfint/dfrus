@@ -1,9 +1,13 @@
 from dfrus.disasm import disasm
 from dfrus.machine_code_utils import mach_memcpy
 from dfrus.metadata_objects import Metadata
-from dfrus.moves_series import get_fix_for_moves, MovesSeriesAnalysisResult, analyze_moves_series
+from dfrus.moves_series import (
+    MovesSeriesAnalysisResult,
+    analyze_moves_series,
+    get_fix_for_moves,
+)
 from dfrus.opcodes import *
-from dfrus.operand import RelativeMemoryReference, AbsoluteMemoryReference
+from dfrus.operand import AbsoluteMemoryReference, RelativeMemoryReference
 
 test_data_1 = bytes.fromhex(
     "8B 0D 50 4B 52 00 "  # 4c1d9a     mov         ecx, [524b50h] ; [aFainted+4]

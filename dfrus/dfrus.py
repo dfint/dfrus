@@ -2,7 +2,7 @@ import os.path
 import sys
 from contextlib import contextmanager
 from shutil import copy
-from typing import Sequence, Tuple, Union, Dict, Iterable
+from typing import Dict, Iterable, Sequence, Tuple, Union
 
 import click
 from peclasses.portable_executable import PortableExecutable

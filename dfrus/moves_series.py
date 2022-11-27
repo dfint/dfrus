@@ -1,20 +1,20 @@
 from binascii import hexlify
 from dataclasses import dataclass, field
-from typing import Set, Mapping, Union, Optional, Dict
+from typing import Dict, Mapping, Optional, Set, Union
 from warnings import warn
 
-from .binio import to_dword, from_dword
+from .binio import from_dword, to_dword
 from .disasm import disasm
 from .machine_code_assembler import asm
 from .machine_code_utils import mach_memcpy
-from .metadata_objects import Metadata, Fix
-from .opcodes import ret_near, nop, Reg, RegType
+from .metadata_objects import Fix, Metadata
+from .opcodes import Reg, RegType, nop, ret_near
 from .operand import (
+    AbsoluteMemoryReference,
+    ImmediateValueOperand,
     MemoryReference,
     RegisterOperand,
     RelativeMemoryReference,
-    AbsoluteMemoryReference,
-    ImmediateValueOperand,
 )
 
 

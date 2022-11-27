@@ -1,5 +1,5 @@
 from .binio import from_dword
-from .opcodes import Reg, mov_reg_imm, mov_acc_mem, mov_rm_reg, x0f_movups, Prefix
+from .opcodes import Prefix, Reg, mov_acc_mem, mov_reg_imm, mov_rm_reg, x0f_movups
 
 
 def match_mov_reg_imm32(b: bytes, reg: Reg, imm: int) -> bool:

@@ -1,6 +1,6 @@
 import pytest
 
-from dfrus.disasm import disasm, analyse_modrm, ModRM, Sib, ModRmAnalysisResult
+from dfrus.disasm import ModRM, ModRmAnalysisResult, Sib, analyse_modrm, disasm
 
 
 @pytest.mark.parametrize(

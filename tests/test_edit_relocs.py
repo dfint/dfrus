@@ -1,6 +1,12 @@
 import pytest
 
-from dfrus.edit_relocs import int_literal_converter, list_int_literal_converter, add_items, remove_items, remove_range
+from dfrus.edit_relocs import (
+    add_items,
+    int_literal_converter,
+    list_int_literal_converter,
+    remove_items,
+    remove_range,
+)
 
 
 @pytest.mark.parametrize(

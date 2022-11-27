@@ -1,26 +1,26 @@
 import io
 import sys
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 from operator import itemgetter
-from typing import Tuple, Set, Mapping, MutableMapping, List, cast, BinaryIO, Any
+from typing import Any, BinaryIO, List, Mapping, MutableMapping, Set, Tuple, cast
 
 from peclasses.portable_executable import PortableExecutable
 from peclasses.relocation_table import RelocationTable
 from peclasses.section_table import Section, SectionTable
 
 from .analyze_and_provide_fix import analyze_reference_code
-from .binio import fpoke4, fpoke, to_dword
+from .binio import fpoke, fpoke4, to_dword
 from .cross_references import get_cross_references
 from .disasm import align
 from .extract_strings import extract_strings
 from .logger import get_logger
 from .machine_code_assembler import asm
 from .machine_code_utils import mach_strlen
-from .metadata_objects import Metadata, Fix
+from .metadata_objects import Fix, Metadata
 from .new_section import add_to_new_section, create_section_blueprint
 from .opcodes import *
-from .patch_charmap import patch_unicode_table, get_encoder, Encoder
-from .pretty_printing import myrepr, format_hex_list
+from .patch_charmap import Encoder, get_encoder, patch_unicode_table
+from .pretty_printing import format_hex_list, myrepr
 from .search_charmap import search_charmap
 from .trace_machine_code import FunctionInformation
 from .type_aliases import Offset

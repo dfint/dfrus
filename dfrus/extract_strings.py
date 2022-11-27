@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Tuple, cast, NamedTuple, Optional, List, Iterator
+from typing import Iterator, List, NamedTuple, Optional, Tuple, cast
 
 import click
 from peclasses.portable_executable import PortableExecutable
