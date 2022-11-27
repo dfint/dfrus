@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import BinaryIO, Callable, Optional, Union
 
-from .binio import read_bytes
-from .disasm import DisasmLine, disasm
-from .operand import ImmediateValueOperand
+from dfrus.binio import read_bytes
+from dfrus.disasm import DisasmLine, disasm
+from dfrus.operand import ImmediateValueOperand
 
 count_after = 0x100
 

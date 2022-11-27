@@ -22,7 +22,7 @@ from copy import copy, deepcopy
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
-from .binio import to_unsigned
+from dfrus.binio import to_unsigned
 
 
 @dataclass

@@ -1,8 +1,8 @@
 from peclasses.pe_classes import ImageSectionHeader
 from peclasses.section_table import Section
 
-from .binio import fpoke
-from .disasm import align
+from dfrus.binio import fpoke
+from dfrus.disasm import align
 
 
 def create_section_blueprint(section_name, virtual_address, physical_address):

@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Iterator, Optional, Tuple, cast
 
-from .binio import to_signed
-from .opcodes import *
-from .operand import (
+from dfrus.binio import to_signed
+from dfrus.opcodes import *
+from dfrus.operand import (
     AbsoluteMemoryReference,
     ImmediateValueOperand,
     MemoryReference,

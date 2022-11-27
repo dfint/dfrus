@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from dfrus.binio import *
+from dfrus.binio import read_bytes, write_dword, write_string
 
 
 def test_binio():

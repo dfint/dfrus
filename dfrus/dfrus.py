@@ -7,9 +7,9 @@ from typing import Dict, Iterable, Sequence, Tuple, Union
 import click
 from peclasses.portable_executable import PortableExecutable
 
-from .dictionary_loaders import load_trans_file
-from .logger import get_logger, init_logger
-from .patchdf import fix_df_exe
+from dfrus.dictionary_loaders import load_trans_file
+from dfrus.logger import get_logger, init_logger
+from dfrus.patchdf import fix_df_exe
 
 
 def slice_translation(trans_table: Union[Dict[str, str], Iterable[Tuple[str, str]]], bounds) -> Dict[str, str]:

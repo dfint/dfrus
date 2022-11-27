@@ -1,15 +1,39 @@
 from typing import BinaryIO
 
-from .binio import fpoke, fpoke4, from_dword, read_bytes, to_signed
-from .disasm import DisasmLine, disasm, join_byte
-from .machine_code_assembler import asm
-from .machine_code_match import get_start, match_mov_reg_imm32
-from .machine_code_utils import mach_strlen
-from .metadata_objects import Fix, Metadata
-from .moves_series import analyze_moves_series, get_fix_for_moves
-from .opcodes import *
-from .operand import ImmediateValueOperand, RegisterOperand, RelativeMemoryReference
-from .trace_machine_code import FunctionInformation, which_func
+from dfrus.binio import fpoke, fpoke4, from_dword, read_bytes, to_signed
+from dfrus.disasm import DisasmLine, disasm, join_byte
+from dfrus.machine_code_assembler import asm
+from dfrus.machine_code_match import get_start, match_mov_reg_imm32
+from dfrus.machine_code_utils import mach_strlen
+from dfrus.metadata_objects import Fix, Metadata
+from dfrus.moves_series import analyze_moves_series, get_fix_for_moves
+from dfrus.opcodes import (
+    Prefix,
+    Reg,
+    add_acc_imm,
+    call_near,
+    jcc_short,
+    jmp_near,
+    jmp_short,
+    lea,
+    mov_acc_mem,
+    mov_reg_imm,
+    mov_reg_rm,
+    mov_rm_imm,
+    mov_rm_reg,
+    op_rm_imm,
+    push_imm8,
+    push_imm32,
+    x0f_jcc_near,
+    x0f_movaps,
+    x0f_movups,
+)
+from dfrus.operand import (
+    ImmediateValueOperand,
+    RegisterOperand,
+    RelativeMemoryReference,
+)
+from dfrus.trace_machine_code import FunctionInformation, which_func
 
 
 def find_instruction(s, instruction):

@@ -3,8 +3,8 @@ import functools
 import unicodedata
 from typing import BinaryIO, Dict, Iterable, Mapping, Tuple, Union
 
-from .binio import fpoke4
-from .type_aliases import Offset
+from dfrus.binio import fpoke4
+from dfrus.type_aliases import Offset
 
 
 def ord_utf16(c: str) -> int:

@@ -3,7 +3,7 @@ from typing import BinaryIO, Iterable, List, Mapping
 
 from peclasses.section_table import SectionTable
 
-from .binio import from_dword, read_bytes
+from dfrus.binio import from_dword, read_bytes
 
 code, rdata, data = range(3)
 

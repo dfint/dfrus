@@ -1,7 +1,20 @@
-from .disasm import join_byte
-from .machine_code_builder import MachineCodeBuilder
-from .opcodes import *
-from .operand import Operand, RelativeMemoryReference
+from dfrus.disasm import join_byte
+from dfrus.machine_code_builder import MachineCodeBuilder
+from dfrus.opcodes import (
+    Cond,
+    Reg,
+    RegType,
+    call_near,
+    jcc_short,
+    jmp_short,
+    lea,
+    mov_reg_imm,
+    mov_rm_reg,
+    pop_reg,
+    push_imm8,
+    push_reg,
+)
+from dfrus.operand import Operand, RelativeMemoryReference
 
 
 class MachineCodeAssembler(MachineCodeBuilder):

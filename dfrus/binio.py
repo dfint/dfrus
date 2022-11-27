@@ -1,6 +1,6 @@
 from typing import BinaryIO, Iterable, Optional, Union
 
-from .type_aliases import Offset
+from dfrus.type_aliases import Offset
 
 
 def write_dword(file_object: BinaryIO, val: int) -> None:

@@ -1,9 +1,19 @@
 from typing import Union
 
-from .machine_code_assembler import MachineCodeAssembler
-from .machine_code_builder import MachineCodeBuilder
-from .opcodes import *
-from .operand import MemoryReference, RelativeMemoryReference
+from dfrus.machine_code_assembler import MachineCodeAssembler
+from dfrus.machine_code_builder import MachineCodeBuilder
+from dfrus.opcodes import (
+    Cond,
+    Prefix,
+    Reg,
+    cmp_rm_imm,
+    inc_reg,
+    movsd,
+    popad,
+    pushad,
+    xor_rm_reg,
+)
+from dfrus.operand import MemoryReference, RelativeMemoryReference
 
 MAX_LEN = 0x100
 
@@ -47,7 +57,7 @@ def mach_memcpy(src: int, dest: MemoryReference, count) -> MachineCodeAssembler:
 
     m = MachineCodeAssembler()
 
-    m.byte(pushad)  # pushad
+    m.byte(pushad)
 
     # If the destination address is not in edi yet, put it there
     if isinstance(dest, RelativeMemoryReference) and (dest.base_reg != Reg.edi or dest.disp != 0):
@@ -65,5 +75,5 @@ def mach_memcpy(src: int, dest: MemoryReference, count) -> MachineCodeAssembler:
     m.byte(xor_rm_reg | 1).modrm(3, Reg.ecx.code, Reg.ecx.code)  # xor ecx, ecx
     m.mov_reg_imm(Reg.cl, (count + 3) // 4)  # mov cl, (count+3)//4
     m.byte(Prefix.rep).byte(movsd)  # rep movsd
-    m.byte(popad)  # popad
+    m.byte(popad)
     return m

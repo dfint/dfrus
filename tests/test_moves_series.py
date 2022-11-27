@@ -6,7 +6,7 @@ from dfrus.moves_series import (
     analyze_moves_series,
     get_fix_for_moves,
 )
-from dfrus.opcodes import *
+from dfrus.opcodes import Reg
 from dfrus.operand import AbsoluteMemoryReference, RelativeMemoryReference
 
 test_data_1 = bytes.fromhex(

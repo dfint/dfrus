@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
 
-from .opcodes import Reg, RegType
+from dfrus.opcodes import Reg, RegType
 
 
 def asmhex(n):

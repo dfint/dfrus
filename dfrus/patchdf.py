@@ -8,22 +8,22 @@ from peclasses.portable_executable import PortableExecutable
 from peclasses.relocation_table import RelocationTable
 from peclasses.section_table import Section, SectionTable
 
-from .analyze_and_provide_fix import analyze_reference_code
-from .binio import fpoke, fpoke4, to_dword
-from .cross_references import get_cross_references
-from .disasm import align
-from .extract_strings import extract_strings
-from .logger import get_logger
-from .machine_code_assembler import asm
-from .machine_code_utils import mach_strlen
-from .metadata_objects import Fix, Metadata
-from .new_section import add_to_new_section, create_section_blueprint
-from .opcodes import *
-from .patch_charmap import Encoder, get_encoder, patch_unicode_table
-from .pretty_printing import format_hex_list, myrepr
-from .search_charmap import search_charmap
-from .trace_machine_code import FunctionInformation
-from .type_aliases import Offset
+from dfrus.analyze_and_provide_fix import analyze_reference_code
+from dfrus.binio import fpoke, fpoke4, to_dword
+from dfrus.cross_references import get_cross_references
+from dfrus.disasm import align
+from dfrus.extract_strings import extract_strings
+from dfrus.logger import get_logger
+from dfrus.machine_code_assembler import asm
+from dfrus.machine_code_utils import mach_strlen
+from dfrus.metadata_objects import Fix, Metadata
+from dfrus.new_section import add_to_new_section, create_section_blueprint
+from dfrus.opcodes import Reg, int3, jmp_near, mov_reg_rm, mov_rm_reg
+from dfrus.patch_charmap import Encoder, get_encoder, patch_unicode_table
+from dfrus.pretty_printing import format_hex_list, myrepr
+from dfrus.search_charmap import search_charmap
+from dfrus.trace_machine_code import FunctionInformation
+from dfrus.type_aliases import Offset
 
 code_section, rdata_section, data_section = range(3)
 
@@ -436,9 +436,8 @@ def extract_function_information(
                     functions[offset].string.update(str_param)
                 elif str_param > functions[offset].string:
                     log.warning(
-                        "Warning: possible function parameter recognition collision for sub_{:x}: {!r} not in {!r}".format(
-                            address, str_param, functions[offset].string
-                        )
+                        "Warning: possible function parameter recognition collision for sub_{:x}: "
+                        "{!r} not in {!r}".format(address, str_param, functions[offset].string)
                     )
                     functions[offset].string.update(str_param)
 

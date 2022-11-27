@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field, fields
 from typing import Iterable, Mapping, Optional, Set, Union
 
-from .machine_code_builder import MachineCodeBuilder
-from .trace_machine_code import FunctionInformation
+from dfrus.machine_code_builder import MachineCodeBuilder
+from dfrus.trace_machine_code import FunctionInformation
 
 
 @dataclass

@@ -3,13 +3,13 @@ from dataclasses import dataclass, field
 from typing import Dict, Mapping, Optional, Set, Union
 from warnings import warn
 
-from .binio import from_dword, to_dword
-from .disasm import disasm
-from .machine_code_assembler import asm
-from .machine_code_utils import mach_memcpy
-from .metadata_objects import Fix, Metadata
-from .opcodes import Reg, RegType, nop, ret_near
-from .operand import (
+from dfrus.binio import from_dword, to_dword
+from dfrus.disasm import disasm
+from dfrus.machine_code_assembler import asm
+from dfrus.machine_code_utils import mach_memcpy
+from dfrus.metadata_objects import Fix, Metadata
+from dfrus.opcodes import Reg, RegType, nop, ret_near
+from dfrus.operand import (
     AbsoluteMemoryReference,
     ImmediateValueOperand,
     MemoryReference,
