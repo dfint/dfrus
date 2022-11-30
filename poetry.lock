@@ -178,6 +178,7 @@ python-versions = ">=3.7,<4.0"
 [package.source]
 type = "url"
 url = "https://github.com/dfint/peclasses/releases/download/0.3.0/peclasses-0.3.0-py3-none-any.whl"
+
 [[package]]
 name = "platformdirs"
 version = "2.5.4"
@@ -307,7 +308,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "flake8 (<5)", "pytest-co
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "c545bb0d0ef33868faa5d0f37ea894bc5f998c0bccab89ac9ad97b3199b561f9"
+content-hash = "925800d22d8c7b4ca335209f66ed64de7ab170fb4d94857d9f1f72c2a8e473d4"
 
 [metadata.files]
 attrs = []
