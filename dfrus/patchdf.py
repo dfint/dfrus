@@ -2,7 +2,7 @@ import io
 import sys
 from collections import OrderedDict, defaultdict
 from operator import itemgetter
-from typing import Any, BinaryIO, List, Mapping, MutableMapping, Set, Tuple, cast
+from typing import Any, BinaryIO, Mapping, MutableMapping, Sequence, Set, Tuple, cast
 
 from peclasses.portable_executable import PortableExecutable
 from peclasses.relocation_table import RelocationTable
@@ -327,10 +327,10 @@ def update_relocation_table(
     reloc_table = RelocationTable.build(relocation_table)
     new_size = reloc_table.size
     data_directory = pe.data_directory
-    relocation_table_offset = sections.rva_to_offset(data_directory.basereloc.virtual_address)
+    relocation_table_offset = sections.rva_to_offset(cast(int, data_directory.basereloc.virtual_address))
     relocation_table_size = cast(int, data_directory.basereloc.size)
-    relocation_section = sections[sections.which_section(offset=relocation_table_offset)]
-    if new_size <= relocation_section.size_of_raw_data:
+    relocation_section = sections.which_section(offset=relocation_table_offset)
+    if new_size <= cast(int, relocation_section.size_of_raw_data):
         file.seek(relocation_table_offset)
         reloc_table.to_file(file)
 
@@ -415,7 +415,7 @@ def apply_delayed_fixes(
 
 
 def extract_function_information(
-    image_base: Offset, metadata: Mapping[Tuple[str, int], Fix], sections: List[Section]
+    image_base: Offset, metadata: Mapping[Tuple[str, int], Fix], sections: Sequence[Section]
 ) -> Mapping[Offset, Metadata]:
     """
     Extract information of functions parameters
