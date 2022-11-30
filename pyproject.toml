@@ -8,7 +8,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.7"
 click = "^8.1.3"
-peclasses = { url = "https://github.com/dfint/peclasses/releases/download/0.3.0/peclasses-0.3.0-py3-none-any.whl" }
+peclasses = { url = "https://github.com/dfint/peclasses/releases/download/0.4.0/peclasses-0.4.0-py3-none-any.whl" }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.2.0"
